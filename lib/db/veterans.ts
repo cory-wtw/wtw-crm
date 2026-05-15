@@ -102,6 +102,18 @@ export async function listVeteransByVsoId(
   return snap.docs.map((d) => deserialize(d.id, d.data()));
 }
 
+/** Veterans currently holding a given phone. Should be 0 or 1; returns
+ * whatever Firestore has so admins can spot drift. */
+export async function listVeteransByPhoneId(
+  phoneId: string,
+): Promise<Veteran[]> {
+  const snap = await adminDb
+    .collection(COLLECTION)
+    .where("assignedPhoneId", "==", phoneId)
+    .get();
+  return snap.docs.map((d) => deserialize(d.id, d.data()));
+}
+
 /** Stage counts for the dashboard, keyed by stage. */
 export async function countVeteransByStage(): Promise<
   Record<PipelineStage, number>
