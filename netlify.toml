@@ -1,0 +1,26 @@
+# Netlify build settings for the Roster.
+#
+# Required environment variables (set these in Netlify UI → Site settings →
+# Environment variables before the first deploy):
+#
+#   NEXT_PUBLIC_FIREBASE_API_KEY
+#   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+#   NEXT_PUBLIC_FIREBASE_PROJECT_ID
+#   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+#   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+#   NEXT_PUBLIC_FIREBASE_APP_ID
+#   FIREBASE_ADMIN_CLIENT_EMAIL
+#   FIREBASE_ADMIN_PRIVATE_KEY   ← multi-line; Netlify supports newlines in env values
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Next 16 requires Node 20.9+
+  NODE_VERSION = "20"
+
+# @netlify/plugin-nextjs is auto-installed when Netlify detects a Next.js
+# project; pinning it here makes the build deterministic.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
