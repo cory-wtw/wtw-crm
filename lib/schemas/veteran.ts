@@ -98,7 +98,10 @@ export const veteranSchema = z.object({
   dateWon: z.date().nullable().default(null),
   dateLost: z.date().nullable().default(null),
 
-  // Win math
+  // Win math.
+  // `lifeExpectancyAtFound` is the expected REMAINING years at the moment
+  // we found them (not absolute life expectancy). Lifetime benefit =
+  // monthlyAmount × 12 × lifeExpectancyAtFound.
   lifeExpectancyAtFound: z.number().positive().optional(),
   ageAtFound: z.number().int().nonnegative().optional(),
 
@@ -137,15 +140,14 @@ export const veteranInputSchema = veteranSchema.omit({
 export type VeteranInput = z.infer<typeof veteranInputSchema>;
 
 /**
- * Compute the anticipated lifetime benefit from a monthly amount and the
- * veteran's life expectancy + age at found. Returns 0 when inputs missing.
+ * Lifetime benefit = monthlyAmount × 12 × lifeExpectancyAtFound, where
+ * lifeExpectancyAtFound is the expected remaining years at Found. Returns
+ * 0 when either input is missing.
  */
 export function lifetimeBenefit(
   monthlyAmount: number | undefined | null,
   lifeExpectancyAtFound: number | undefined | null,
-  ageAtFound: number | undefined | null,
 ): number {
-  if (!monthlyAmount || !lifeExpectancyAtFound || !ageAtFound) return 0;
-  const yearsRemaining = Math.max(lifeExpectancyAtFound - ageAtFound, 0);
-  return monthlyAmount * 12 * yearsRemaining;
+  if (!monthlyAmount || !lifeExpectancyAtFound) return 0;
+  return monthlyAmount * 12 * lifeExpectancyAtFound;
 }
