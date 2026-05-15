@@ -1,5 +1,6 @@
 export * from "./pipeline";
 export * from "./user";
+export * from "./invite";
 export * from "./rate";
 export * from "./vso";
 export * from "./phone";
