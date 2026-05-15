@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "make-admin": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/make-admin.ts"
+    "make-admin": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/make-admin.ts",
+    "seed-rates": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/seed-rates.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -17,6 +18,7 @@
     "date-fns": "^4.1.0",
     "firebase": "^12.13.0",
     "firebase-admin": "^13.10.0",
+    "firebase-functions": "^7.2.5",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "react": "19.2.4",
