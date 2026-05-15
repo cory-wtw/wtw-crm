@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { adminDb } from "@/lib/firebase/admin";
+import { logAudit } from "@/lib/audit";
+import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import {
   encounterInputSchema,
@@ -95,6 +97,11 @@ export async function createVeteranAction(
   });
 
   const ref = await adminDb.collection("veterans").add(doc);
+  await logAudit({
+    action: "create",
+    resourceType: "veteran",
+    resourceId: ref.id,
+  });
 
   revalidatePath("/veterans");
   revalidatePath("/");
@@ -149,7 +156,19 @@ export async function editVeteranAction(
     updatedAt: now,
   });
 
+  const diff = computeDiff(
+    existing as Record<string, unknown>,
+    input as unknown as Record<string, unknown>,
+    Object.keys(input),
+  );
+
   await docRef.update(updates);
+  await logAudit({
+    action: "update",
+    resourceType: "veteran",
+    resourceId: id,
+    diff,
+  });
 
   revalidatePath(`/veterans/${id}`);
   revalidatePath("/veterans");
@@ -196,6 +215,17 @@ export async function changeStageAction(
     updatedBy: session.uid,
     updatedAt: now,
   });
+  await logAudit({
+    action: "update",
+    resourceType: "veteran",
+    resourceId: veteranId,
+    diff: {
+      pipelineStage: {
+        before: existing.pipelineStage ?? null,
+        after: newStage,
+      },
+    },
+  });
 
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath("/veterans");
@@ -224,7 +254,7 @@ export async function addEncounterAction(
     createdAt: now,
   });
 
-  await adminDb
+  const encounterRef = await adminDb
     .collection("veterans")
     .doc(veteranId)
     .collection("encounters")
@@ -234,6 +264,12 @@ export async function addEncounterAction(
   await adminDb.collection("veterans").doc(veteranId).update({
     updatedAt: now,
     updatedBy: session.uid,
+  });
+
+  await logAudit({
+    action: "create",
+    resourceType: "encounter",
+    resourceId: `${veteranId}/${encounterRef.id}`,
   });
 
   revalidatePath(`/veterans/${veteranId}`);

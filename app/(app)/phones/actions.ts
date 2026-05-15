@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase/admin";
+import { logAudit } from "@/lib/audit";
+import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import { phoneInputSchema } from "@/lib/schemas";
 
@@ -61,6 +63,11 @@ export async function createPhoneAction(
   });
 
   const ref = await adminDb.collection("phones").add(doc);
+  await logAudit({
+    action: "create",
+    resourceType: "phone",
+    resourceId: ref.id,
+  });
   revalidatePath("/phones");
   return { ok: true, id: ref.id };
 }
@@ -81,6 +88,7 @@ export async function editPhoneAction(
   const ref = adminDb.collection("phones").doc(id);
   const snap = await ref.get();
   if (!snap.exists) return { ok: false, error: "Phone not found." };
+  const existing = snap.data()!;
 
   const now = new Date();
   const updates = dropUndefined({
@@ -90,7 +98,19 @@ export async function editPhoneAction(
     updatedAt: now,
   });
 
+  const diff = computeDiff(
+    existing as Record<string, unknown>,
+    input as unknown as Record<string, unknown>,
+    Object.keys(input),
+  );
+
   await ref.update(updates);
+  await logAudit({
+    action: "update",
+    resourceType: "phone",
+    resourceId: id,
+    diff,
+  });
   revalidatePath(`/phones/${id}`);
   revalidatePath("/phones");
   return { ok: true, id };

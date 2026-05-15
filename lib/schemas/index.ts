@@ -6,3 +6,4 @@ export * from "./vso";
 export * from "./phone";
 export * from "./veteran";
 export * from "./encounter";
+export * from "./audit";

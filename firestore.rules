@@ -1,7 +1,6 @@
 rules_version = '2';
 
-// Loose authenticated-user rules. Tightened in the RBAC pass once admin
-// user management and audit logging are in place.
+// Loose authenticated-user rules. Tightened in the RBAC pass.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -9,11 +8,21 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token.role == 'admin';
+    }
+
     match /users/{uid} {
       // Users can read their own user doc; admins (via Admin SDK / future UI)
       // create and edit. No client-side writes for now.
       allow read: if signedIn();
       allow write: if false;
+    }
+
+    match /invites/{email} {
+      // Admin SDK only. Surface in /admin/users.
+      allow read, write: if false;
     }
 
     match /veterans/{id} {
@@ -43,8 +52,10 @@ service cloud.firestore {
     }
 
     match /auditLog/{id} {
-      // Written by Cloud Functions only. Admin-only read once RBAC lands.
-      allow read: if false;
+      // Written by the server (Admin SDK). Admins can read via the
+      // /admin/audit page (which uses Admin SDK too, so this rule is
+      // belt-and-suspenders against direct client reads).
+      allow read: if isAdmin();
       allow write: if false;
     }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/firebase/session";
 import { normalizeEmail, userRoleSchema } from "@/lib/schemas";
 
@@ -45,6 +46,12 @@ export async function inviteUserAction(
     invitedBy: guard.session.uid,
     invitedAt: new Date(),
   });
+  await logAudit({
+    action: "create",
+    resourceType: "invite",
+    resourceId: normalized,
+    diff: { role: { before: null, after: role.data } },
+  });
 
   revalidatePath("/admin/users");
   return { ok: true };
@@ -56,7 +63,13 @@ export async function revokeInviteAction(
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
 
-  await adminDb.collection("invites").doc(normalizeEmail(email)).delete();
+  const normalized = normalizeEmail(email);
+  await adminDb.collection("invites").doc(normalized).delete();
+  await logAudit({
+    action: "delete",
+    resourceType: "invite",
+    resourceId: normalized,
+  });
   revalidatePath("/admin/users");
   return { ok: true };
 }
@@ -82,6 +95,13 @@ export async function setUserActiveAction(
     await adminAuth.revokeRefreshTokens(uid);
   }
 
+  await logAudit({
+    action: "update",
+    resourceType: "user",
+    resourceId: uid,
+    diff: { active: { before: !active, after: active } },
+  });
+
   revalidatePath("/admin/users");
   return { ok: true };
 }
@@ -105,11 +125,22 @@ export async function changeUserRoleAction(
     };
   }
 
-  await adminDb.collection("users").doc(uid).update({
+  const userRef = adminDb.collection("users").doc(uid);
+  const snap = await userRef.get();
+  const before = snap.data()?.role ?? null;
+
+  await userRef.update({
     role: role.data,
     updatedAt: new Date(),
   });
   await adminAuth.setCustomUserClaims(uid, { role: role.data });
+
+  await logAudit({
+    action: "update",
+    resourceType: "user",
+    resourceId: uid,
+    diff: { role: { before, after: role.data } },
+  });
 
   revalidatePath("/admin/users");
   return { ok: true };
