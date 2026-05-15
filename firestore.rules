@@ -1,8 +1,54 @@
 rules_version = '2';
 
-// Deny-all default. Lock down per-collection as auth, RBAC, and audit logging come online.
+// Loose authenticated-user rules. Tightened in the RBAC pass once admin
+// user management and audit logging are in place.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /users/{uid} {
+      // Users can read their own user doc; admins (via Admin SDK / future UI)
+      // create and edit. No client-side writes for now.
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /veterans/{id} {
+      allow read, create, update: if signedIn();
+      allow delete: if false; // admin-only delete comes with RBAC
+
+      match /encounters/{encounterId} {
+        allow read, create, update: if signedIn();
+        allow delete: if false;
+      }
+    }
+
+    match /vsos/{id} {
+      allow read, create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    match /phones/{id} {
+      allow read, create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    match /rateTable/{rateCode} {
+      // Read-only for the app. Seeded via Admin SDK.
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /auditLog/{id} {
+      // Written by Cloud Functions only. Admin-only read once RBAC lands.
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // Deny-all for anything else.
     match /{document=**} {
       allow read, write: if false;
     }
