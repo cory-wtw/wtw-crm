@@ -1,31 +1,42 @@
 import {
+  applicationDefault,
   cert,
   getApps,
   initializeApp,
   type App,
+  type AppOptions,
 } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
-function loadCredentials() {
-  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+function buildOptions(): AppOptions {
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  if (!projectId) {
+    throw new Error(
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID is required for the Admin SDK.",
+    );
+  }
+
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(
     /\\n/g,
     "\n",
   );
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      "Missing Firebase Admin credentials. Set FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL, and FIREBASE_ADMIN_PRIVATE_KEY.",
-    );
+  if (clientEmail && privateKey) {
+    return {
+      projectId,
+      credential: cert({ projectId, clientEmail, privateKey }),
+    };
   }
 
-  return cert({ projectId, clientEmail, privateKey });
+  // Fall back to Application Default Credentials:
+  //   - locally: `gcloud auth application-default login`
+  //   - on Firebase / Cloud Run / Functions: metadata server
+  return { projectId, credential: applicationDefault() };
 }
 
-const adminApp: App =
-  getApps()[0] ?? initializeApp({ credential: loadCredentials() });
+const adminApp: App = getApps()[0] ?? initializeApp(buildOptions());
 
 export const adminAuth: Auth = getAuth(adminApp);
 export const adminDb: Firestore = getFirestore(adminApp);
