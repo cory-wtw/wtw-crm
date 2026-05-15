@@ -1,4 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/firebase/session";
+import { canEditVeteran, canReassignVeteran } from "@/lib/permissions";
 import { listPhones } from "@/lib/db/phones";
 import { listRates } from "@/lib/db/rates";
 import { listUsers } from "@/lib/db/users";
@@ -18,6 +20,12 @@ export default async function EditVeteranPage({
   const { id } = await params;
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
+
+  const session = await getSession();
+  if (!canEditVeteran(session, veteran)) {
+    redirect(`/veterans/${id}`);
+  }
+  const canReassign = canReassignVeteran(session);
 
   const [users, rates, vsos, phones] = await Promise.all([
     listUsers(),
@@ -40,6 +48,7 @@ export default async function EditVeteranPage({
 
       <VeteranForm
         initial={{ id: veteran.id, values: veteranToFormValues(veteran) }}
+        canReassign={canReassign}
         assignees={users.map((u) => ({
           uid: u.uid,
           label: u.displayName ?? u.email,

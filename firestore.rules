@@ -1,6 +1,9 @@
 rules_version = '2';
 
-// Loose authenticated-user rules. Tightened in the RBAC pass.
+// RBAC mirrors lib/permissions.ts. Note that today every Firestore write
+// goes through the Admin SDK in our Server Actions (which bypasses these
+// rules); these rules are belt-and-suspenders in case a future client-side
+// write path opens up. Keep them in sync with permissions.ts.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -13,35 +16,56 @@ service cloud.firestore {
              request.auth.token.role == 'admin';
     }
 
+    function isAssignee() {
+      return request.auth != null &&
+             resource.data.assigneeUid == request.auth.uid;
+    }
+
+    function assigneeUnchanged() {
+      return request.resource.data.assigneeUid == resource.data.assigneeUid;
+    }
+
     match /users/{uid} {
-      // Users can read their own user doc; admins (via Admin SDK / future UI)
-      // create and edit. No client-side writes for now.
+      // Users can read their own user doc. Admin SDK handles writes via
+      // the admin user-management UI.
       allow read: if signedIn();
       allow write: if false;
     }
 
     match /invites/{email} {
-      // Admin SDK only. Surface in /admin/users.
+      // Admin SDK only.
       allow read, write: if false;
     }
 
     match /veterans/{id} {
-      allow read, create, update: if signedIn();
-      allow delete: if false; // admin-only delete comes with RBAC
+      allow read: if signedIn();
+      allow create: if signedIn();
+      // Admins can update anything. Standard users can update veterans
+      // assigned to them, as long as they're not changing the assignee.
+      allow update: if isAdmin() ||
+                       (isAssignee() && assigneeUnchanged());
+      allow delete: if isAdmin();
 
       match /encounters/{encounterId} {
-        allow read, create, update: if signedIn();
+        // Everyone signed in can read + create encounters. Edits + deletes
+        // require admin or the parent veteran's assignee.
+        allow read, create: if signedIn();
+        allow update: if isAdmin() ||
+                         get(/databases/$(database)/documents/veterans/$(id))
+                           .data.assigneeUid == request.auth.uid;
         allow delete: if false;
       }
     }
 
     match /vsos/{id} {
-      allow read, create, update: if signedIn();
+      allow read: if signedIn();
+      allow create, update: if isAdmin();
       allow delete: if false;
     }
 
     match /phones/{id} {
-      allow read, create, update: if signedIn();
+      allow read: if signedIn();
+      allow create, update: if isAdmin();
       allow delete: if false;
     }
 
@@ -52,9 +76,8 @@ service cloud.firestore {
     }
 
     match /auditLog/{id} {
-      // Written by the server (Admin SDK). Admins can read via the
-      // /admin/audit page (which uses Admin SDK too, so this rule is
-      // belt-and-suspenders against direct client reads).
+      // Written only by the server (Admin SDK). Admins can read via the
+      // /admin/audit page; the rule below is belt-and-suspenders.
       allow read: if isAdmin();
       allow write: if false;
     }
