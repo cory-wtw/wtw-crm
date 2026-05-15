@@ -9,6 +9,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import {
+  parseCsv,
+  parseCurrency,
+  parseDateMDY,
+  parseIntOrNull,
+} from "@/lib/csv";
+import {
   type DependentStatus,
   type PipelineHistoryEntry,
   type PipelineStage,
@@ -29,68 +35,6 @@ const DEPENDENT_LABEL_TO_VALUE: Record<string, DependentStatus> = {
   "With Spouse": "with_spouse",
   "With Spouse + Kids": "with_spouse_kids",
 };
-
-type CsvRow = Record<string, string>;
-
-function parseCsv(text: string): CsvRow[] {
-  const lines = text.replace(/\r\n/g, "\n").split("\n").filter((l) => l.length > 0);
-  if (lines.length === 0) return [];
-  const headers = parseCsvLine(lines[0]);
-  return lines.slice(1).map((line) => {
-    const cells = parseCsvLine(line);
-    const row: CsvRow = {};
-    headers.forEach((h, i) => {
-      row[h] = (cells[i] ?? "").trim();
-    });
-    return row;
-  });
-}
-
-function parseCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (c === "," && !inQuotes) {
-      out.push(current);
-      current = "";
-    } else {
-      current += c;
-    }
-  }
-  out.push(current);
-  return out;
-}
-
-function parseDate(s: string): Date | null {
-  if (!s) return null;
-  // M/D/YYYY → Date (interpreted as local midnight; good enough for AirTable rows)
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const [, mm, dd, yyyy] = m;
-  return new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-}
-
-function parseCurrency(s: string): number | null {
-  if (!s) return null;
-  const cleaned = s.replace(/[$,\s]/g, "");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseIntOrNull(s: string): number | null {
-  if (!s) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? Math.trunc(n) : null;
-}
 
 function dropUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Partial<T> = {};
@@ -159,8 +103,8 @@ async function main() {
       );
     }
 
-    const dateFound = parseDate(row["Date Found"]);
-    const dateConnected = parseDate(row["Date Connected"]);
+    const dateFound = parseDateMDY(row["Date Found"]);
+    const dateConnected = parseDateMDY(row["Date Connected"]);
 
     const history: PipelineHistoryEntry[] = [];
     if (dateFound) {

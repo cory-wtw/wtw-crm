@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { adminDb } from "@/lib/firebase/admin";
+import { parseCsv } from "@/lib/csv";
 import { DEPENDENT_STATUSES, type DependentStatus } from "@/lib/schemas";
 
 const DEPENDENT_LABEL_TO_VALUE: Record<string, DependentStatus> = {
@@ -12,7 +13,7 @@ const DEPENDENT_LABEL_TO_VALUE: Record<string, DependentStatus> = {
   "With Spouse + Kids": "with_spouse_kids",
 };
 
-type CsvRow = {
+type RateRow = {
   rateCode: string;
   rating: string;
   dependentStatus: DependentStatus;
@@ -20,32 +21,28 @@ type CsvRow = {
   rateYear: number;
 };
 
-function parseCsv(contents: string): CsvRow[] {
-  const lines = contents.trim().split("\n");
-  const [, ...dataLines] = lines;
-  return dataLines.map((line) => {
-    const [rateCode, rating, dependentLabel, monthlyAmount, rateYear] = line
-      .split(",")
-      .map((cell) => cell.trim());
+function toRateRows(text: string): RateRow[] {
+  return parseCsv(text).map((row) => {
+    const dependentLabel = row["Dependent Status"];
     const dependentStatus = DEPENDENT_LABEL_TO_VALUE[dependentLabel];
     if (!dependentStatus || !DEPENDENT_STATUSES.includes(dependentStatus)) {
       throw new Error(
-        `Unknown dependent status "${dependentLabel}" for ${rateCode}`,
+        `Unknown dependent status "${dependentLabel}" for ${row["Rate Code"]}`,
       );
     }
     return {
-      rateCode,
-      rating,
+      rateCode: row["Rate Code"],
+      rating: row["Rating"],
       dependentStatus,
-      monthlyAmount: Number(monthlyAmount),
-      rateYear: Number(rateYear),
+      monthlyAmount: Number(row["Monthly Amount"]),
+      rateYear: Number(row["Rate Year"]),
     };
   });
 }
 
 async function main() {
   const csvPath = resolve(process.cwd(), "data/va-rates-2026.csv");
-  const rows = parseCsv(readFileSync(csvPath, "utf8"));
+  const rows = toRateRows(readFileSync(csvPath, "utf8"));
   console.log(`Seeding ${rows.length} rate codes from ${csvPath}…`);
 
   const batch = adminDb.batch();
