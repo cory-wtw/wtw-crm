@@ -17,14 +17,20 @@ import {
   PIPELINE_LABELS,
   PIPELINE_STAGES,
 } from "@/lib/schemas";
-import { createVeteranAction } from "./actions";
+import { createVeteranAction, editVeteranAction } from "./actions";
 
 export type AssigneeOption = { uid: string; label: string };
 export type RateOption = { code: string; label: string };
 export type VsoOption = { id: string; label: string };
 export type PhoneOption = { id: string; label: string };
 
+export type VeteranFormInitial = {
+  id: string;
+  values: Partial<FormValues>;
+};
+
 type Props = {
+  initial?: VeteranFormInitial | null;
   assignees: AssigneeOption[];
   rates: RateOption[];
   vsos: VsoOption[];
@@ -71,7 +77,13 @@ function toNumber(s: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export function VeteranForm({ assignees, rates, vsos, phones }: Props) {
+export function VeteranForm({
+  initial,
+  assignees,
+  rates,
+  vsos,
+  phones,
+}: Props) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -84,8 +96,27 @@ export function VeteranForm({ assignees, rates, vsos, phones }: Props) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      preferredName: "",
+      phone: "",
+      birthYear: "",
+      yearlyIncome: "",
+      householdSize: "",
+      dependentStatus: "",
+      branch: "",
+      dischargeStatus: "",
+      serviceFrom: "",
+      serviceTo: "",
+      housingStatus: "",
+      assigneeUid: "",
       pipelineStage: "found",
+      lifeExpectancyAtFound: "",
+      ageAtFound: "",
+      anticipatedRateCode: "",
+      actualRateCode: "",
       vsoIds: [],
+      assignedPhoneId: "",
+      notes: "",
+      ...initial?.values,
     },
   });
 
@@ -125,7 +156,9 @@ export function VeteranForm({ assignees, rates, vsos, phones }: Props) {
       notes: values.notes || undefined,
     };
 
-    const result = await createVeteranAction(input);
+    const result = initial
+      ? await editVeteranAction(initial.id, input)
+      : await createVeteranAction(input);
     if (!result.ok) {
       setServerError(result.error);
       return;
@@ -390,11 +423,17 @@ export function VeteranForm({ assignees, rates, vsos, phones }: Props) {
           disabled={isSubmitting || isPending}
           className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
-          {isSubmitting || isPending ? "Saving…" : "Save veteran"}
+          {isSubmitting || isPending
+            ? "Saving…"
+            : initial
+              ? "Save changes"
+              : "Save veteran"}
         </button>
         <button
           type="button"
-          onClick={() => router.push("/veterans")}
+          onClick={() =>
+            router.push(initial ? `/veterans/${initial.id}` : "/veterans")
+          }
           className="text-sm font-bold text-muted-foreground hover:text-foreground"
         >
           Cancel
