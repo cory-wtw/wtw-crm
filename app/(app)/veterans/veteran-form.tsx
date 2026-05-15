@@ -31,6 +31,9 @@ export type VeteranFormInitial = {
 
 type Props = {
   initial?: VeteranFormInitial | null;
+  /** Whether the current user can choose / change the assignee. Admins can;
+   *  Standard users always self-assign and don't see the field. */
+  canReassign: boolean;
   assignees: AssigneeOption[];
   rates: RateOption[];
   vsos: VsoOption[];
@@ -79,6 +82,7 @@ function toNumber(s: string | undefined): number | undefined {
 
 export function VeteranForm({
   initial,
+  canReassign,
   assignees,
   rates,
   vsos,
@@ -284,24 +288,36 @@ export function VeteranForm({
             </Select>
           }
         />
-        <Field
-          label="Assignee"
-          hint={
-            assignees.length === 0
-              ? "Nobody to assign yet — invite teammates first."
-              : "The staff member running point."
-          }
-          input={
-            <Select {...register("assigneeUid")}>
-              <option value="">Unassigned</option>
-              {assignees.map((a) => (
-                <option key={a.uid} value={a.uid}>
-                  {a.label}
-                </option>
-              ))}
-            </Select>
-          }
-        />
+        {canReassign ? (
+          <Field
+            label="Assignee"
+            hint={
+              assignees.length === 0
+                ? "Nobody to assign yet — invite teammates first."
+                : "The staff member running point."
+            }
+            input={
+              <Select {...register("assigneeUid")}>
+                <option value="">Unassigned</option>
+                {assignees.map((a) => (
+                  <option key={a.uid} value={a.uid}>
+                    {a.label}
+                  </option>
+                ))}
+              </Select>
+            }
+          />
+        ) : (
+          <Field
+            label="Assignee"
+            hint="You'll be assigned automatically. Ask an admin to reassign."
+            input={
+              <p className="rounded-md border border-input bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">
+                You
+              </p>
+            }
+          />
+        )}
       </Section>
 
       <Section title="Win math">

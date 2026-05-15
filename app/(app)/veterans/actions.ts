@@ -7,6 +7,11 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import {
+  canEditVeteran,
+  canReassignVeteran,
+  isAdmin,
+} from "@/lib/permissions";
+import {
   encounterInputSchema,
   type PipelineHistoryEntry,
   type PipelineStage,
@@ -70,6 +75,11 @@ export async function createVeteranAction(
   const now = new Date();
   const stage = input.pipelineStage ?? "found";
 
+  // Standard users can't choose the assignee — they always self-assign.
+  const assigneeUid = canReassignVeteran(session)
+    ? (input.assigneeUid ?? null)
+    : session.uid;
+
   const historyEntry: PipelineHistoryEntry = {
     stage,
     enteredAt: now,
@@ -86,7 +96,7 @@ export async function createVeteranAction(
     dateWon: null,
     dateLost: null,
     vsoIds: input.vsoIds ?? [],
-    assigneeUid: input.assigneeUid ?? null,
+    assigneeUid,
     anticipatedRateCode: input.anticipatedRateCode ?? null,
     actualRateCode: input.actualRateCode ?? null,
     assignedPhoneId: input.assignedPhoneId ?? null,
@@ -127,6 +137,26 @@ export async function editVeteranAction(
     return { ok: false, error: "Veteran not found." };
   }
   const existing = existingSnap.data()!;
+
+  if (
+    !canEditVeteran(session, {
+      assigneeUid: existing.assigneeUid ?? null,
+    })
+  ) {
+    return {
+      ok: false,
+      error: "You can only edit veterans assigned to you.",
+    };
+  }
+
+  // Standard users can't change the assignee. Force it back to whatever
+  // the doc already had so a hand-edited request can't slip through.
+  if (
+    !canReassignVeteran(session) &&
+    input.assigneeUid !== existing.assigneeUid
+  ) {
+    input.assigneeUid = existing.assigneeUid ?? null;
+  }
 
   const now = new Date();
   const stageChanged = input.pipelineStage !== existing.pipelineStage;
@@ -195,6 +225,17 @@ export async function changeStageAction(
     return { ok: false, error: "Veteran not found." };
   }
   const existing = snap.data()!;
+
+  if (
+    !canEditVeteran(session, {
+      assigneeUid: existing.assigneeUid ?? null,
+    })
+  ) {
+    return {
+      ok: false,
+      error: "You can only change the stage on veterans assigned to you.",
+    };
+  }
 
   if (existing.pipelineStage === newStage) {
     return { ok: false, error: "Already at that stage." };
@@ -280,4 +321,33 @@ export async function addEncounterAction(
 
 export async function redirectToVeteran(id: string): Promise<void> {
   redirect(`/veterans/${id}`);
+}
+
+export async function deleteVeteranAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!isAdmin(session)) {
+    return { ok: false, error: "Only admins can delete veterans." };
+  }
+
+  const docRef = adminDb.collection("veterans").doc(id);
+  const snap = await docRef.get();
+  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+
+  // Delete encounter subcollection docs first so we don't leave orphans.
+  const encounters = await docRef.collection("encounters").listDocuments();
+  await Promise.all(encounters.map((e) => e.delete()));
+
+  await docRef.delete();
+  await logAudit({
+    action: "delete",
+    resourceType: "veteran",
+    resourceId: id,
+  });
+
+  revalidatePath("/veterans");
+  revalidatePath("/");
+  return { ok: true };
 }

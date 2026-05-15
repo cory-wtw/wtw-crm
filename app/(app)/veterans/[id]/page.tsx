@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getSession } from "@/lib/firebase/session";
+import {
+  canDeleteVeteran,
+  canEditVeteran,
+} from "@/lib/permissions";
 import { listEncounters } from "@/lib/db/encounters";
 import { getPhone } from "@/lib/db/phones";
 import { getRate } from "@/lib/db/rates";
@@ -7,6 +12,7 @@ import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
 import { formatDate, formatUsd } from "@/lib/format";
+import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
   BRANCH_LABELS,
   DEPENDENT_STATUS_LABELS,
@@ -39,7 +45,7 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, allUsers] =
+  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, allUsers, session] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
       veteran.anticipatedRateCode
@@ -52,7 +58,11 @@ export default async function VeteranDetailPage({
         : null,
       listEncounters(veteran.id),
       listUsers(),
+      getSession(),
     ]);
+
+  const canEdit = canEditVeteran(session, veteran);
+  const canDelete = canDeleteVeteran(session);
 
   const usersByUid = new Map(allUsers.map((u) => [u.uid, u]));
   function nameForUid(uid: string): string {
@@ -94,12 +104,20 @@ export default async function VeteranDetailPage({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href={`/veterans/${veteran.id}/edit`}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
-          >
-            Edit
-          </Link>
+          {canEdit && (
+            <Link
+              href={`/veterans/${veteran.id}/edit`}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            >
+              Edit
+            </Link>
+          )}
+          {canDelete && (
+            <DeleteVeteranButton
+              veteranId={veteran.id}
+              veteranName={veteran.name}
+            />
+          )}
         </div>
       </div>
 
@@ -165,15 +183,17 @@ export default async function VeteranDetailPage({
         <Row label="Date filed" value={formatDate(veteran.dateFiled)} />
         <Row label="Date won" value={formatDate(veteran.dateWon)} />
         <Row label="Date lost" value={formatDate(veteran.dateLost)} />
-        <div className="md:col-span-2 border-t border-border pt-4">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-            Change stage
-          </p>
-          <StageChanger
-            veteranId={veteran.id}
-            currentStage={veteran.pipelineStage}
-          />
-        </div>
+        {canEdit && (
+          <div className="md:col-span-2 border-t border-border pt-4">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+              Change stage
+            </p>
+            <StageChanger
+              veteranId={veteran.id}
+              currentStage={veteran.pipelineStage}
+            />
+          </div>
+        )}
       </Card>
 
       <Card title="Benefits">

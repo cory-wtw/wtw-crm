@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/firebase/session";
+import { canCreateVeteran, canReassignVeteran } from "@/lib/permissions";
 import { listPhones } from "@/lib/db/phones";
 import { listRates } from "@/lib/db/rates";
 import { listUsers } from "@/lib/db/users";
@@ -8,6 +11,10 @@ import { VeteranForm } from "../veteran-form";
 export const dynamic = "force-dynamic";
 
 export default async function NewVeteranPage() {
+  const session = await getSession();
+  if (!canCreateVeteran(session)) redirect("/veterans");
+  const canReassign = canReassignVeteran(session);
+
   const [users, rates, vsos, phones] = await Promise.all([
     listUsers(),
     listRates(),
@@ -26,6 +33,7 @@ export default async function NewVeteranPage() {
       </div>
 
       <VeteranForm
+        canReassign={canReassign}
         assignees={users.map((u) => ({
           uid: u.uid,
           label: u.displayName ?? u.email,
