@@ -1,30 +1,47 @@
 import Image from "next/image";
-import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/firebase/session";
+import { signOutAction } from "./login/actions";
 
-export default function Home() {
+export default async function Dashboard() {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
-      <div className="flex flex-col items-center gap-8 text-center">
-        <Image
-          src="/wtw-medal.svg"
-          alt="Worth Their Weight medal"
-          width={96}
-          height={120}
-          priority
-        />
-        <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
-          Worth Their Weight CRM
-        </h1>
-        <p className="max-w-md text-base text-muted-foreground">
-          Internal tool for the WTW team. Sign in to find veterans the system
-          missed and connect them to VSO partners who can help.
-        </p>
-        <Link
-          href="/login"
-          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-base font-semibold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          Sign in
-        </Link>
+    <main className="flex flex-1 flex-col px-6 py-12">
+      <div className="mx-auto w-full max-w-4xl space-y-8">
+        <header className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/wtw-medal.svg"
+              alt=""
+              width={32}
+              height={42}
+              priority
+            />
+            <h1 className="text-2xl font-black tracking-tight">Dashboard</h1>
+          </div>
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            >
+              Sign out
+            </button>
+          </form>
+        </header>
+
+        <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+          <p className="text-sm text-muted-foreground">Signed in as</p>
+          <p className="mt-1 text-lg font-bold">{session.email}</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
+            {session.role ?? "no role yet"}
+          </p>
+        </section>
+
+        <section className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+          Veterans, VSOs, and the pipeline view are coming next.
+        </section>
       </div>
     </main>
   );
