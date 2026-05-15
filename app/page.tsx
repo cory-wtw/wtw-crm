@@ -13,10 +13,10 @@ export default async function Dashboard() {
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Image
-              src="/wtw-medal.svg"
+              src="/wtw-logo.png"
               alt=""
-              width={32}
-              height={42}
+              width={40}
+              height={40}
               priority
             />
             <h1 className="text-2xl font-black tracking-tight">Dashboard</h1>

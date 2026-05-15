@@ -11,7 +11,7 @@ export default async function LoginPage() {
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm space-y-6 rounded-lg border border-border bg-card p-8 shadow-sm">
         <div className="flex flex-col items-center gap-3 text-center">
-          <Image src="/wtw-medal.svg" alt="" width={48} height={64} priority />
+          <Image src="/wtw-logo.png" alt="" width={72} height={72} priority />
           <h1 className="text-2xl font-black tracking-tight">
             Worth Their Weight CRM
           </h1>
