@@ -8,33 +8,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import {
-  parseCsv,
-  parseCurrency,
-  parseDateMDY,
-  parseIntOrNull,
-} from "@/lib/csv";
-import {
-  type DependentStatus,
-  type PipelineHistoryEntry,
-  type PipelineStage,
-} from "@/lib/schemas";
+import { mapAirtableRowToVeteran } from "@/lib/airtable-mapping";
+import { parseCsv } from "@/lib/csv";
 
 const SYSTEM_UID = "system-import";
-
-const PIPELINE_LABEL_TO_VALUE: Record<string, PipelineStage> = {
-  Found: "found",
-  Connected: "connected",
-  Filed: "filed",
-  Won: "won",
-  Lost: "lost",
-};
-
-const DEPENDENT_LABEL_TO_VALUE: Record<string, DependentStatus> = {
-  Alone: "alone",
-  "With Spouse": "with_spouse",
-  "With Spouse + Kids": "with_spouse_kids",
-};
 
 function dropUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Partial<T> = {};
@@ -78,95 +55,23 @@ async function main() {
   let written = 0;
 
   for (const row of rows) {
-    const name = row["Name"];
-    if (!name) {
-      console.warn(`Skipping row with no Name`);
+    const result = mapAirtableRowToVeteran(row, {
+      assigneeUidByDisplayName: assigneeMap,
+      now,
+      systemUid: SYSTEM_UID,
+    });
+
+    if (!result.ok) {
+      console.warn(`Skipping row: ${result.error}`);
       continue;
     }
 
-    const stageLabel = row["Pipeline Stage"];
-    const stage = PIPELINE_LABEL_TO_VALUE[stageLabel] ?? "found";
-    if (stageLabel && !PIPELINE_LABEL_TO_VALUE[stageLabel]) {
-      console.warn(
-        `  ! Unknown pipeline stage "${stageLabel}" for ${name}; defaulting to found.`,
-      );
+    for (const warning of result.warnings) {
+      console.warn(`  ! [${warning.row}] ${warning.message}`);
     }
 
-    const assigneeName = row["Assignee"];
-    const assigneeUid =
-      assigneeName != null && assigneeName.length > 0
-        ? (assigneeMap.get(assigneeName.toLowerCase()) ?? null)
-        : null;
-    if (assigneeName && !assigneeUid) {
-      console.warn(
-        `  ! Assignee "${assigneeName}" for ${name} didn't match any Firebase user. Leaving unassigned.`,
-      );
-    }
-
-    const dateFound = parseDateMDY(row["Date Found"]);
-    const dateConnected = parseDateMDY(row["Date Connected"]);
-
-    const history: PipelineHistoryEntry[] = [];
-    if (dateFound) {
-      history.push({
-        stage: "found",
-        enteredAt: dateFound,
-        byUid: assigneeUid ?? SYSTEM_UID,
-      });
-    }
-    if (dateConnected) {
-      history.push({
-        stage: "connected",
-        enteredAt: dateConnected,
-        byUid: assigneeUid ?? SYSTEM_UID,
-      });
-    }
-    if (
-      stage !== "found" &&
-      stage !== "connected" &&
-      !history.some((h) => h.stage === stage)
-    ) {
-      // We don't have a date for filed/won/lost in the CSV; stamp it now.
-      history.push({
-        stage,
-        enteredAt: now,
-        byUid: assigneeUid ?? SYSTEM_UID,
-      });
-    }
-
-    const dependentLabel = row["Dependent Status"];
-    const veteran = dropUndefined({
-      name,
-      phone: row["Phone"] || undefined,
-      birthYear: parseIntOrNull(row["Birth Year"]) ?? undefined,
-      yearlyIncome: parseCurrency(row["Yearly Income"]) ?? undefined,
-      householdSize: parseIntOrNull(row["Household Size"]) ?? undefined,
-      dependentStatus: dependentLabel
-        ? (DEPENDENT_LABEL_TO_VALUE[dependentLabel] ?? undefined)
-        : undefined,
-
-      assigneeUid,
-
-      pipelineStage: stage,
-      pipelineHistory: history,
-      dateFound,
-      dateConnected,
-      dateFiled: null,
-      dateWon: stage === "won" ? now : null,
-      dateLost: stage === "lost" ? now : null,
-
-      lifeExpectancyAtFound:
-        parseIntOrNull(row["Life Expectancy at Found"]) ?? undefined,
-      ageAtFound: parseIntOrNull(row["Age at Found"]) ?? undefined,
-
-      anticipatedRateCode: row["Anticipated Rate"] || null,
-      actualRateCode: row["Actual Rate"] || null,
-
-      vsoIds: [],
-      assignedPhoneId: null,
-
-      notes: row["Notes"] || undefined,
-
+    const doc = dropUndefined({
+      ...result.veteran,
       createdBy: SYSTEM_UID,
       createdAt: now,
       updatedBy: SYSTEM_UID,
@@ -174,10 +79,11 @@ async function main() {
     });
 
     const ref = adminDb.collection("veterans").doc();
-    batch.set(ref, veteran);
+    batch.set(ref, doc);
     written++;
     console.log(
-      `  + ${name} (${stage})${assigneeUid ? ` → ${assigneeName}` : assigneeName ? ` [unassigned]` : ""}`,
+      `  + ${result.veteran.name} (${result.veteran.pipelineStage})` +
+        (result.veteran.assigneeUid ? ` → ${result.veteran.assigneeUid}` : ""),
     );
   }
 

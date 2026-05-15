@@ -21,6 +21,8 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Next requires the matcher pattern to be a static literal. The same pattern
+// lives in lib/proxy-matcher.ts where it's tested — keep them in sync.
 export const config = {
   matcher: ["/((?!_next/|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)"],
 };
