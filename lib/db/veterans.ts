@@ -91,6 +91,17 @@ export async function getVeteran(id: string): Promise<Veteran | null> {
   return deserialize(doc.id, doc.data()!);
 }
 
+/** Veterans currently linked to a given VSO. */
+export async function listVeteransByVsoId(
+  vsoId: string,
+): Promise<Veteran[]> {
+  const snap = await adminDb
+    .collection(COLLECTION)
+    .where("vsoIds", "array-contains", vsoId)
+    .get();
+  return snap.docs.map((d) => deserialize(d.id, d.data()));
+}
+
 /** Stage counts for the dashboard, keyed by stage. */
 export async function countVeteransByStage(): Promise<
   Record<PipelineStage, number>

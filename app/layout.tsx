@@ -9,8 +9,8 @@ const sourceSans3 = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
-  title: "Worth Their Weight CRM",
-  description: "Internal CRM for Worth Their Weight",
+  title: "Worth Their Weight Roster",
+  description: "Internal roster for Worth Their Weight",
 };
 
 export default function RootLayout({

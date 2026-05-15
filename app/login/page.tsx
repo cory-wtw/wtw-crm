@@ -13,7 +13,7 @@ export default async function LoginPage() {
         <div className="flex flex-col items-center gap-3 text-center">
           <Image src="/wtw-logo.png" alt="" width={72} height={72} priority />
           <h1 className="text-2xl font-black tracking-tight">
-            Worth Their Weight CRM
+            Worth Their Weight Roster
           </h1>
           <p className="text-sm text-muted-foreground">Sign in to continue.</p>
         </div>
