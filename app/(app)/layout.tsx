@@ -26,7 +26,7 @@ export default async function AuthenticatedLayout({
               priority
             />
             <span className="text-sm font-bold tracking-tight">
-              Worth Their Weight CRM
+              Worth Their Weight Roster
             </span>
           </Link>
           <nav className="hidden flex-1 items-center gap-1 md:flex">
