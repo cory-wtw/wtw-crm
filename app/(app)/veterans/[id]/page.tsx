@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { listEncounters } from "@/lib/db/encounters";
 import { getPhone } from "@/lib/db/phones";
 import { getRate } from "@/lib/db/rates";
-import { getUser } from "@/lib/db/users";
+import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
 import { formatDate, formatUsd } from "@/lib/format";
@@ -15,6 +16,8 @@ import {
   PIPELINE_LABELS,
   type PipelineStage,
 } from "@/lib/schemas";
+import { EncounterForm } from "./encounter-form";
+import { StageChanger } from "./stage-changer";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +39,7 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, anticipatedRate, actualRate, vsos, phone] =
+  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, allUsers] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
       veteran.anticipatedRateCode
@@ -47,7 +50,17 @@ export default async function VeteranDetailPage({
       veteran.assignedPhoneId
         ? getPhone(veteran.assignedPhoneId)
         : null,
+      listEncounters(veteran.id),
+      listUsers(),
     ]);
+
+  const usersByUid = new Map(allUsers.map((u) => [u.uid, u]));
+  function nameForUid(uid: string): string {
+    if (uid === "system-import") return "AirTable import";
+    const u = usersByUid.get(uid);
+    if (!u) return "Unknown";
+    return u.displayName ?? u.email;
+  }
 
   const anticipatedMonthly = anticipatedRate?.monthlyAmount ?? null;
   const actualMonthly = actualRate?.monthlyAmount ?? null;
@@ -152,6 +165,15 @@ export default async function VeteranDetailPage({
         <Row label="Date filed" value={formatDate(veteran.dateFiled)} />
         <Row label="Date won" value={formatDate(veteran.dateWon)} />
         <Row label="Date lost" value={formatDate(veteran.dateLost)} />
+        <div className="md:col-span-2 border-t border-border pt-4">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+            Change stage
+          </p>
+          <StageChanger
+            veteranId={veteran.id}
+            currentStage={veteran.pipelineStage}
+          />
+        </div>
       </Card>
 
       <Card title="Benefits">
@@ -237,17 +259,20 @@ export default async function VeteranDetailPage({
         {veteran.pipelineHistory.length === 0 ? (
           <p className="text-sm text-muted-foreground">No history yet.</p>
         ) : (
-          <ol className="space-y-2 text-sm">
+          <ol className="md:col-span-2 space-y-2 text-sm">
             {veteran.pipelineHistory
               .slice()
               .reverse()
               .map((h, i) => (
                 <li key={i} className="flex items-baseline gap-3">
-                  <span className="inline-flex w-20 items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]">
+                  <span className="inline-flex w-20 shrink-0 items-center justify-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]">
                     {PIPELINE_LABELS[h.stage]}
                   </span>
                   <span className="text-muted-foreground">
                     {formatDate(h.enteredAt)}
+                    {h.byUid && (
+                      <span> · {nameForUid(h.byUid)}</span>
+                    )}
                   </span>
                 </li>
               ))}
@@ -255,10 +280,58 @@ export default async function VeteranDetailPage({
         )}
       </Card>
 
-      <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-        Encounter timeline + the stage-changer come next. Edit the veteran to
-        update fields in the meantime.
-      </div>
+      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+        <div className="mb-4 flex items-baseline justify-between gap-3">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
+            Encounters ({encounters.length})
+          </h2>
+          <EncounterForm veteranId={veteran.id} />
+        </div>
+        {encounters.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No encounters logged yet. Tap &ldquo;Log encounter&rdquo; above.
+          </p>
+        ) : (
+          <ol className="space-y-4">
+            {encounters.map((e) => (
+              <li
+                key={e.id}
+                className="border-l-2 border-[color:var(--wtw-brand-gold)] pl-4"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-sm font-bold">
+                    {formatDate(e.occurredAt)}
+                    {e.location && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {e.location}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Logged by {nameForUid(e.loggedBy)}
+                  </p>
+                </div>
+                <p className="mt-1 whitespace-pre-wrap text-sm">{e.summary}</p>
+                {e.nextStep && (
+                  <p className="mt-2 text-xs">
+                    <span className="font-bold uppercase tracking-[0.15em] text-[color:var(--wtw-deep-gold)]">
+                      Next step
+                    </span>{" "}
+                    {e.nextStep}
+                    {e.nextStepDueAt && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · due {formatDate(e.nextStepDueAt)}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
     </div>
   );
 }
