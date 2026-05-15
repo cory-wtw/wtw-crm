@@ -1,15 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80" role="img" aria-label="Worth Their Weight gold medal">
-  <defs>
-    <linearGradient id="wtw-gold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#EECD5C" />
-      <stop offset="55%" stop-color="#D2A63C" />
-      <stop offset="100%" stop-color="#BB8525" />
-    </linearGradient>
-  </defs>
-  <path d="M16 2 L24 26 L20 30 Z" fill="#BB8525" />
-  <path d="M48 2 L40 26 L44 30 Z" fill="#BB8525" />
-  <path d="M16 2 L48 2 L40 26 L24 26 Z" fill="#D2A63C" />
-  <circle cx="32" cy="50" r="22" fill="url(#wtw-gold)" stroke="#1D1912" stroke-width="1.5" />
-  <circle cx="32" cy="50" r="16" fill="none" stroke="#1D1912" stroke-width="1" opacity="0.35" />
-  <text x="32" y="55" text-anchor="middle" font-family="Source Sans 3, system-ui, sans-serif" font-weight="900" font-size="14" fill="#1D1912">WTW</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 128" role="img" aria-label="Worth Their Weight medal">
+  <title>Worth Their Weight</title>
+  <!-- Placeholder approximation of the brand mark. Canonical SVG from Kittl
+       (per brand guide section 02) should replace this file. -->
+  <rect x="10" y="4" width="76" height="8" fill="#D2A63C" />
+  <g>
+    <polygon points="14,14 21,14 19,84 16,80" fill="#D2A63C" />
+    <polygon points="23,14 30,14 27,86 23,82" fill="#EECD5C" />
+    <polygon points="32,14 38,14 34,84 30,86" fill="#D2A63C" />
+    <polygon points="42,14 49,14 47,84 44,80" fill="#D2A63C" />
+    <polygon points="51,14 58,14 55,86 51,82" fill="#EECD5C" />
+    <polygon points="60,14 66,14 62,84 58,86" fill="#D2A63C" />
+    <polygon points="70,14 77,14 75,84 72,80" fill="#D2A63C" />
+    <polygon points="79,14 86,14 83,86 79,82" fill="#EECD5C" />
+  </g>
+  <polygon points="48,92 52.9,107.1 68.8,107.1 55.9,116.4 60.8,131.5 48,122.2 35.2,131.5 40.1,116.4 27.2,107.1 43.1,107.1"
+    transform="translate(0,-8)" fill="#D2A63C" />
 </svg>

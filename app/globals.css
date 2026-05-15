@@ -15,9 +15,9 @@
 
   --background: var(--wtw-cream);
   --foreground: var(--wtw-near-black);
-  --card: #ffffff;
+  --card: #fafaf0;
   --card-foreground: var(--wtw-near-black);
-  --popover: #ffffff;
+  --popover: #fafaf0;
   --popover-foreground: var(--wtw-near-black);
   --primary: var(--wtw-brand-gold);
   --primary-foreground: var(--wtw-near-black);
@@ -97,6 +97,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-source-sans-3), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-source-sans-3), Arial, sans-serif;
   }
 }

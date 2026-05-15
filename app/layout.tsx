@@ -5,7 +5,7 @@ import "./globals.css";
 const sourceSans3 = Source_Sans_3({
   variable: "--font-source-sans-3",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "900"],
+  weight: ["300", "400", "700", "900"],
 });
 
 export const metadata: Metadata = {

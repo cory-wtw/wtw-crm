@@ -16,8 +16,8 @@ export default function Home() {
           Worth Their Weight CRM
         </h1>
         <p className="max-w-md text-base text-muted-foreground">
-          Internal tool for the WTW team. Sign in to find, connect, and follow
-          up on veterans in our pipeline.
+          Internal tool for the WTW team. Sign in to find veterans the system
+          missed and connect them to VSO partners who can help.
         </p>
         <Link
           href="/login"
