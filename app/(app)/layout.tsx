@@ -34,7 +34,7 @@ export default async function AuthenticatedLayout({
             <NavLink href="/veterans">Veterans</NavLink>
             <NavLink href="/vsos">VSOs</NavLink>
             {session.role === "admin" && (
-              <NavLink href="/admin">Admin</NavLink>
+              <NavLink href="/admin/users">Admin</NavLink>
             )}
           </nav>
           <div className="flex items-center gap-3 text-xs">

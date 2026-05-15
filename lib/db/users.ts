@@ -29,6 +29,11 @@ export async function listUsers(): Promise<User[]> {
   return snap.docs.map((d) => deserialize(d.id, d.data()));
 }
 
+export async function listAllUsers(): Promise<User[]> {
+  const snap = await adminDb.collection(COLLECTION).get();
+  return snap.docs.map((d) => deserialize(d.id, d.data()));
+}
+
 export async function getUser(uid: string): Promise<User | null> {
   const doc = await adminDb.collection(COLLECTION).doc(uid).get();
   if (!doc.exists) return null;
