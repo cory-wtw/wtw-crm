@@ -1,0 +1,19 @@
+{
+  "hosting": {
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      ".next/cache/**"
+    ],
+    "frameworksBackend": {
+      "region": "us-central1",
+      "maxInstances": 10
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
