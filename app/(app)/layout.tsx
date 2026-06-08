@@ -33,6 +33,7 @@ export default async function AuthenticatedLayout({
             <NavLink href="/">Dashboard</NavLink>
             <NavLink href="/veterans">Veterans</NavLink>
             <NavLink href="/vsos">VSOs</NavLink>
+            <NavLink href="/orgs">Orgs</NavLink>
             <NavLink href="/phones">Phones</NavLink>
             {session.role === "admin" && (
               <NavLink href="/admin/users">Admin</NavLink>
