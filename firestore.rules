@@ -63,6 +63,24 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /orgs/{id} {
+      // Same shape as veterans: anyone signed in can create + read, the
+      // assignee or an admin can update, only admins delete.
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if isAdmin() ||
+                       (isAssignee() && assigneeUnchanged());
+      allow delete: if isAdmin();
+
+      match /encounters/{encounterId} {
+        allow read, create: if signedIn();
+        allow update: if isAdmin() ||
+                         get(/databases/$(database)/documents/orgs/$(id))
+                           .data.assigneeUid == request.auth.uid;
+        allow delete: if false;
+      }
+    }
+
     match /phones/{id} {
       allow read: if signedIn();
       allow create, update: if isAdmin();
