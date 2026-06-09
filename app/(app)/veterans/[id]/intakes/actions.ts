@@ -34,6 +34,75 @@ function formatIssues(
     .join("; ");
 }
 
+/**
+ * Push the intake's basics back to the veteran record so the canonical row
+ * stays current. Skips empty values (we don't overwrite a real phone with
+ * blank) and only writes fields that actually changed. Audit-logged with
+ * a precise before/after diff.
+ */
+async function syncVeteranFromIntakeBasics(
+  veteranId: string,
+  basics:
+    | {
+        fullName?: string;
+        bestPhone?: string;
+        dateOfBirth?: string;
+      }
+    | undefined,
+  sessionUid: string,
+): Promise<void> {
+  if (!basics) return;
+
+  const docRef = adminDb.collection("veterans").doc(veteranId);
+  const snap = await docRef.get();
+  if (!snap.exists) return;
+  const existing = snap.data() as Record<string, unknown>;
+
+  const diff: Record<string, { before: unknown; after: unknown }> = {};
+  const updates: Record<string, unknown> = {};
+
+  const newName = basics.fullName?.trim();
+  if (newName && newName !== existing.name) {
+    diff.name = { before: existing.name ?? null, after: newName };
+    updates.name = newName;
+  }
+
+  const newPhone = basics.bestPhone?.trim();
+  if (newPhone && newPhone !== existing.phone) {
+    diff.phone = { before: existing.phone ?? null, after: newPhone };
+    updates.phone = newPhone;
+  }
+
+  if (basics.dateOfBirth) {
+    const parsed = new Date(basics.dateOfBirth);
+    if (!Number.isNaN(parsed.getTime())) {
+      const year = parsed.getFullYear();
+      if (Number.isFinite(year) && year !== existing.birthYear) {
+        diff.birthYear = {
+          before: existing.birthYear ?? null,
+          after: year,
+        };
+        updates.birthYear = year;
+      }
+    }
+  }
+
+  if (Object.keys(updates).length === 0) return;
+
+  await docRef.update({
+    ...updates,
+    updatedBy: sessionUid,
+    updatedAt: new Date(),
+  });
+
+  await logAudit({
+    action: "update",
+    resourceType: "veteran",
+    resourceId: veteranId,
+    diff,
+  });
+}
+
 export async function createIntakeAction(
   veteranId: string,
   rawInput: unknown,
@@ -69,6 +138,8 @@ export async function createIntakeAction(
     resourceType: "intake",
     resourceId: `${veteranId}/${ref.id}`,
   });
+
+  await syncVeteranFromIntakeBasics(veteranId, parsed.data.basics, session.uid);
 
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath(`/veterans/${veteranId}/intakes/${ref.id}`);
@@ -110,6 +181,8 @@ export async function saveIntakeDraftAction(
     resourceType: "intake",
     resourceId: `${veteranId}/${intakeId}`,
   });
+
+  await syncVeteranFromIntakeBasics(veteranId, parsed.data.basics, session.uid);
 
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath(`/veterans/${veteranId}/intakes/${intakeId}`);
