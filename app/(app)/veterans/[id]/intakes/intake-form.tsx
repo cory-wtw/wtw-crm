@@ -206,10 +206,12 @@ export function IntakeForm({
   // mid-conversation.
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(
-    initial ? new Date() : null,
+    initial?.intakeId ? new Date() : null,
   );
   const dirtyRef = useRef(false);
-  const currentIntakeIdRef = useRef<string | null>(initial?.intakeId ?? null);
+  const currentIntakeIdRef = useRef<string | null>(
+    initial?.intakeId || null,
+  );
   const inFlightSaveRef = useRef<Promise<unknown> | null>(null);
   useEffect(() => {
     dirtyRef.current = isDirty;
@@ -294,9 +296,10 @@ export function IntakeForm({
 
   async function onSaveDraft(event: React.FormEvent) {
     event.preventDefault();
+    const wasNew = !currentIntakeIdRef.current;
     const result = await performSave();
     if (!result.ok) return;
-    if (!initial) {
+    if (wasNew) {
       startTransition(() => {
         router.replace(`/veterans/${veteranId}/intakes/${result.id}/edit`);
         router.refresh();
