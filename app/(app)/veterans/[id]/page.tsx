@@ -6,6 +6,7 @@ import {
   canEditVeteran,
 } from "@/lib/permissions";
 import { listEncounters } from "@/lib/db/encounters";
+import { listIntakes } from "@/lib/db/intakes";
 import { getPhone } from "@/lib/db/phones";
 import { getRate } from "@/lib/db/rates";
 import { getUser, listUsers } from "@/lib/db/users";
@@ -45,7 +46,7 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, allUsers, session] =
+  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, intakes, allUsers, session] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
       veteran.anticipatedRateCode
@@ -57,6 +58,7 @@ export default async function VeteranDetailPage({
         ? getPhone(veteran.assignedPhoneId)
         : null,
       listEncounters(veteran.id),
+      listIntakes(veteran.id),
       listUsers(),
       getSession(),
     ]);
@@ -299,6 +301,63 @@ export default async function VeteranDetailPage({
           </ol>
         )}
       </Card>
+
+      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+        <div className="mb-4 flex items-baseline justify-between gap-3">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
+            Life & Service Intakes ({intakes.length})
+          </h2>
+          <Link
+            href={`/veterans/${veteran.id}/intakes/new`}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+          >
+            New intake
+          </Link>
+        </div>
+        {intakes.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No intakes yet. Start one to capture the veteran&rsquo;s story for
+            a VSO handoff.
+          </p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {intakes.map((intake) => (
+              <li
+                key={intake.id}
+                className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border pb-2 last:border-b-0"
+              >
+                <div>
+                  <Link
+                    href={`/veterans/${veteran.id}/intakes/${intake.id}`}
+                    className="font-bold underline-offset-4 hover:underline"
+                  >
+                    {intake.status === "complete"
+                      ? `Completed ${formatDate(intake.completedAt)}`
+                      : `Draft (updated ${formatDate(intake.updatedAt)})`}
+                  </Link>
+                  <span
+                    className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${
+                      intake.status === "complete"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-[color:var(--wtw-deep-gold)]/15 text-[color:var(--wtw-deep-gold)]"
+                    }`}
+                  >
+                    {intake.status}
+                  </span>
+                </div>
+                {intake.status === "draft" && (
+                  <Link
+                    href={`/veterans/${veteran.id}/intakes/${intake.id}/edit`}
+                    className="text-xs font-bold text-[color:var(--wtw-deep-gold)] underline-offset-4 hover:underline"
+                  >
+                    Continue
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="mb-4 flex items-baseline justify-between gap-3">

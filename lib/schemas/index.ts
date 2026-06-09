@@ -7,4 +7,5 @@ export * from "./phone";
 export * from "./veteran";
 export * from "./encounter";
 export * from "./org";
+export * from "./intake";
 export * from "./audit";
