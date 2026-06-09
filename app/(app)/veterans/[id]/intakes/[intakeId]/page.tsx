@@ -66,10 +66,16 @@ export default async function IntakeViewPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href={`/veterans/${veteran.id}/intakes/${intake.id}/pdf`}
+            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+          >
+            Download PDF
+          </a>
           {intake.status === "draft" ? (
             <Link
               href={`/veterans/${veteran.id}/intakes/${intake.id}/edit`}
-              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
             >
               Continue editing
             </Link>
