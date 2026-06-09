@@ -16,6 +16,7 @@ const ACTION_TINT: Record<AuditAction, string> = {
   update:
     "bg-[color:var(--wtw-deep-gold)]/15 text-[color:var(--wtw-deep-gold)]",
   delete: "bg-destructive/15 text-destructive",
+  export: "bg-[color:var(--wtw-brand-gold)]/15 text-foreground",
 };
 
 function resourceLink(type: ResourceType, id: string): string | null {

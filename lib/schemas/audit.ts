@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-export const AUDIT_ACTIONS = ["read", "create", "update", "delete"] as const;
+export const AUDIT_ACTIONS = [
+  "read",
+  "create",
+  "update",
+  "delete",
+  "export",
+] as const;
 export const auditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
@@ -9,6 +15,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   create: "Created",
   update: "Updated",
   delete: "Deleted",
+  export: "Exported",
 };
 
 export const RESOURCE_TYPES = [
