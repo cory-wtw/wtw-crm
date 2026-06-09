@@ -55,6 +55,16 @@ service cloud.firestore {
                            .data.assigneeUid == request.auth.uid;
         allow delete: if false;
       }
+
+      match /intakes/{intakeId} {
+        // Anyone signed in can read or create intakes. Updates allowed for
+        // admin or the veteran's assignee.
+        allow read, create: if signedIn();
+        allow update: if isAdmin() ||
+                         get(/databases/$(database)/documents/veterans/$(id))
+                           .data.assigneeUid == request.auth.uid;
+        allow delete: if false;
+      }
     }
 
     match /vsos/{id} {
