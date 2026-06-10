@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/firebase/session";
 import {
   intakeBranchToVeteran,
+  intakeHousingToVeteran,
 } from "@/lib/intake-veteran-sync";
 import { intakeInputSchema } from "@/lib/schemas";
 import type { IntakeInput } from "@/lib/schemas";
@@ -110,6 +111,15 @@ async function syncVeteranFromIntake(
       after: newDischarge,
     };
     updates.dischargeStatus = newDischarge;
+  }
+
+  const newHousing = intakeHousingToVeteran(data.housing);
+  if (newHousing && newHousing !== existing.housingStatus) {
+    diff.housingStatus = {
+      before: existing.housingStatus ?? null,
+      after: newHousing,
+    };
+    updates.housingStatus = newHousing;
   }
 
   if (Object.keys(updates).length === 0) return;

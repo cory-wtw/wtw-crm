@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { getVeteran } from "@/lib/db/veterans";
-import { veteranBranchToIntake } from "@/lib/intake-veteran-sync";
+import {
+  veteranBranchToIntake,
+  veteranHousingToIntake,
+} from "@/lib/intake-veteran-sync";
 import { IntakeForm } from "../intake-form";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +29,17 @@ export default async function NewIntakePage({
       currentLocation: "",
       bestWayToReach: "",
     },
+    housing: (veteranHousingToIntake(veteran.housingStatus ?? null) ??
+      "") as
+      | ""
+      | "unsheltered"
+      | "shelter"
+      | "couch_surfing"
+      | "vehicle"
+      | "renting"
+      | "own_home"
+      | "transitional"
+      | "other",
     service: {
       branches: veteranBranchToIntake(veteran.branch ?? null),
       yearsServed: "",

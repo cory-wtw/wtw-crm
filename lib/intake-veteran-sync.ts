@@ -1,6 +1,8 @@
 import type {
   Branch,
   DischargeStatus,
+  HousingSituation,
+  HousingStatus,
   IntakeBranch,
 } from "./schemas";
 
@@ -48,4 +50,68 @@ export function syncableDischargeStatus(
   value: DischargeStatus | null | undefined,
 ): DischargeStatus | null {
   return value ?? null;
+}
+
+/**
+ * Housing: the intake captures 8 categories of where a veteran is staying
+ * right now; the veteran row condenses that to 4 (unsheltered / transitional
+ * / housed / unknown). Mapping is opinionated but lossy in both directions:
+ *
+ *   - unsheltered (intake) → unsheltered (veteran)
+ *   - shelter             → transitional   (emergency shelters are transitional)
+ *   - couch_surfing       → transitional
+ *   - vehicle             → unsheltered    (living in a car is unsheltered)
+ *   - renting             → housed
+ *   - own_home            → housed
+ *   - transitional        → transitional
+ *   - other               → null (ambiguous — leave the existing value alone)
+ *
+ * The narrative "where staying right now" text field on the intake captures
+ * the granularity that this mapping drops.
+ */
+export function intakeHousingToVeteran(
+  housing: HousingSituation | null | undefined,
+): HousingStatus | null {
+  if (!housing) return null;
+  switch (housing) {
+    case "unsheltered":
+      return "unsheltered";
+    case "vehicle":
+      return "unsheltered";
+    case "shelter":
+      return "transitional";
+    case "couch_surfing":
+      return "transitional";
+    case "transitional":
+      return "transitional";
+    case "renting":
+      return "housed";
+    case "own_home":
+      return "housed";
+    case "other":
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Prefill helper. Veteran's `housed` is ambiguous (renting vs. own home), so
+ * we only prefill when there's a clean one-to-one match: `unsheltered` and
+ * `transitional` ride straight across, `housed` is left blank for the
+ * liaison to disambiguate, `unknown` clears.
+ */
+export function veteranHousingToIntake(
+  housing: HousingStatus | null | undefined,
+): HousingSituation | null {
+  switch (housing) {
+    case "unsheltered":
+      return "unsheltered";
+    case "transitional":
+      return "transitional";
+    case "housed":
+    case "unknown":
+    default:
+      return null;
+  }
 }
