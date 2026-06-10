@@ -139,7 +139,15 @@ export async function createIntakeAction(
     resourceId: `${veteranId}/${ref.id}`,
   });
 
-  await syncVeteranFromIntakeBasics(veteranId, parsed.data.basics, session.uid);
+  try {
+    await syncVeteranFromIntakeBasics(
+      veteranId,
+      parsed.data.basics,
+      session.uid,
+    );
+  } catch (err) {
+    console.error("syncVeteranFromIntakeBasics failed", err);
+  }
 
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath(`/veterans/${veteranId}/intakes/${ref.id}`);
@@ -182,7 +190,15 @@ export async function saveIntakeDraftAction(
     resourceId: `${veteranId}/${intakeId}`,
   });
 
-  await syncVeteranFromIntakeBasics(veteranId, parsed.data.basics, session.uid);
+  try {
+    await syncVeteranFromIntakeBasics(
+      veteranId,
+      parsed.data.basics,
+      session.uid,
+    );
+  } catch (err) {
+    console.error("syncVeteranFromIntakeBasics failed", err);
+  }
 
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath(`/veterans/${veteranId}/intakes/${intakeId}`);
