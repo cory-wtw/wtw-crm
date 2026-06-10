@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 import {
   COPING_OPTION_LABELS,
   type CopingOption,
+  DISCHARGE_STATUS_LABELS,
   DOC_STATUS_LABELS,
   HEARING_FREQUENCY_LABELS,
   HOUSING_SITUATION_LABELS,
@@ -123,7 +124,14 @@ export default async function IntakeViewPage({
           <Row label="Years served" value={intake.service.yearsServed} />
           <Row label="Rank at discharge" value={intake.service.rankAtDischarge} />
           <Row label="MOS / Job" value={intake.service.mos} />
-          <Row label="Discharge status" value={intake.service.dischargeStatus} />
+          <Row
+            label="Discharge status"
+            value={
+              intake.service.dischargeStatus
+                ? DISCHARGE_STATUS_LABELS[intake.service.dischargeStatus]
+                : null
+            }
+          />
           <LongRow label="Places served" value={intake.service.placesServed} />
           <LongRow
             label="Combat experience"

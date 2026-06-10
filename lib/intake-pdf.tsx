@@ -8,6 +8,7 @@ import {
 import {
   COPING_OPTION_LABELS,
   type CopingOption,
+  DISCHARGE_STATUS_LABELS,
   DOC_STATUS_LABELS,
   HEARING_FREQUENCY_LABELS,
   HOUSING_SITUATION_LABELS,
@@ -324,7 +325,11 @@ export function IntakePdf({
         <Row label="MOS / Job" value={intake.service.mos} />
         <Row
           label="Discharge status"
-          value={intake.service.dischargeStatus}
+          value={
+            intake.service.dischargeStatus
+              ? DISCHARGE_STATUS_LABELS[intake.service.dischargeStatus]
+              : null
+          }
         />
         <LongBlock
           label="Where did you serve?"

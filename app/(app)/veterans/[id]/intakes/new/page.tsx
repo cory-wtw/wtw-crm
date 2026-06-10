@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getVeteran } from "@/lib/db/veterans";
+import { veteranBranchToIntake } from "@/lib/intake-veteran-sync";
 import { IntakeForm } from "../intake-form";
 
 export const dynamic = "force-dynamic";
@@ -13,19 +14,34 @@ export default async function NewIntakePage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  // Prefill the intake basics from whatever the veteran record already has.
-  // The liaison can edit during the conversation; auto-sync pushes changes
-  // back to the veteran row.
+  // Prefill the intake from whatever the veteran record already has so the
+  // liaison isn't re-asking what we already know. Auto-sync pushes any
+  // edits back to the veteran row when the intake saves.
   const prefill = {
     basics: {
       fullName: veteran.name ?? "",
       bestPhone: veteran.phone ?? "",
       bestEmail: "",
-      // Veteran schema only stores birthYear (integer). Leave the full DOB
-      // blank rather than guess Jan 1 — but flag the known year as a hint.
       dateOfBirth: "",
       currentLocation: "",
       bestWayToReach: "",
+    },
+    service: {
+      branches: veteranBranchToIntake(veteran.branch ?? null),
+      yearsServed: "",
+      rankAtDischarge: "",
+      mos: "",
+      dischargeStatus: (veteran.dischargeStatus ?? "") as
+        | ""
+        | "honorable"
+        | "general"
+        | "oth"
+        | "bcd"
+        | "dd"
+        | "unknown",
+      placesServed: "",
+      combatExperience: "",
+      proudOf: "",
     },
   };
 
@@ -41,8 +57,9 @@ export default async function NewIntakePage({
         <p className="text-sm text-muted-foreground">
           A conversation. Not a form. For {veteran.name}. One sitting, 30–45
           minutes. Skip anything that doesn&rsquo;t fit. Save draft anytime;
-          mark complete when ready to send to a VSO. Basics are prefilled
-          from the veteran record — edits flow back automatically.
+          mark complete when ready to send to a VSO. Basics + service info
+          are prefilled from the veteran record — edits flow back
+          automatically.
           {veteran.birthYear && (
             <>
               {" "}
