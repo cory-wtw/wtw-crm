@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { getPhone } from "@/lib/db/phones";
 import { PhoneForm } from "../../phone-form";
@@ -13,7 +13,6 @@ export default async function EditPhonePage({
   const { id } = await params;
   const session = await getSession();
   if (!session) notFound();
-  if (session.role !== "admin") redirect(`/phones/${id}`);
 
   const phone = await getPhone(id);
   if (!phone) notFound();

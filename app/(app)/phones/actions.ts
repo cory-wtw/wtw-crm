@@ -28,19 +28,16 @@ function formatIssues(
     .join("; ");
 }
 
-async function requireAdmin() {
+async function requireSignedIn() {
   const session = await getSession();
   if (!session) return { ok: false as const, error: "Not signed in." };
-  if (session.role !== "admin") {
-    return { ok: false as const, error: "Admins only." };
-  }
   return { ok: true as const, session };
 }
 
 export async function createPhoneAction(
   rawInput: unknown,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const guard = await requireAdmin();
+  const guard = await requireSignedIn();
   if (!guard.ok) return guard;
 
   const parsed = phoneInputSchema.safeParse(rawInput);
@@ -76,7 +73,7 @@ export async function editPhoneAction(
   id: string,
   rawInput: unknown,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const guard = await requireAdmin();
+  const guard = await requireSignedIn();
   if (!guard.ok) return guard;
 
   const parsed = phoneInputSchema.safeParse(rawInput);

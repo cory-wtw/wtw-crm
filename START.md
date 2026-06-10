@@ -157,8 +157,11 @@ Audit log entries are written by Cloud Functions triggers on every relevant coll
 | Delete veteran | ✅ | ❌ |
 | Change pipeline stage | ✅ | ✅ |
 | Reassign veteran | ✅ | ❌ |
-| View/edit VSO rolodex | ✅ | ✅ (view-only) |
-| Create/edit VSO | ✅ | ❌ |
+| View VSO rolodex | ✅ | ✅ |
+| Create/edit VSO | ✅ | ✅ |
+| Create/edit phone | ✅ | ✅ |
+| Create/edit org | ✅ | ✅ |
+| Delete VSO / phone / org | ✅ | ❌ |
 | View audit log | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
 | Run CSV import | ✅ | ❌ |
@@ -179,9 +182,9 @@ Enforce in both:
 /veterans/[id]             detail + encounter timeline
 /veterans/[id]/edit        edit
 /vsos                      list
-/vsos/new                  create (admin)
+/vsos/new                  create
 /vsos/[id]                 detail
-/vsos/[id]/edit            edit (admin)
+/vsos/[id]/edit            edit
 /admin/users               admin only
 /admin/audit               admin only
 /admin/import              admin only — CSV upload

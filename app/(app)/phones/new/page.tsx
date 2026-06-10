@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { PhoneForm } from "../phone-form";
 
@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 export default async function NewPhonePage() {
   const session = await getSession();
   if (!session) notFound();
-  if (session.role !== "admin") redirect("/phones");
 
   return (
     <div className="space-y-6">

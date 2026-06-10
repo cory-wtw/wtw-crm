@@ -69,7 +69,7 @@ service cloud.firestore {
 
     match /vsos/{id} {
       allow read: if signedIn();
-      allow create, update: if isAdmin();
+      allow create, update: if signedIn();
       allow delete: if false;
     }
 
@@ -93,7 +93,7 @@ service cloud.firestore {
 
     match /phones/{id} {
       allow read: if signedIn();
-      allow create, update: if isAdmin();
+      allow create, update: if signedIn();
       allow delete: if false;
     }
 

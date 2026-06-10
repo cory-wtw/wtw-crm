@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { getVso } from "@/lib/db/vsos";
 import { VsoForm } from "../../vso-form";
@@ -13,7 +13,6 @@ export default async function EditVsoPage({
   const { id } = await params;
   const session = await getSession();
   if (!session) notFound();
-  if (session.role !== "admin") redirect(`/vsos/${id}`);
 
   const vso = await getVso(id);
   if (!vso) notFound();

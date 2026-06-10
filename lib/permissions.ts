@@ -47,14 +47,15 @@ export function canDeleteVeteran(session: SessionLike | null): boolean {
   return isAdmin(session);
 }
 
-/** Only admins create / edit VSOs. Everyone signed in can view. */
+/** Anyone signed in can create / edit VSOs and phones. They're shared
+ *  org-wide reference data — gating writes to admins meant standard users
+ *  had to flag down a manager to add a partner or log a loaner. */
 export function canEditVso(session: SessionLike | null): boolean {
-  return isAdmin(session);
+  return !!session;
 }
 
-/** Only admins create / edit phones. Everyone signed in can view. */
 export function canEditPhone(session: SessionLike | null): boolean {
-  return isAdmin(session);
+  return !!session;
 }
 
 /** Only admins manage users + invites. */
