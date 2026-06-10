@@ -297,7 +297,18 @@ export function IntakeForm({
   async function onSaveDraft(event: React.FormEvent) {
     event.preventDefault();
     const wasNew = !currentIntakeIdRef.current;
-    const result = await performSave();
+    let result: { ok: true; id: string } | { ok: false; error: string };
+    try {
+      result = await performSave();
+    } catch (err) {
+      console.error("intake save failed", err);
+      setServerError(
+        err instanceof Error
+          ? `Save failed: ${err.message}`
+          : "Save failed. Check the browser console.",
+      );
+      return;
+    }
     if (!result.ok) return;
     if (wasNew) {
       startTransition(() => {
