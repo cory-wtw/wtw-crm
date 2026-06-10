@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
+  DISCHARGE_STATUS_LABELS,
+  DISCHARGE_STATUSES,
   COPING_OPTION_LABELS,
   COPING_OPTIONS,
   DOC_STATUS_LABELS,
@@ -51,7 +53,7 @@ type FormState = {
     yearsServed: string;
     rankAtDischarge: string;
     mos: string;
-    dischargeStatus: string;
+    dischargeStatus: "" | (typeof DISCHARGE_STATUSES)[number];
     placesServed: string;
     combatExperience: string;
     proudOf: string;
@@ -221,7 +223,10 @@ export function IntakeForm({
     // Convert form state to the shape expected by the server action.
     return {
       basics: state.basics,
-      service: state.service,
+      service: {
+        ...state.service,
+        dischargeStatus: state.service.dischargeStatus || null,
+      },
       bodyDuringService: state.bodyDuringService,
       bodyToday: {
         ...state.bodyToday,
@@ -566,12 +571,23 @@ export function IntakeForm({
               />
             </Field>
             <Field label="Discharge status">
-              <Input
+              <Select
                 value={state.service.dischargeStatus}
                 onChange={(e) =>
-                  setService("dischargeStatus", e.target.value)
+                  setService(
+                    "dischargeStatus",
+                    e.target
+                      .value as FormState["service"]["dischargeStatus"],
+                  )
                 }
-              />
+              >
+                <option value="">—</option>
+                {DISCHARGE_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {DISCHARGE_STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </Select>
             </Field>
           </Grid>
           <Field

@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/firebase/session";
+import {
+  intakeBranchToVeteran,
+  intakeHousingToVeteran,
+} from "@/lib/intake-veteran-sync";
 import { intakeInputSchema } from "@/lib/schemas";
+import type { IntakeInput } from "@/lib/schemas";
 
 function dropUndefined<T extends Record<string, unknown>>(
   obj: T,
@@ -35,23 +40,29 @@ function formatIssues(
 }
 
 /**
- * Push the intake's basics back to the veteran record so the canonical row
- * stays current. Skips empty values (we don't overwrite a real phone with
- * blank) and only writes fields that actually changed. Audit-logged with
- * a precise before/after diff.
+ * Push parts of the intake snapshot back to the veteran record so the
+ * canonical row stays current. Skips empty values (we don't overwrite a
+ * real phone with blank) and only writes fields that actually changed.
+ * Audit-logged with a precise before/after diff.
+ *
+ * Covers:
+ *   - basics.fullName       → veteran.name
+ *   - basics.bestPhone      → veteran.phone
+ *   - basics.dateOfBirth    → veteran.birthYear (year extracted)
+ *   - service.branches      → veteran.branch (only when intake has a
+ *                              single branch that exists on the veteran
+ *                              enum; multi-branch and Reserves/National
+ *                              Guard are skipped)
+ *   - service.dischargeStatus → veteran.dischargeStatus (same enum)
  */
-async function syncVeteranFromIntakeBasics(
+async function syncVeteranFromIntake(
   veteranId: string,
-  basics:
-    | {
-        fullName?: string;
-        bestPhone?: string;
-        dateOfBirth?: string;
-      }
-    | undefined,
+  data: IntakeInput,
   sessionUid: string,
 ): Promise<void> {
-  if (!basics) return;
+  const basics = data.basics;
+  const service = data.service;
+  if (!basics && !service) return;
 
   const docRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await docRef.get();
@@ -61,19 +72,19 @@ async function syncVeteranFromIntakeBasics(
   const diff: Record<string, { before: unknown; after: unknown }> = {};
   const updates: Record<string, unknown> = {};
 
-  const newName = basics.fullName?.trim();
+  const newName = basics?.fullName?.trim();
   if (newName && newName !== existing.name) {
     diff.name = { before: existing.name ?? null, after: newName };
     updates.name = newName;
   }
 
-  const newPhone = basics.bestPhone?.trim();
+  const newPhone = basics?.bestPhone?.trim();
   if (newPhone && newPhone !== existing.phone) {
     diff.phone = { before: existing.phone ?? null, after: newPhone };
     updates.phone = newPhone;
   }
 
-  if (basics.dateOfBirth) {
+  if (basics?.dateOfBirth) {
     const parsed = new Date(basics.dateOfBirth);
     if (!Number.isNaN(parsed.getTime())) {
       const year = parsed.getFullYear();
@@ -85,6 +96,30 @@ async function syncVeteranFromIntakeBasics(
         updates.birthYear = year;
       }
     }
+  }
+
+  const newBranch = intakeBranchToVeteran(service?.branches ?? []);
+  if (newBranch && newBranch !== existing.branch) {
+    diff.branch = { before: existing.branch ?? null, after: newBranch };
+    updates.branch = newBranch;
+  }
+
+  const newDischarge = service?.dischargeStatus ?? null;
+  if (newDischarge && newDischarge !== existing.dischargeStatus) {
+    diff.dischargeStatus = {
+      before: existing.dischargeStatus ?? null,
+      after: newDischarge,
+    };
+    updates.dischargeStatus = newDischarge;
+  }
+
+  const newHousing = intakeHousingToVeteran(data.housing);
+  if (newHousing && newHousing !== existing.housingStatus) {
+    diff.housingStatus = {
+      before: existing.housingStatus ?? null,
+      after: newHousing,
+    };
+    updates.housingStatus = newHousing;
   }
 
   if (Object.keys(updates).length === 0) return;
@@ -140,13 +175,13 @@ export async function createIntakeAction(
   });
 
   try {
-    await syncVeteranFromIntakeBasics(
+    await syncVeteranFromIntake(
       veteranId,
-      parsed.data.basics,
+      parsed.data,
       session.uid,
     );
   } catch (err) {
-    console.error("syncVeteranFromIntakeBasics failed", err);
+    console.error("syncVeteranFromIntake failed", err);
   }
 
   revalidatePath(`/veterans/${veteranId}`);
@@ -191,13 +226,13 @@ export async function saveIntakeDraftAction(
   });
 
   try {
-    await syncVeteranFromIntakeBasics(
+    await syncVeteranFromIntake(
       veteranId,
-      parsed.data.basics,
+      parsed.data,
       session.uid,
     );
   } catch (err) {
-    console.error("syncVeteranFromIntakeBasics failed", err);
+    console.error("syncVeteranFromIntake failed", err);
   }
 
   revalidatePath(`/veterans/${veteranId}`);

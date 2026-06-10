@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DISCHARGE_STATUSES } from "./veteran";
 
 // Branches: superset of veteran schema's branches; covers National Guard +
 // Reserves which appear on the intake form but not the veteran schema.
@@ -295,12 +296,13 @@ export const intakeSchema = z.object({
       yearsServed: z.string().optional(),
       rankAtDischarge: z.string().optional(),
       mos: z.string().optional(),
-      dischargeStatus: z.string().optional(),
+      // Same enum as veteran.dischargeStatus so the sync is lossless.
+      dischargeStatus: z.enum(DISCHARGE_STATUSES).nullable().default(null),
       placesServed: z.string().optional(),
       combatExperience: z.string().optional(),
       proudOf: z.string().optional(),
     })
-    .default({ branches: [] }),
+    .default({ branches: [], dischargeStatus: null }),
 
   // Section 02 — What Happened & Your Body
   bodyDuringService: z
