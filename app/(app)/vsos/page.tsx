@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function VsosPage() {
   const [vsos, session] = await Promise.all([listVsos(), getSession()]);
-  const isAdmin = session?.role === "admin";
+  const canEdit = !!session;
 
   const rows = vsos.map((v) => ({
     id: v.id,
@@ -29,7 +29,7 @@ export default async function VsosPage() {
             off to.
           </p>
         </div>
-        {isAdmin && (
+        {canEdit && (
           <Link
             href="/vsos/new"
             className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
@@ -42,17 +42,13 @@ export default async function VsosPage() {
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-10 text-center">
           <p className="text-sm font-bold">No VSOs yet.</p>
-          {isAdmin ? (
+          {canEdit && (
             <Link
               href="/vsos/new"
               className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Add the first VSO
             </Link>
-          ) : (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Ask an admin to add the first one.
-            </p>
           )}
         </div>
       ) : (

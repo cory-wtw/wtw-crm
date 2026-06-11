@@ -12,7 +12,7 @@ export default async function PhonesPage() {
     getSession(),
     listVeterans(),
   ]);
-  const isAdmin = session?.role === "admin";
+  const canEdit = !!session;
 
   const veteransByPhone = new Map<string, string>();
   for (const v of veterans) {
@@ -38,7 +38,7 @@ export default async function PhonesPage() {
             Straight Talk loaners we hand out to veterans during outreach.
           </p>
         </div>
-        {isAdmin && (
+        {canEdit && (
           <Link
             href="/phones/new"
             className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
@@ -51,17 +51,13 @@ export default async function PhonesPage() {
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-10 text-center">
           <p className="text-sm font-bold">No phones in inventory yet.</p>
-          {isAdmin ? (
+          {canEdit && (
             <Link
               href="/phones/new"
               className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Add the first phone
             </Link>
-          ) : (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Ask an admin to add the first one.
-            </p>
           )}
         </div>
       ) : (

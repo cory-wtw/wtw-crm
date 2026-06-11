@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { VsoForm } from "../vso-form";
 
@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 export default async function NewVsoPage() {
   const session = await getSession();
   if (!session) notFound();
-  if (session.role !== "admin") redirect("/vsos");
 
   return (
     <div className="space-y-6">

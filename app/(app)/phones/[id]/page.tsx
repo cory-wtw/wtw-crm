@@ -33,7 +33,7 @@ export default async function PhoneDetailPage({
     listVeteransByPhoneId(id),
   ]);
   if (!phone) notFound();
-  const isAdmin = session?.role === "admin";
+  const canEdit = !!session;
 
   return (
     <div className="space-y-8">
@@ -55,7 +55,7 @@ export default async function PhoneDetailPage({
             </p>
           )}
         </div>
-        {isAdmin && (
+        {canEdit && (
           <Link
             href={`/phones/${phone.id}/edit`}
             className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"

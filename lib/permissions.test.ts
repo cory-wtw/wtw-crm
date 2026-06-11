@@ -68,12 +68,21 @@ describe("canReassignVeteran / canDeleteVeteran", () => {
   });
 });
 
-describe("canEditVso / canEditPhone / canManageUsers / canViewAuditLog", () => {
-  it("all admin-only", () => {
+describe("canEditVso / canEditPhone", () => {
+  it("allows anyone signed in", () => {
     expect(canEditVso(ADMIN)).toBe(true);
-    expect(canEditVso(STANDARD_A)).toBe(false);
+    expect(canEditVso(STANDARD_A)).toBe(true);
     expect(canEditPhone(ADMIN)).toBe(true);
-    expect(canEditPhone(STANDARD_A)).toBe(false);
+    expect(canEditPhone(STANDARD_A)).toBe(true);
+  });
+  it("blocks not-signed-in", () => {
+    expect(canEditVso(null)).toBe(false);
+    expect(canEditPhone(null)).toBe(false);
+  });
+});
+
+describe("canManageUsers / canViewAuditLog", () => {
+  it("admin only", () => {
     expect(canManageUsers(ADMIN)).toBe(true);
     expect(canManageUsers(STANDARD_A)).toBe(false);
     expect(canViewAuditLog(ADMIN)).toBe(true);
