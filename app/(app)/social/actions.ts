@@ -79,8 +79,9 @@ export async function createMediaAction(
 }
 
 /**
- * Flip a media item between "new" and "used". Marking it used stamps usedAt,
- * which starts the 30-day auto-purge clock (see lib/media-purge.ts).
+ * Flip a media item between "new" and "used". Marking it used stamps usedAt /
+ * usedBy so the gallery can show when (and who) posted it. Items are removed
+ * manually via deleteMediaAction — there's no auto-deletion.
  */
 export async function setMediaUsedAction(
   id: string,

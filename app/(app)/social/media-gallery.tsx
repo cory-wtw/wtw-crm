@@ -1,11 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import {
-  MEDIA_STATUS_LABELS,
-  type MediaKind,
-  type MediaStatus,
-} from "@/lib/schemas";
+import { type MediaKind, type MediaStatus } from "@/lib/schemas";
 import { deleteMediaAction, setMediaUsedAction } from "./actions";
 
 export type MediaRow = {
@@ -20,9 +16,9 @@ export type MediaRow = {
   sizeBytes: number;
   createdBy: string;
   createdAtIso: string;
+  usedAtIso: string | null;
   linkedVeteranId: string | null;
   linkedVeteranName: string | null;
-  daysUntilPurge: number | null;
 };
 
 type Filter = "all" | MediaStatus;
@@ -143,32 +139,49 @@ function MediaCard({
   }
 
   return (
-    <figure className="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
+    <figure
+      className={`flex flex-col overflow-hidden rounded-lg border-2 bg-card transition-colors ${
+        isUsed ? "border-[color:var(--wtw-deep-gold)]" : "border-border"
+      }`}
+    >
       <div className="relative aspect-video bg-secondary">
         {row.kind === "video" ? (
           <video
             src={row.downloadUrl}
             controls
             preload="metadata"
-            className="h-full w-full object-cover"
+            className={`h-full w-full object-cover ${
+              isUsed ? "opacity-60 grayscale" : ""
+            }`}
           />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={row.downloadUrl}
             alt={row.caption}
-            className="h-full w-full object-cover"
+            className={`h-full w-full object-cover ${
+              isUsed ? "opacity-60 grayscale" : ""
+            }`}
           />
         )}
-        <span
-          className={`absolute left-2 top-2 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-            isUsed
-              ? "bg-muted text-muted-foreground"
-              : "bg-primary text-primary-foreground"
-          }`}
-        >
-          {MEDIA_STATUS_LABELS[row.status]}
-        </span>
+
+        {isUsed ? (
+          <>
+            {/* Bold, unmistakable "used" marker across the thumbnail. */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="rotate-[-8deg] rounded-md border-2 border-[color:var(--wtw-deep-gold)] bg-[color:var(--wtw-near-black)]/75 px-4 py-1 text-lg font-black uppercase tracking-widest text-[color:var(--wtw-gold-light)] shadow-lg">
+                ✓ Used
+              </span>
+            </div>
+            <span className="absolute left-2 top-2 rounded bg-[color:var(--wtw-deep-gold)] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
+              Used
+            </span>
+          </>
+        ) : (
+          <span className="absolute left-2 top-2 rounded bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+            New
+          </span>
+        )}
       </div>
 
       <figcaption className="flex flex-1 flex-col gap-2 p-3">
@@ -202,10 +215,10 @@ function MediaCard({
         <p className="text-[11px] text-muted-foreground">
           {formatSize(row.sizeBytes)} ·{" "}
           {dateFmt.format(new Date(row.createdAtIso))}
-          {isUsed && row.daysUntilPurge != null && (
-            <span className="text-destructive">
+          {isUsed && row.usedAtIso && (
+            <span className="font-bold text-[color:var(--wtw-deep-gold)]">
               {" "}
-              · deletes in {row.daysUntilPurge}d
+              · Used {dateFmt.format(new Date(row.usedAtIso))}
             </span>
           )}
         </p>
@@ -224,9 +237,13 @@ function MediaCard({
             type="button"
             onClick={toggleUsed}
             disabled={isPending}
-            className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-xs font-bold transition-colors hover:bg-secondary disabled:opacity-50"
+            className={`inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-bold transition-colors disabled:opacity-50 ${
+              isUsed
+                ? "border border-border hover:bg-secondary"
+                : "bg-[color:var(--wtw-deep-gold)] text-white hover:opacity-90"
+            }`}
           >
-            {isUsed ? "Mark new" : "Mark used"}
+            {isUsed ? "Mark unused" : "Mark used"}
           </button>
           {canDelete && (
             <button

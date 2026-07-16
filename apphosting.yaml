@@ -31,15 +31,8 @@ env:
     value: wtw-crm-31aef.firebasestorage.app
     availability:
       - BUILD
-      # RUNTIME too: server-side media deletes + the purge cron resolve the
-      # bucket by name from this var.
-      - RUNTIME
-  # Shared secret guarding /api/cron/purge-media. Create it once with:
-  #   firebase apphosting:secrets:set cron-secret
-  # then grant the backend access when prompted.
-  - variable: CRON_SECRET
-    secret: cron-secret
-    availability:
+      # RUNTIME too: server-side media deletes resolve the bucket by name
+      # from this var.
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
     value: "259965531521"

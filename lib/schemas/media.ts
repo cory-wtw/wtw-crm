@@ -4,11 +4,10 @@ import { z } from "zod";
  * Social media wall. Staff drop photos and short videos (plus a caption)
  * here so the social media manager has a single, searchable place to pull
  * from instead of a shared Google Drive folder. Files live in Firebase
- * Storage; this doc holds the metadata + lifecycle.
+ * Storage; this doc holds the metadata + status.
  *
- * Lifecycle: new -> used -> (auto-purged 30 days after being marked used).
- * See lib/media-purge.ts for the retention math and the cron endpoint at
- * app/api/cron/purge-media that runs it.
+ * Status is new -> used (set once it's been posted). Items are deleted
+ * manually when no longer needed; nothing is removed automatically.
  */
 
 export const MEDIA_KINDS = ["image", "video"] as const;
@@ -59,7 +58,7 @@ export const mediaSchema = z.object({
    */
   consentOnFile: z.boolean().default(false),
   status: mediaStatusSchema.default("new"),
-  /** Set when status flips to "used"; starts the 30-day purge clock. */
+  /** Set when status flips to "used" — records when it was posted. */
   usedAt: z.date().nullable().default(null),
   usedBy: z.string().nullable().default(null),
   createdBy: z.string(),

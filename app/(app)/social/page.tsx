@@ -2,7 +2,6 @@ import Link from "next/link";
 import { listMedia } from "@/lib/db/media";
 import { listVeterans } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
-import { daysUntilPurge } from "@/lib/media-purge";
 import { MediaGallery, type MediaRow } from "./media-gallery";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +14,6 @@ export default async function SocialPage() {
   ]);
 
   const veteranName = new Map(veterans.map((v) => [v.id, v.name]));
-  const now = new Date();
 
   const rows: MediaRow[] = media.map((m) => ({
     id: m.id,
@@ -29,11 +27,11 @@ export default async function SocialPage() {
     sizeBytes: m.sizeBytes,
     createdBy: m.createdBy,
     createdAtIso: m.createdAt.toISOString(),
+    usedAtIso: m.usedAt ? m.usedAt.toISOString() : null,
     linkedVeteranId: m.linkedVeteranId,
     linkedVeteranName: m.linkedVeteranId
       ? veteranName.get(m.linkedVeteranId) ?? null
       : null,
-    daysUntilPurge: daysUntilPurge(m, now),
   }));
 
   return (
@@ -43,8 +41,8 @@ export default async function SocialPage() {
           <h1 className="text-3xl font-black tracking-tight">Social</h1>
           <p className="text-sm text-muted-foreground">
             Photos and videos for the social media manager to pull from. Mark
-            an item <strong>Used</strong> once it&rsquo;s posted&nbsp;&mdash; it
-            auto-deletes 30 days later.
+            an item <strong>Used</strong> once it&rsquo;s posted, and delete it
+            when it&rsquo;s no longer needed.
           </p>
         </div>
         <Link
