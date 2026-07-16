@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { type MediaKind, type MediaStatus } from "@/lib/schemas";
 import { deleteMediaAction, setMediaUsedAction } from "./actions";
@@ -101,7 +102,7 @@ export function MediaGallery({
             <MediaCard
               key={row.id}
               row={row}
-              canDelete={isAdmin || row.createdBy === currentUid}
+              canManage={isAdmin || row.createdBy === currentUid}
             />
           ))}
         </div>
@@ -112,10 +113,10 @@ export function MediaGallery({
 
 function MediaCard({
   row,
-  canDelete,
+  canManage,
 }: {
   row: MediaRow;
-  canDelete: boolean;
+  canManage: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -225,7 +226,7 @@ function MediaCard({
 
         {error && <p className="text-[11px] text-destructive">{error}</p>}
 
-        <div className="mt-auto flex items-center gap-2 pt-1">
+        <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
           <a
             href={row.downloadUrl}
             download={row.fileName}
@@ -245,15 +246,23 @@ function MediaCard({
           >
             {isUsed ? "Mark unused" : "Mark used"}
           </button>
-          {canDelete && (
-            <button
-              type="button"
-              onClick={remove}
-              disabled={isPending}
-              className="ml-auto inline-flex h-8 items-center justify-center rounded-md px-2 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
-            >
-              Delete
-            </button>
+          {canManage && (
+            <div className="ml-auto flex items-center gap-1">
+              <Link
+                href={`/social/${row.id}/edit`}
+                className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-xs font-bold transition-colors hover:bg-secondary"
+              >
+                Edit
+              </Link>
+              <button
+                type="button"
+                onClick={remove}
+                disabled={isPending}
+                className="inline-flex h-8 items-center justify-center rounded-md px-2 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
           )}
         </div>
       </figcaption>

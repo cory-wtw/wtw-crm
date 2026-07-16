@@ -3,6 +3,7 @@ import {
   MEDIA_KINDS,
   MEDIA_MAX_BYTES,
   MEDIA_STATUSES,
+  mediaEditInputSchema,
   mediaInputSchema,
   mediaKindFromContentType,
 } from "..";
@@ -81,6 +82,39 @@ describe("mediaInputSchema", () => {
   it("rejects a negative size", () => {
     const result = mediaInputSchema.safeParse({ ...VALID, sizeBytes: -1 });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("mediaEditInputSchema", () => {
+  it("accepts the editable fields", () => {
+    const result = mediaEditInputSchema.safeParse({
+      caption: "Updated caption",
+      tags: ["event"],
+      linkedVeteranId: null,
+      consentOnFile: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("still requires a caption", () => {
+    const result = mediaEditInputSchema.safeParse({
+      caption: "",
+      tags: [],
+      consentOnFile: false,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("defaults tags and veteran link", () => {
+    const result = mediaEditInputSchema.safeParse({
+      caption: "Just a caption",
+      consentOnFile: false,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.tags).toEqual([]);
+      expect(result.data.linkedVeteranId).toBeNull();
+    }
   });
 });
 

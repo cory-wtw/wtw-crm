@@ -116,3 +116,13 @@ export function canDeleteMedia(
   if (session.role === "admin") return true;
   return media.createdBy === session.uid;
 }
+
+/** Uploaders can edit their own media's details; admins can edit anything. */
+export function canEditMedia(
+  session: SessionLike | null,
+  media: { createdBy: string },
+): boolean {
+  if (!session) return false;
+  if (session.role === "admin") return true;
+  return media.createdBy === session.uid;
+}

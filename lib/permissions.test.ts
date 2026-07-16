@@ -4,6 +4,7 @@ import {
   canCreateVeteran,
   canDeleteMedia,
   canDeleteVeteran,
+  canEditMedia,
   canEditPhone,
   canEditVeteran,
   canEditVso,
@@ -131,6 +132,23 @@ describe("social role", () => {
     expect(canMarkMediaUsed(SOCIAL)).toBe(true);
     expect(canDeleteMedia(SOCIAL, { createdBy: "u-social" })).toBe(true);
     expect(canDeleteMedia(SOCIAL, { createdBy: "u-other" })).toBe(false);
+    expect(canEditMedia(SOCIAL, { createdBy: "u-social" })).toBe(true);
+    expect(canEditMedia(SOCIAL, { createdBy: "u-other" })).toBe(false);
+  });
+});
+
+describe("canEditMedia", () => {
+  it("lets the uploader edit their own item", () => {
+    expect(canEditMedia(STANDARD_A, { createdBy: "u-a" })).toBe(true);
+  });
+  it("blocks editing someone else's item", () => {
+    expect(canEditMedia(STANDARD_A, { createdBy: "u-b" })).toBe(false);
+  });
+  it("lets an admin edit anything", () => {
+    expect(canEditMedia(ADMIN, { createdBy: "u-b" })).toBe(true);
+  });
+  it("blocks not-signed-in", () => {
+    expect(canEditMedia(null, { createdBy: "u-a" })).toBe(false);
   });
 });
 
