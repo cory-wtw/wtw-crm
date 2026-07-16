@@ -17,7 +17,7 @@ export default async function Dashboard() {
   return (
     <div className="space-y-8">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-3xl font-black tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Dashboard</h1>
         <Link
           href="/veterans/new"
           className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
@@ -64,7 +64,7 @@ function StageCard({
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
         {PIPELINE_LABELS[stage]}
       </p>
-      <p className="mt-1 text-3xl font-black tracking-tight">{count}</p>
+      <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{count}</p>
     </Link>
   );
 }

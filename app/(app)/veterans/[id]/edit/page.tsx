@@ -37,7 +37,7 @@ export default async function EditVeteranPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight">
+        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
           Edit {veteran.name}
         </h1>
         <p className="text-sm text-muted-foreground">

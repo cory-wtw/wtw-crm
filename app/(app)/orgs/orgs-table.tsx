@@ -126,8 +126,8 @@ export function OrgsTable({ rows }: { rows: OrgRow[] }) {
           {filtered.length} of {rows.length}
         </span>
       </div>
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <table className="w-full text-sm">
+      <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
+        <table className="w-full min-w-[44rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>

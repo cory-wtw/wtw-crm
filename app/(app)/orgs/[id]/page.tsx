@@ -55,7 +55,7 @@ export default async function OrgDetailPage({
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-black tracking-tight">{org.name}</h1>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">{org.name}</h1>
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STATUS_TINT[org.relationshipStatus]}`}
             >

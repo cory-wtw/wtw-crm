@@ -40,7 +40,7 @@ export default async function PhoneDetailPage({
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-black tracking-tight">
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
               {phone.name}
             </h1>
             <span

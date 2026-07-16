@@ -42,7 +42,7 @@ export default async function SocialPage() {
     <div className="space-y-6">
       <div className="flex items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Social</h1>
+          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Social</h1>
           <p className="text-sm text-muted-foreground">
             Photos and videos for the social media manager to pull from. Mark
             an item <strong>Used</strong> once it&rsquo;s posted, and delete it

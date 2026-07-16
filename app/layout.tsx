@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
@@ -11,6 +11,13 @@ const sourceSans3 = Source_Sans_3({
 export const metadata: Metadata = {
   title: "Worth Their Weight Roster",
   description: "Internal roster for Worth Their Weight",
+};
+
+// Explicit, accessible viewport: fit the device width but never block the
+// user from pinch-zooming (no maximumScale / user-scalable lock).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

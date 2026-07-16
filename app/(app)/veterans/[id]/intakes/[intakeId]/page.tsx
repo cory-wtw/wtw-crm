@@ -54,7 +54,7 @@ export default async function IntakeViewPage({
             Life & Service Intake ·{" "}
             {intake.status === "complete" ? "Complete" : "Draft"}
           </p>
-          <h1 className="text-3xl font-black tracking-tight">
+          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
             {veteran.name}
           </h1>
           <p className="text-sm text-muted-foreground">
