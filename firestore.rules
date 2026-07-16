@@ -16,6 +16,15 @@ service cloud.firestore {
              request.auth.token.role == 'admin';
     }
 
+    // Social-only users (the social media manager) can reach the media
+    // collection and nothing else. canAccessCrm gates the veteran/VSO/org/
+    // phone data collections. Mirrors isSocialOnly / canAccessCrm in
+    // permissions.ts.
+    function canAccessCrm() {
+      return request.auth != null &&
+             request.auth.token.role != 'social';
+    }
+
     function isAssignee() {
       return request.auth != null &&
              resource.data.assigneeUid == request.auth.uid;
@@ -38,8 +47,8 @@ service cloud.firestore {
     }
 
     match /veterans/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn();
+      allow read: if canAccessCrm();
+      allow create: if canAccessCrm();
       // Admins can update anything. Standard users can update veterans
       // assigned to them, as long as they're not changing the assignee.
       allow update: if isAdmin() ||
@@ -47,9 +56,9 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /encounters/{encounterId} {
-        // Everyone signed in can read + create encounters. Edits + deletes
-        // require admin or the parent veteran's assignee.
-        allow read, create: if signedIn();
+        // Everyone with CRM access can read + create encounters. Edits +
+        // deletes require admin or the parent veteran's assignee.
+        allow read, create: if canAccessCrm();
         allow update: if isAdmin() ||
                          get(/databases/$(database)/documents/veterans/$(id))
                            .data.assigneeUid == request.auth.uid;
@@ -57,9 +66,9 @@ service cloud.firestore {
       }
 
       match /intakes/{intakeId} {
-        // Anyone signed in can read or create intakes. Updates allowed for
-        // admin or the veteran's assignee.
-        allow read, create: if signedIn();
+        // CRM users can read or create intakes. Updates allowed for admin
+        // or the veteran's assignee.
+        allow read, create: if canAccessCrm();
         allow update: if isAdmin() ||
                          get(/databases/$(database)/documents/veterans/$(id))
                            .data.assigneeUid == request.auth.uid;
@@ -68,22 +77,22 @@ service cloud.firestore {
     }
 
     match /vsos/{id} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read: if canAccessCrm();
+      allow create, update: if canAccessCrm();
       allow delete: if false;
     }
 
     match /orgs/{id} {
-      // Same shape as veterans: anyone signed in can create + read, the
-      // assignee or an admin can update, only admins delete.
-      allow read: if signedIn();
-      allow create: if signedIn();
+      // Same shape as veterans: CRM users can create + read, the assignee
+      // or an admin can update, only admins delete.
+      allow read: if canAccessCrm();
+      allow create: if canAccessCrm();
       allow update: if isAdmin() ||
                        (isAssignee() && assigneeUnchanged());
       allow delete: if isAdmin();
 
       match /encounters/{encounterId} {
-        allow read, create: if signedIn();
+        allow read, create: if canAccessCrm();
         allow update: if isAdmin() ||
                          get(/databases/$(database)/documents/orgs/$(id))
                            .data.assigneeUid == request.auth.uid;
@@ -92,8 +101,8 @@ service cloud.firestore {
     }
 
     match /phones/{id} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read: if canAccessCrm();
+      allow create, update: if canAccessCrm();
       allow delete: if false;
     }
 
@@ -112,7 +121,7 @@ service cloud.firestore {
 
     match /rateTable/{rateCode} {
       // Read-only for the app. Seeded via Admin SDK.
-      allow read: if signedIn();
+      allow read: if canAccessCrm();
       allow write: if false;
     }
 

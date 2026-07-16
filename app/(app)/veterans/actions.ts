@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import {
+  canAccessCrm,
   canEditVeteran,
   canReassignVeteran,
   isAdmin,
@@ -65,6 +66,8 @@ export async function createVeteranAction(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = veteranInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -124,6 +127,8 @@ export async function editVeteranAction(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = veteranInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -212,6 +217,8 @@ export async function changeStageAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const stageParse = pipelineStageSchema.safeParse(newStageRaw);
   if (!stageParse.success) {
@@ -280,6 +287,8 @@ export async function addEncounterAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = encounterInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -328,6 +337,8 @@ export async function deleteVeteranAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
   if (!isAdmin(session)) {
     return { ok: false, error: "Only admins can delete veterans." };
   }

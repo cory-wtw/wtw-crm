@@ -16,15 +16,36 @@ export function isAdmin(session: SessionLike | null): boolean {
   return session?.role === "admin";
 }
 
-/** Anyone signed in can read any veteran. */
-export function canViewVeteran(session: SessionLike | null): boolean {
-  return !!session;
+/**
+ * A "social" user is the restricted social media manager: they can reach the
+ * Social wall and nothing else (no veteran/VSO/org/phone data).
+ */
+export function isSocialOnly(session: SessionLike | null): boolean {
+  return session?.role === "social";
 }
 
-/** Anyone signed in can create a veteran. Admin can choose the assignee;
- *  Standard always gets self-assigned. */
+/** Signed in AND allowed to touch the core CRM data (i.e. not social-only). */
+export function canAccessCrm(session: SessionLike | null): boolean {
+  return !!session && session.role !== "social";
+}
+
+/**
+ * Whether a given app path is part of the Social section. Used to keep
+ * social-only users penned into /social. Pure so it can be unit-tested.
+ */
+export function isSocialPath(pathname: string): boolean {
+  return pathname === "/social" || pathname.startsWith("/social/");
+}
+
+/** Anyone with CRM access can read any veteran. Social-only users cannot. */
+export function canViewVeteran(session: SessionLike | null): boolean {
+  return canAccessCrm(session);
+}
+
+/** Anyone with CRM access can create a veteran. Admin can choose the assignee;
+ *  Standard always gets self-assigned. Social-only users cannot. */
 export function canCreateVeteran(session: SessionLike | null): boolean {
-  return !!session;
+  return canAccessCrm(session);
 }
 
 /** Admins can edit any veteran. Standard can only edit ones assigned to them. */
@@ -32,9 +53,9 @@ export function canEditVeteran(
   session: SessionLike | null,
   veteran: VeteranLike,
 ): boolean {
-  if (!session) return false;
-  if (session.role === "admin") return true;
-  return veteran.assigneeUid === session.uid;
+  if (!canAccessCrm(session)) return false;
+  if (session!.role === "admin") return true;
+  return veteran.assigneeUid === session!.uid;
 }
 
 /** Only admins can change the assignee of a veteran (reassign). */
@@ -51,11 +72,11 @@ export function canDeleteVeteran(session: SessionLike | null): boolean {
  *  org-wide reference data — gating writes to admins meant standard users
  *  had to flag down a manager to add a partner or log a loaner. */
 export function canEditVso(session: SessionLike | null): boolean {
-  return !!session;
+  return canAccessCrm(session);
 }
 
 export function canEditPhone(session: SessionLike | null): boolean {
-  return !!session;
+  return canAccessCrm(session);
 }
 
 /** Only admins manage users + invites. */

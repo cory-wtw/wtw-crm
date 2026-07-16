@@ -5,6 +5,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
+import { canAccessCrm } from "@/lib/permissions";
 import { phoneInputSchema } from "@/lib/schemas";
 
 function dropUndefined<T extends Record<string, unknown>>(
@@ -31,6 +32,11 @@ function formatIssues(
 async function requireSignedIn() {
   const session = await getSession();
   if (!session) return { ok: false as const, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return {
+      ok: false as const,
+      error: "Your account doesn't have access to this.",
+    };
   return { ok: true as const, session };
 }
 

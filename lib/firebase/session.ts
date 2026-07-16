@@ -18,7 +18,7 @@ const EIGHT_HOURS_S = 8 * 60 * 60;
 export type Session = {
   uid: string;
   email: string;
-  role: "admin" | "standard" | null;
+  role: "admin" | "standard" | "social" | null;
 };
 
 /**

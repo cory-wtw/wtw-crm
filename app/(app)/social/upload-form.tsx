@@ -171,24 +171,26 @@ export function UploadForm({ veterans }: { veterans: VeteranOption[] }) {
         />
       </div>
 
-      <div className="space-y-1">
-        <label className="text-xs font-bold text-[color:var(--wtw-deep-gold)]">
-          Related veteran{" "}
-          <span className="text-muted-foreground">(optional)</span>
-        </label>
-        <select
-          value={linkedVeteranId}
-          onChange={(e) => setLinkedVeteranId(e.target.value)}
-          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
-        >
-          <option value="">— None —</option>
-          {veterans.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {veterans.length > 0 && (
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-[color:var(--wtw-deep-gold)]">
+            Related veteran{" "}
+            <span className="text-muted-foreground">(optional)</span>
+          </label>
+          <select
+            value={linkedVeteranId}
+            onChange={(e) => setLinkedVeteranId(e.target.value)}
+            className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+          >
+            <option value="">— None —</option>
+            {veterans.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <label className="flex items-start gap-2 rounded-md border border-border bg-card p-3 text-sm">
         <input

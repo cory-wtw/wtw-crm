@@ -2,15 +2,19 @@ import Link from "next/link";
 import { listMedia } from "@/lib/db/media";
 import { listVeterans } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
+import { canViewVeteran } from "@/lib/permissions";
 import { MediaGallery, type MediaRow } from "./media-gallery";
 
 export const dynamic = "force-dynamic";
 
 export default async function SocialPage() {
-  const [media, veterans, session] = await Promise.all([
+  const session = await getSession();
+
+  // Social-only users can't see veteran data, so don't resolve linked-veteran
+  // names for them — the badge just won't render.
+  const [media, veterans] = await Promise.all([
     listMedia(),
-    listVeterans(),
-    getSession(),
+    canViewVeteran(session) ? listVeterans() : Promise.resolve([]),
   ]);
 
   const veteranName = new Map(veterans.map((v) => [v.id, v.name]));
