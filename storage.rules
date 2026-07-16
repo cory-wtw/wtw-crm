@@ -1,0 +1,34 @@
+rules_version = '2';
+
+// Storage rules for the social media wall. Files live under
+// media/{uid}/{fileName}. The uploader must be signed in and can only write
+// into their own folder; anyone signed in can read (the gallery renders via
+// tokenized download URLs). Uploads are capped at 500 MB and must be an
+// image or video — mirrors MEDIA_MAX_BYTES / mediaKindFromContentType.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /media/{uid}/{fileName=**} {
+      allow read: if signedIn();
+
+      allow write: if signedIn() &&
+                      request.auth.uid == uid &&
+                      request.resource.size < 500 * 1024 * 1024 &&
+                      (request.resource.contentType.matches('image/.*') ||
+                       request.resource.contentType.matches('video/.*'));
+
+      // Deletes go through the Admin SDK (delete action + purge cron), which
+      // bypasses these rules. Block client-side deletes.
+      allow delete: if false;
+    }
+
+    // Deny everything else.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

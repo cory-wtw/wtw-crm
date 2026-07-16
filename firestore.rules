@@ -97,6 +97,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /media/{id} {
+      // Social media wall. Anyone signed in can read, add, and update
+      // (mark used / new). Deletes are restricted to the uploader or an
+      // admin — mirrors canDeleteMedia in permissions.ts. In practice every
+      // write goes through the Admin SDK in Server Actions; these are
+      // belt-and-suspenders.
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if isAdmin() ||
+                       (signedIn() &&
+                        resource.data.createdBy == request.auth.uid);
+    }
+
     match /rateTable/{rateCode} {
       // Read-only for the app. Seeded via Admin SDK.
       allow read: if signedIn();

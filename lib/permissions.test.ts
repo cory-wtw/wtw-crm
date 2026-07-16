@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   canCreateVeteran,
+  canDeleteMedia,
   canDeleteVeteran,
   canEditPhone,
   canEditVeteran,
   canEditVso,
   canManageUsers,
+  canMarkMediaUsed,
   canReassignVeteran,
+  canUploadMedia,
   canViewAuditLog,
+  canViewMedia,
   canViewVeteran,
   isAdmin,
 } from "./permissions";
@@ -87,5 +91,37 @@ describe("canManageUsers / canViewAuditLog", () => {
     expect(canManageUsers(STANDARD_A)).toBe(false);
     expect(canViewAuditLog(ADMIN)).toBe(true);
     expect(canViewAuditLog(STANDARD_A)).toBe(false);
+  });
+});
+
+describe("media permissions", () => {
+  it("anyone signed in can view, upload, and mark used", () => {
+    for (const s of [ADMIN, STANDARD_A]) {
+      expect(canViewMedia(s)).toBe(true);
+      expect(canUploadMedia(s)).toBe(true);
+      expect(canMarkMediaUsed(s)).toBe(true);
+    }
+  });
+
+  it("not-signed-in can do none of it", () => {
+    expect(canViewMedia(null)).toBe(false);
+    expect(canUploadMedia(null)).toBe(false);
+    expect(canMarkMediaUsed(null)).toBe(false);
+  });
+
+  it("uploader can delete their own media", () => {
+    expect(canDeleteMedia(STANDARD_A, { createdBy: "u-a" })).toBe(true);
+  });
+
+  it("standard user cannot delete someone else's media", () => {
+    expect(canDeleteMedia(STANDARD_A, { createdBy: "u-b" })).toBe(false);
+  });
+
+  it("admin can delete anyone's media", () => {
+    expect(canDeleteMedia(ADMIN, { createdBy: "u-b" })).toBe(true);
+  });
+
+  it("not-signed-in cannot delete media", () => {
+    expect(canDeleteMedia(null, { createdBy: "u-a" })).toBe(false);
   });
 });

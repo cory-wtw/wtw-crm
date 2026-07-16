@@ -8,6 +8,7 @@ import {
 } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage, type Storage } from "firebase-admin/storage";
 
 function buildOptions(): AppOptions {
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -40,3 +41,10 @@ const adminApp: App = getApps()[0] ?? initializeApp(buildOptions());
 
 export const adminAuth: Auth = getAuth(adminApp);
 export const adminDb: Firestore = getFirestore(adminApp);
+export const adminStorage: Storage = getStorage(adminApp);
+
+/** Default Storage bucket for media files (photos/videos). */
+export function mediaBucket() {
+  const name = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  return name ? adminStorage.bucket(name) : adminStorage.bucket();
+}

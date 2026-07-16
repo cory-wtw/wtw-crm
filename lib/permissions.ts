@@ -67,3 +67,31 @@ export function canManageUsers(session: SessionLike | null): boolean {
 export function canViewAuditLog(session: SessionLike | null): boolean {
   return isAdmin(session);
 }
+
+/** Anyone signed in can view the social media wall. */
+export function canViewMedia(session: SessionLike | null): boolean {
+  return !!session;
+}
+
+/** Anyone signed in can upload photos/videos to the social media wall. */
+export function canUploadMedia(session: SessionLike | null): boolean {
+  return !!session;
+}
+
+/**
+ * Anyone signed in can flag media as used / new (the social media manager
+ * works the wall, but we don't gate the toggle by a dedicated role yet).
+ */
+export function canMarkMediaUsed(session: SessionLike | null): boolean {
+  return !!session;
+}
+
+/** Uploaders can delete their own media; admins can delete anything. */
+export function canDeleteMedia(
+  session: SessionLike | null,
+  media: { createdBy: string },
+): boolean {
+  if (!session) return false;
+  if (session.role === "admin") return true;
+  return media.createdBy === session.uid;
+}
