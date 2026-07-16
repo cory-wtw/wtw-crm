@@ -94,6 +94,18 @@ export const mediaInputSchema = mediaSchema
   });
 export type MediaInput = z.infer<typeof mediaInputSchema>;
 
+/**
+ * The subset of fields editable after upload. The file itself (and its
+ * derived kind/size/paths) is immutable — to change it, delete and re-upload.
+ */
+export const mediaEditInputSchema = mediaSchema.pick({
+  caption: true,
+  tags: true,
+  linkedVeteranId: true,
+  consentOnFile: true,
+});
+export type MediaEditInput = z.infer<typeof mediaEditInputSchema>;
+
 /** Map a MIME type to our coarse kind, or null if it's neither. */
 export function mediaKindFromContentType(
   contentType: string,

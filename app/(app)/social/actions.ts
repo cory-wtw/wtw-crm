@@ -3,10 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { adminDb, mediaBucket } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
+import { computeDiff } from "@/lib/audit-diff";
 import { getMedia } from "@/lib/db/media";
-import { canDeleteMedia, canMarkMediaUsed } from "@/lib/permissions";
+import {
+  canDeleteMedia,
+  canEditMedia,
+  canMarkMediaUsed,
+  canViewVeteran,
+} from "@/lib/permissions";
 import { getSession } from "@/lib/firebase/session";
-import { mediaInputSchema, mediaKindFromContentType } from "@/lib/schemas";
+import {
+  mediaEditInputSchema,
+  mediaInputSchema,
+  mediaKindFromContentType,
+} from "@/lib/schemas";
 
 function dropUndefined<T extends Record<string, unknown>>(
   obj: T,
@@ -76,6 +86,68 @@ export async function createMediaAction(
 
   revalidatePath("/social");
   return { ok: true, id: ref.id };
+}
+
+/**
+ * Edit an item's details (caption, tags, consent, veteran link). The file
+ * itself is immutable. A social-only editor never sees veteran names, so we
+ * preserve any existing linkedVeteranId rather than let the edit clear it.
+ */
+export async function editMediaAction(
+  id: string,
+  rawInput: unknown,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+
+  const media = await getMedia(id);
+  if (!media) return { ok: false, error: "Media not found." };
+  if (!canEditMedia(session, media)) {
+    return { ok: false, error: "Only the uploader or an admin can edit this." };
+  }
+
+  const parsed = mediaEditInputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: formatIssues(parsed.error.issues) };
+  }
+  const input = parsed.data;
+
+  // Only a user allowed to see veterans may change the link; otherwise keep
+  // whatever's already there.
+  const linkedVeteranId = canViewVeteran(session)
+    ? input.linkedVeteranId ?? null
+    : media.linkedVeteranId;
+
+  const updates = {
+    caption: input.caption,
+    tags: input.tags ?? [],
+    consentOnFile: input.consentOnFile,
+    linkedVeteranId,
+    updatedBy: session.uid,
+    updatedAt: new Date(),
+  };
+
+  const diff = computeDiff(
+    {
+      caption: media.caption,
+      tags: media.tags,
+      consentOnFile: media.consentOnFile,
+      linkedVeteranId: media.linkedVeteranId,
+    },
+    { caption: updates.caption, tags: updates.tags, consentOnFile: updates.consentOnFile, linkedVeteranId },
+    ["caption", "tags", "consentOnFile", "linkedVeteranId"],
+  );
+
+  await adminDb.collection("media").doc(id).update(updates);
+  await logAudit({
+    action: "update",
+    resourceType: "media",
+    resourceId: id,
+    diff,
+  });
+
+  revalidatePath("/social");
+  return { ok: true, id };
 }
 
 /**
