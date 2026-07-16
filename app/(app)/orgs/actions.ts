@@ -5,6 +5,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
+import { canAccessCrm } from "@/lib/permissions";
 import { encounterInputSchema, orgInputSchema } from "@/lib/schemas";
 
 function dropUndefined<T extends Record<string, unknown>>(
@@ -33,6 +34,8 @@ export async function createOrgAction(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = orgInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -68,6 +71,8 @@ export async function editOrgAction(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = orgInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -114,6 +119,8 @@ export async function addOrgEncounterAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = encounterInputSchema.safeParse(rawInput);
   if (!parsed.success) {

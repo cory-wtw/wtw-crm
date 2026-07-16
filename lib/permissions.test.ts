@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAccessCrm,
   canCreateVeteran,
   canDeleteMedia,
   canDeleteVeteran,
@@ -14,10 +15,13 @@ import {
   canViewMedia,
   canViewVeteran,
   isAdmin,
+  isSocialOnly,
+  isSocialPath,
 } from "./permissions";
 
 const ADMIN = { uid: "u-admin", role: "admin" as const };
 const STANDARD_A = { uid: "u-a", role: "standard" as const };
+const SOCIAL = { uid: "u-social", role: "social" as const };
 
 const VET_A = { assigneeUid: "u-a" };
 const VET_B = { assigneeUid: "u-b" };
@@ -94,9 +98,59 @@ describe("canManageUsers / canViewAuditLog", () => {
   });
 });
 
+describe("social role", () => {
+  it("isSocialOnly recognizes only the social role", () => {
+    expect(isSocialOnly(SOCIAL)).toBe(true);
+    expect(isSocialOnly(ADMIN)).toBe(false);
+    expect(isSocialOnly(STANDARD_A)).toBe(false);
+    expect(isSocialOnly(null)).toBe(false);
+  });
+
+  it("canAccessCrm is true for admin/standard, false for social/null", () => {
+    expect(canAccessCrm(ADMIN)).toBe(true);
+    expect(canAccessCrm(STANDARD_A)).toBe(true);
+    expect(canAccessCrm(SOCIAL)).toBe(false);
+    expect(canAccessCrm(null)).toBe(false);
+  });
+
+  it("social users are locked out of all CRM data", () => {
+    expect(canViewVeteran(SOCIAL)).toBe(false);
+    expect(canCreateVeteran(SOCIAL)).toBe(false);
+    expect(canEditVeteran(SOCIAL, VET_A)).toBe(false);
+    expect(canEditVso(SOCIAL)).toBe(false);
+    expect(canEditPhone(SOCIAL)).toBe(false);
+    expect(canManageUsers(SOCIAL)).toBe(false);
+    expect(canViewAuditLog(SOCIAL)).toBe(false);
+    expect(canReassignVeteran(SOCIAL)).toBe(false);
+    expect(canDeleteVeteran(SOCIAL)).toBe(false);
+  });
+
+  it("social users keep full access to the media wall", () => {
+    expect(canViewMedia(SOCIAL)).toBe(true);
+    expect(canUploadMedia(SOCIAL)).toBe(true);
+    expect(canMarkMediaUsed(SOCIAL)).toBe(true);
+    expect(canDeleteMedia(SOCIAL, { createdBy: "u-social" })).toBe(true);
+    expect(canDeleteMedia(SOCIAL, { createdBy: "u-other" })).toBe(false);
+  });
+});
+
+describe("isSocialPath", () => {
+  it("matches the social section", () => {
+    expect(isSocialPath("/social")).toBe(true);
+    expect(isSocialPath("/social/new")).toBe(true);
+    expect(isSocialPath("/social/anything/deep")).toBe(true);
+  });
+  it("rejects everything else", () => {
+    expect(isSocialPath("/")).toBe(false);
+    expect(isSocialPath("/veterans")).toBe(false);
+    expect(isSocialPath("/socialite")).toBe(false);
+    expect(isSocialPath("/admin/users")).toBe(false);
+  });
+});
+
 describe("media permissions", () => {
   it("anyone signed in can view, upload, and mark used", () => {
-    for (const s of [ADMIN, STANDARD_A]) {
+    for (const s of [ADMIN, STANDARD_A, SOCIAL]) {
       expect(canViewMedia(s)).toBe(true);
       expect(canUploadMedia(s)).toBe(true);
       expect(canMarkMediaUsed(s)).toBe(true);

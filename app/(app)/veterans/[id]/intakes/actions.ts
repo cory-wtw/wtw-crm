@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/firebase/session";
+import { canAccessCrm } from "@/lib/permissions";
 import {
   intakeBranchToVeteran,
   intakeHousingToVeteran,
@@ -144,6 +145,8 @@ export async function createIntakeAction(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = intakeInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -196,6 +199,8 @@ export async function saveIntakeDraftAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const parsed = intakeInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -246,6 +251,8 @@ export async function markIntakeCompleteAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const ref = adminDb
     .collection("veterans")
@@ -281,6 +288,8 @@ export async function reopenIntakeAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
 
   const ref = adminDb
     .collection("veterans")

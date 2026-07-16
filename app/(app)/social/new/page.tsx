@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { listVeterans } from "@/lib/db/veterans";
+import { getSession } from "@/lib/firebase/session";
+import { canViewVeteran } from "@/lib/permissions";
 import { UploadForm } from "../upload-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewMediaPage() {
-  const veterans = await listVeterans();
+  const session = await getSession();
+  // Only load the veteran list for users allowed to see veteran data — a
+  // social-only user must never see veteran names (PII). An empty list hides
+  // the "related veteran" picker entirely.
+  const veterans = canViewVeteran(session) ? await listVeterans() : [];
   const options = veterans.map((v) => ({ id: v.id, name: v.name }));
 
   return (

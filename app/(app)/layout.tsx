@@ -1,8 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { signOutAction } from "@/app/login/actions";
 import { getSession } from "@/lib/firebase/session";
+import { isSocialOnly, isSocialPath } from "@/lib/permissions";
 import { NavLink } from "./nav-link";
 
 export default async function AuthenticatedLayout({
@@ -12,6 +14,16 @@ export default async function AuthenticatedLayout({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // Social-only users are penned into /social. This is the authoritative
+  // check — it runs on every authenticated page render and reads the real
+  // role from the session (not a client-tamperable cookie). The middleware
+  // supplies the current path via a header.
+  const socialOnly = isSocialOnly(session);
+  if (socialOnly) {
+    const pathname = (await headers()).get("x-pathname") ?? "/social";
+    if (!isSocialPath(pathname)) redirect("/social");
+  }
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
@@ -30,14 +42,20 @@ export default async function AuthenticatedLayout({
             </span>
           </Link>
           <nav className="hidden flex-1 items-center gap-1 md:flex">
-            <NavLink href="/">Dashboard</NavLink>
-            <NavLink href="/veterans">Veterans</NavLink>
-            <NavLink href="/vsos">VSOs</NavLink>
-            <NavLink href="/orgs">Orgs</NavLink>
-            <NavLink href="/phones">Phones</NavLink>
-            <NavLink href="/social">Social</NavLink>
-            {session.role === "admin" && (
-              <NavLink href="/admin/users">Admin</NavLink>
+            {socialOnly ? (
+              <NavLink href="/social">Social</NavLink>
+            ) : (
+              <>
+                <NavLink href="/">Dashboard</NavLink>
+                <NavLink href="/veterans">Veterans</NavLink>
+                <NavLink href="/vsos">VSOs</NavLink>
+                <NavLink href="/orgs">Orgs</NavLink>
+                <NavLink href="/phones">Phones</NavLink>
+                <NavLink href="/social">Social</NavLink>
+                {session.role === "admin" && (
+                  <NavLink href="/admin/users">Admin</NavLink>
+                )}
+              </>
             )}
           </nav>
           <div className="flex items-center gap-3 text-xs">

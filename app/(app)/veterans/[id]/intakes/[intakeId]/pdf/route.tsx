@@ -5,6 +5,7 @@ import { getIntake } from "@/lib/db/intakes";
 import { getUser } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
+import { canAccessCrm } from "@/lib/permissions";
 import { formatDate } from "@/lib/format";
 import { IntakePdf } from "@/lib/intake-pdf";
 
@@ -31,6 +32,9 @@ export async function GET(
   const session = await getSession();
   if (!session) {
     return new NextResponse("Not signed in.", { status: 401 });
+  }
+  if (!canAccessCrm(session)) {
+    return new NextResponse("Not allowed.", { status: 403 });
   }
 
   const [veteran, intake] = await Promise.all([

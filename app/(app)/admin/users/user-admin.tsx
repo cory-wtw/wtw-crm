@@ -103,6 +103,7 @@ export function UserAdmin({
             >
               <option value="standard">Standard</option>
               <option value="admin">Admin</option>
+              <option value="social">Social (media only)</option>
             </select>
           </div>
           <button
@@ -214,6 +215,7 @@ export function UserAdmin({
                     >
                       <option value="standard">Standard</option>
                       <option value="admin">Admin</option>
+                      <option value="social">Social (media only)</option>
                     </select>
                   </td>
                   <td className="py-2.5">

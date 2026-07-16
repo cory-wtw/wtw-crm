@@ -18,7 +18,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(target);
   }
 
-  return NextResponse.next();
+  // Forward the path so the authenticated layout can enforce role-based
+  // routing (it reads the session to know the role; the cookie here is
+  // opaque and can't be decoded at the edge). Kept in a header rather than
+  // a query param so it never leaks into the rendered URL.
+  const headers = new Headers(request.headers);
+  headers.set("x-pathname", pathname);
+  return NextResponse.next({ request: { headers } });
 }
 
 // Next requires the matcher pattern to be a static literal. The same pattern
