@@ -31,6 +31,9 @@ env:
     value: wtw-crm-31aef.firebasestorage.app
     availability:
       - BUILD
+      # RUNTIME too: server-side media deletes resolve the bucket by name
+      # from this var.
+      - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
     value: "259965531521"
     availability:

@@ -8,4 +8,5 @@ export * from "./veteran";
 export * from "./encounter";
 export * from "./org";
 export * from "./intake";
+export * from "./media";
 export * from "./audit";
