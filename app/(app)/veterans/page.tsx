@@ -23,7 +23,7 @@ export default async function VeteransPage() {
     <div className="space-y-6">
       <div className="flex items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Veterans</h1>
+          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Veterans</h1>
           <p className="text-sm text-muted-foreground">
             Everyone WTW has identified.
           </p>

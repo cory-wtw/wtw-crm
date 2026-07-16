@@ -17,7 +17,7 @@ export default async function EditOrgPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-black tracking-tight">Edit {org.name}</h1>
+      <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Edit {org.name}</h1>
       <OrgForm
         initial={{
           id: org.id,

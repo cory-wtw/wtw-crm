@@ -124,8 +124,8 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
           {filtered.length} of {rows.length}
         </span>
       </div>
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <table className="w-full text-sm">
+      <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
+        <table className="w-full min-w-[48rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>

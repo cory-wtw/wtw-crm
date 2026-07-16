@@ -9,7 +9,7 @@ export default async function NewOrgPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight">Add organization</h1>
+        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Add organization</h1>
         <p className="text-sm text-muted-foreground">
           Only Name is required. Fill in what you know.
         </p>

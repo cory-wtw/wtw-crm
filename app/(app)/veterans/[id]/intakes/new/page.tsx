@@ -65,7 +65,7 @@ export default async function NewIntakePage({
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
           Life & Service Intake
         </p>
-        <h1 className="text-3xl font-black tracking-tight">
+        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
           Tell us your story
         </h1>
         <p className="text-sm text-muted-foreground">

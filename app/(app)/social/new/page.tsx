@@ -23,7 +23,7 @@ export default async function NewMediaPage() {
         >
           ← Back to Social
         </Link>
-        <h1 className="mt-2 text-3xl font-black tracking-tight">Add media</h1>
+        <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Add media</h1>
         <p className="text-sm text-muted-foreground">
           Upload a photo or video and describe it so the social media manager
           knows what it is.

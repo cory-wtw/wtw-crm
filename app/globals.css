@@ -3,6 +3,33 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Mobile hardening. These rules live OUTSIDE any @layer so they win over
+   Tailwind utility classes regardless of specificity.
+
+   1. iOS Safari zooms the viewport whenever a focused form control renders
+      text below 16px. Our inputs use text-sm (14px), so bump them to 16px on
+      phones — the desktop text-sm styling is untouched above the sm breakpoint. */
+@media (max-width: 639.98px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* 2. Long unbroken strings (emails, URLs, IMEIs) shouldn't force horizontal
+      page scroll on narrow screens. */
+body {
+  overflow-wrap: break-word;
+}
+
+/* 3. Momentum scrolling for the horizontally-scrollable tables on iOS. */
+@media (max-width: 767.98px) {
+  .mobile-touch-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Worth Their Weight brand palette + shadcn token mapping.
    Light mode: cream background, near-black text, brand gold accents.
    Dark mode: near-black background, cream text, gold-light accents. */

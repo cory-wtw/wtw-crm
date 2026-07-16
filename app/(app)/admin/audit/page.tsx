@@ -43,7 +43,7 @@ export default async function AuditLogPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-black tracking-tight">Audit log</h1>
+        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Audit log</h1>
         <p className="text-sm text-muted-foreground">
           Every read of a veteran record + every create / update / delete
           across the system. Showing the most recent {logs.length} entries.
@@ -55,8 +55,8 @@ export default async function AuditLogPage() {
           No audit entries yet.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <table className="w-full text-sm">
+        <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
+          <table className="w-full min-w-[48rem] text-sm">
             <thead className="bg-secondary/60">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.15em] text-[color:var(--wtw-deep-gold)]">
                 <th className="px-4 py-3">When</th>

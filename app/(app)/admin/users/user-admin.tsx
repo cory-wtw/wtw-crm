@@ -131,7 +131,8 @@ export function UserAdmin({
         {invites.length === 0 ? (
           <p className="text-sm text-muted-foreground">No pending invites.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="mobile-touch-scroll overflow-x-auto">
+          <table className="w-full min-w-[32rem] text-sm">
             <thead>
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                 <th className="py-2">Email</th>
@@ -162,6 +163,7 @@ export function UserAdmin({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -172,7 +174,8 @@ export function UserAdmin({
         {users.length === 0 ? (
           <p className="text-sm text-muted-foreground">No users yet.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="mobile-touch-scroll overflow-x-auto">
+          <table className="w-full min-w-[44rem] text-sm">
             <thead>
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                 <th className="py-2">Name / Email</th>
@@ -263,6 +266,7 @@ export function UserAdmin({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </div>

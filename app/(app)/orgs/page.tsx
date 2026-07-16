@@ -21,7 +21,7 @@ export default async function OrgsPage() {
     <div className="space-y-6">
       <div className="flex items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Organizations</h1>
+          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Organizations</h1>
           <p className="text-sm text-muted-foreground">
             Companies, foundations, sponsors, and partners we&rsquo;ve made
             contact with.
