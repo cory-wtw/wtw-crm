@@ -106,6 +106,14 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /resources/{id} {
+      // Community resource directory (outside orgs we refer veterans to).
+      // Same shape as vsos/phones: any CRM user can read/create/update.
+      allow read: if canAccessCrm();
+      allow create, update: if canAccessCrm();
+      allow delete: if false;
+    }
+
     match /media/{id} {
       // Social media wall. Anyone signed in can read, add, and update
       // (mark used / new). Deletes are restricted to the uploader or an
