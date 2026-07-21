@@ -33,6 +33,7 @@ export default async function AuthenticatedLayout({
         { href: "/veterans", label: "Veterans" },
         { href: "/vsos", label: "VSOs" },
         { href: "/orgs", label: "Orgs" },
+        { href: "/resources", label: "Resources" },
         { href: "/phones", label: "Phones" },
         { href: "/social", label: "Social" },
         ...(session.role === "admin"

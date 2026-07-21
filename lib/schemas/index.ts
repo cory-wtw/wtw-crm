@@ -3,6 +3,7 @@ export * from "./user";
 export * from "./invite";
 export * from "./rate";
 export * from "./vso";
+export * from "./resource";
 export * from "./phone";
 export * from "./veteran";
 export * from "./encounter";
