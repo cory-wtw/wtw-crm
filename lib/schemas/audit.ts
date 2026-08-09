@@ -27,7 +27,6 @@ export const RESOURCE_TYPES = [
   "invite",
   "org",
   "org_encounter",
-  "intake",
   "media",
   "resource",
 ] as const;
@@ -43,7 +42,6 @@ export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
   invite: "Invite",
   org: "Organization",
   org_encounter: "Org Encounter",
-  intake: "Intake",
   media: "Media",
   resource: "Community Resource",
 };

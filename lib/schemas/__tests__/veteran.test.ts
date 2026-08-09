@@ -1,97 +1,111 @@
 import { describe, expect, it } from "vitest";
-import {
-  BRANCHES,
-  DISCHARGE_STATUSES,
-  HOUSING_STATUSES,
-  lifetimeBenefit,
-  veteranInputSchema,
-} from "..";
+import { lifetimeBenefit, veteranInputSchema } from "..";
+
+const base = {
+  firstName: "Test",
+  preferredContact: "phone" as const,
+  phone: "555-0100",
+  pipelineStage: "found" as const,
+};
 
 describe("veteranInputSchema", () => {
-  it("requires name", () => {
+  it("requires firstName", () => {
     const result = veteranInputSchema.safeParse({
+      preferredContact: "phone",
+      phone: "555-0100",
       pipelineStage: "found",
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.path[0] === "name")).toBe(
+      expect(
+        result.error.issues.some((i) => i.path[0] === "firstName"),
+      ).toBe(true);
+    }
+  });
+
+  it("accepts a minimal record (first name + phone)", () => {
+    const result = veteranInputSchema.safeParse(base);
+    expect(result.success).toBe(true);
+  });
+
+  it("upper-cases the last initial", () => {
+    const result = veteranInputSchema.safeParse({ ...base, lastInitial: "d" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.lastInitial).toBe("D");
+  });
+
+  it("rejects a multi-character last initial", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      lastInitial: "Do",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("requires a phone when the preferred contact is phone", () => {
+    const result = veteranInputSchema.safeParse({
+      firstName: "Test",
+      preferredContact: "phone",
+      phone: "",
+      pipelineStage: "found",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path[0] === "phone")).toBe(
         true,
       );
     }
   });
 
-  it("accepts a minimal record (name only)", () => {
+  it("requires an email when the preferred contact is email", () => {
     const result = veteranInputSchema.safeParse({
-      name: "Test Veteran",
+      firstName: "Test",
+      preferredContact: "email",
+      email: "",
+      pipelineStage: "found",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts an email-preferred record", () => {
+    const result = veteranInputSchema.safeParse({
+      firstName: "Test",
+      preferredContact: "email",
+      email: "vet@example.com",
       pipelineStage: "found",
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects unknown branches", () => {
+  it("rejects storing both a phone and an email", () => {
     const result = veteranInputSchema.safeParse({
-      name: "Test",
+      firstName: "Test",
+      preferredContact: "phone",
+      phone: "555-0100",
+      email: "vet@example.com",
       pipelineStage: "found",
-      branch: "marines_reserve",
     });
     expect(result.success).toBe(false);
-  });
-
-  it("accepts every defined branch", () => {
-    for (const branch of BRANCHES) {
-      const result = veteranInputSchema.safeParse({
-        name: "Test",
-        pipelineStage: "found",
-        branch,
-      });
-      expect(result.success).toBe(true);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path[0] === "email")).toBe(
+        true,
+      );
     }
   });
 
-  it("rejects unknown discharge statuses", () => {
+  it("rejects an invalid email", () => {
     const result = veteranInputSchema.safeParse({
-      name: "Test",
+      firstName: "Test",
+      preferredContact: "email",
+      email: "not-an-email",
       pipelineStage: "found",
-      dischargeStatus: "honorable_with_distinction",
     });
     expect(result.success).toBe(false);
-  });
-
-  it("accepts every defined discharge status", () => {
-    for (const status of DISCHARGE_STATUSES) {
-      const result = veteranInputSchema.safeParse({
-        name: "Test",
-        pipelineStage: "found",
-        dischargeStatus: status,
-      });
-      expect(result.success).toBe(true);
-    }
-  });
-
-  it("rejects unknown housing statuses", () => {
-    const result = veteranInputSchema.safeParse({
-      name: "Test",
-      pipelineStage: "found",
-      housingStatus: "couch_surfing",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("accepts every defined housing status", () => {
-    for (const status of HOUSING_STATUSES) {
-      const result = veteranInputSchema.safeParse({
-        name: "Test",
-        pipelineStage: "found",
-        housingStatus: status,
-      });
-      expect(result.success).toBe(true);
-    }
   });
 
   it("rejects birth years before 1900", () => {
     const result = veteranInputSchema.safeParse({
-      name: "Test",
-      pipelineStage: "found",
+      ...base,
       birthYear: 1850,
     });
     expect(result.success).toBe(false);
@@ -99,27 +113,8 @@ describe("veteranInputSchema", () => {
 
   it("rejects future birth years", () => {
     const result = veteranInputSchema.safeParse({
-      name: "Test",
-      pipelineStage: "found",
+      ...base,
       birthYear: new Date().getFullYear() + 5,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects negative income", () => {
-    const result = veteranInputSchema.safeParse({
-      name: "Test",
-      pipelineStage: "found",
-      yearlyIncome: -100,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects negative household size", () => {
-    const result = veteranInputSchema.safeParse({
-      name: "Test",
-      pipelineStage: "found",
-      householdSize: -1,
     });
     expect(result.success).toBe(false);
   });
@@ -132,17 +127,14 @@ describe("veteranInputSchema", () => {
       "won",
       "lost",
     ] as const) {
-      const result = veteranInputSchema.safeParse({
-        name: "Test",
-        pipelineStage: stage,
-      });
+      const result = veteranInputSchema.safeParse({ ...base, pipelineStage: stage });
       expect(result.success).toBe(true);
     }
   });
 
   it("rejects unknown pipeline stages", () => {
     const result = veteranInputSchema.safeParse({
-      name: "Test",
+      ...base,
       pipelineStage: "in_review",
     });
     expect(result.success).toBe(false);

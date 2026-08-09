@@ -12,6 +12,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { formatDate } from "@/lib/format";
+import { formatShortName } from "@/lib/name";
 import { PIPELINE_LABELS, type PipelineStage } from "@/lib/schemas";
 import type { VeteranListItem } from "@/lib/db/veterans";
 
@@ -25,16 +26,15 @@ const STAGE_TINT: Record<PipelineStage, string> = {
 
 const columns: ColumnDef<VeteranListItem>[] = [
   {
-    accessorKey: "name",
+    id: "name",
+    accessorFn: (row) => formatShortName(row.firstName, row.lastInitial),
     header: "Name",
     cell: ({ row }) => (
       <Link
         href={`/veterans/${row.original.id}`}
         className="font-bold text-foreground underline-offset-4 hover:underline"
       >
-        {row.original.preferredName
-          ? `${row.original.name} (${row.original.preferredName})`
-          : row.original.name}
+        {formatShortName(row.original.firstName, row.original.lastInitial)}
       </Link>
     ),
   },
@@ -80,10 +80,8 @@ export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
   const filtered = useMemo(() => {
     if (!query.trim()) return rows;
     const q = query.toLowerCase();
-    return rows.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        (r.preferredName ?? "").toLowerCase().includes(q),
+    return rows.filter((r) =>
+      formatShortName(r.firstName, r.lastInitial).toLowerCase().includes(q),
     );
   }, [rows, query]);
 

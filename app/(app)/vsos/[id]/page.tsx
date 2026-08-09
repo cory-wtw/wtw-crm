@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { getVso } from "@/lib/db/vsos";
 import { listVeteransByVsoId } from "@/lib/db/veterans";
+import { formatShortName } from "@/lib/name";
 import { formatDate } from "@/lib/format";
 import {
   PARTNERSHIP_STATUS_LABELS,
@@ -123,7 +124,7 @@ export default async function VsoDetailPage({
                   href={`/veterans/${v.id}`}
                   className="font-bold underline-offset-4 hover:underline"
                 >
-                  {v.name}
+                  {formatShortName(v.firstName, v.lastInitial)}
                 </Link>
                 <span className="text-xs text-muted-foreground">
                   {PIPELINE_LABELS[v.pipelineStage]}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listMedia } from "@/lib/db/media";
 import { listVeterans } from "@/lib/db/veterans";
+import { formatShortName } from "@/lib/name";
 import { getSession } from "@/lib/firebase/session";
 import { canViewVeteran } from "@/lib/permissions";
 import { MediaGallery, type MediaRow } from "./media-gallery";
@@ -17,7 +18,9 @@ export default async function SocialPage() {
     canViewVeteran(session) ? listVeterans() : Promise.resolve([]),
   ]);
 
-  const veteranName = new Map(veterans.map((v) => [v.id, v.name]));
+  const veteranName = new Map(
+    veterans.map((v) => [v.id, formatShortName(v.firstName, v.lastInitial)]),
+  );
 
   const rows: MediaRow[] = media.map((m) => ({
     id: m.id,
