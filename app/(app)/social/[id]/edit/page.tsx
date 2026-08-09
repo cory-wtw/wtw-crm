@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getMedia } from "@/lib/db/media";
 import { listVeterans } from "@/lib/db/veterans";
+import { formatShortName } from "@/lib/name";
 import { getSession } from "@/lib/firebase/session";
 import { canEditMedia, canViewVeteran } from "@/lib/permissions";
 import { EditMediaForm } from "./edit-form";
@@ -22,7 +23,10 @@ export default async function EditMediaPage({
   // Only surface the veteran picker to users allowed to see veteran data.
   const showVeteranPicker = canViewVeteran(session);
   const veterans = showVeteranPicker ? await listVeterans() : [];
-  const options = veterans.map((v) => ({ id: v.id, name: v.name }));
+  const options = veterans.map((v) => ({
+    id: v.id,
+    name: formatShortName(v.firstName, v.lastInitial),
+  }));
 
   return (
     <div className="space-y-6">

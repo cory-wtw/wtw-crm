@@ -26,18 +26,12 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
 
   return {
     id,
-    name: data.name ?? "",
-    preferredName: data.preferredName ?? undefined,
+    firstName: data.firstName ?? "",
+    lastInitial: data.lastInitial ?? "",
+    preferredContact: data.preferredContact ?? "phone",
     phone: data.phone ?? undefined,
+    email: data.email ?? undefined,
     birthYear: data.birthYear ?? undefined,
-    yearlyIncome: data.yearlyIncome ?? undefined,
-    householdSize: data.householdSize ?? undefined,
-    dependentStatus: data.dependentStatus ?? undefined,
-    branch: data.branch ?? undefined,
-    dischargeStatus: data.dischargeStatus ?? undefined,
-    serviceFrom: data.serviceFrom ?? undefined,
-    serviceTo: data.serviceTo ?? undefined,
-    housingStatus: data.housingStatus ?? undefined,
     assigneeUid: data.assigneeUid ?? null,
     pipelineStage: data.pipelineStage ?? "found",
     pipelineHistory: history.map(
@@ -58,7 +52,6 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     actualRateCode: data.actualRateCode ?? null,
     vsoIds: data.vsoIds ?? [],
     assignedPhoneId: data.assignedPhoneId ?? null,
-    notes: data.notes ?? undefined,
     createdBy: data.createdBy ?? "",
     createdAt: tsToDate(data.createdAt) ?? new Date(),
     updatedBy: data.updatedBy ?? "",
@@ -68,8 +61,8 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
 
 export type VeteranListItem = {
   id: string;
-  name: string;
-  preferredName: string | null;
+  firstName: string;
+  lastInitial: string;
   pipelineStage: PipelineStage;
   assigneeUid: string | null;
   dateFound: string | null;

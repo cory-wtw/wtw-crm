@@ -6,16 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  BRANCH_LABELS,
-  BRANCHES,
-  DEPENDENT_STATUS_LABELS,
-  DEPENDENT_STATUSES,
-  DISCHARGE_STATUS_LABELS,
-  DISCHARGE_STATUSES,
-  HOUSING_STATUS_LABELS,
-  HOUSING_STATUSES,
   PIPELINE_LABELS,
   PIPELINE_STAGES,
+  PREFERRED_CONTACT_LABELS,
+  PREFERRED_CONTACT_METHODS,
 } from "@/lib/schemas";
 import { createVeteranAction, editVeteranAction } from "./actions";
 
@@ -43,20 +37,14 @@ type Props = {
 // Form values are strings so empty inputs are easy to detect; we coerce
 // before sending to the server action.
 const formSchema = z.object({
-  name: z.string().min(1, "Required"),
-  preferredName: z.string().optional(),
+  firstName: z.string().min(1, "Required"),
+  lastInitial: z.string().max(1, "One letter only").optional(),
+
+  preferredContact: z.enum(PREFERRED_CONTACT_METHODS),
   phone: z.string().optional(),
+  email: z.string().optional(),
 
   birthYear: z.string().optional(),
-  yearlyIncome: z.string().optional(),
-  householdSize: z.string().optional(),
-  dependentStatus: z.string().optional(),
-
-  branch: z.string().optional(),
-  dischargeStatus: z.string().optional(),
-  serviceFrom: z.string().optional(),
-  serviceTo: z.string().optional(),
-  housingStatus: z.string().optional(),
 
   assigneeUid: z.string().optional(),
   pipelineStage: z.enum(PIPELINE_STAGES),
@@ -69,8 +57,6 @@ const formSchema = z.object({
 
   vsoIds: z.array(z.string()),
   assignedPhoneId: z.string().optional(),
-
-  notes: z.string().optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -95,22 +81,17 @@ export function VeteranForm({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      preferredName: "",
+      firstName: "",
+      lastInitial: "",
+      preferredContact: "phone",
       phone: "",
+      email: "",
       birthYear: "",
-      yearlyIncome: "",
-      householdSize: "",
-      dependentStatus: "",
-      branch: "",
-      dischargeStatus: "",
-      serviceFrom: "",
-      serviceTo: "",
-      housingStatus: "",
       assigneeUid: "",
       pipelineStage: "found",
       lifeExpectancyAtFound: "",
@@ -119,45 +100,31 @@ export function VeteranForm({
       actualRateCode: "",
       vsoIds: [],
       assignedPhoneId: "",
-      notes: "",
       ...initial?.values,
     },
   });
 
+  const preferredContact = watch("preferredContact");
+
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
+    // Store only the preferred contact channel — the other is left blank so
+    // we never keep both a phone and an email on the same record.
+    const usePhone = values.preferredContact === "phone";
     const input = {
-      name: values.name,
-      preferredName: values.preferredName || undefined,
-      phone: values.phone || undefined,
+      firstName: values.firstName,
+      lastInitial: (values.lastInitial || "").toUpperCase(),
+      preferredContact: values.preferredContact,
+      phone: usePhone ? values.phone || undefined : "",
+      email: !usePhone ? values.email || undefined : "",
       birthYear: toNumber(values.birthYear),
-      yearlyIncome: toNumber(values.yearlyIncome),
-      householdSize: toNumber(values.householdSize),
-      dependentStatus:
-        values.dependentStatus && values.dependentStatus.length
-          ? values.dependentStatus
-          : undefined,
-      branch:
-        values.branch && values.branch.length ? values.branch : undefined,
-      dischargeStatus:
-        values.dischargeStatus && values.dischargeStatus.length
-          ? values.dischargeStatus
-          : undefined,
-      serviceFrom: values.serviceFrom || undefined,
-      serviceTo: values.serviceTo || undefined,
-      housingStatus:
-        values.housingStatus && values.housingStatus.length
-          ? values.housingStatus
-          : undefined,
       assigneeUid: values.assigneeUid || null,
       pipelineStage: values.pipelineStage,
       lifeExpectancyAtFound: toNumber(values.lifeExpectancyAtFound),
-      ageAtFound: toNumber(values.ageAtFound),
       anticipatedRateCode: values.anticipatedRateCode || null,
       actualRateCode: values.actualRateCode || null,
       vsoIds: values.vsoIds,
       assignedPhoneId: values.assignedPhoneId || null,
-      notes: values.notes || undefined,
     };
 
     const result = initial
@@ -177,101 +144,52 @@ export function VeteranForm({
     <form onSubmit={onSubmit} className="space-y-10">
       <Section title="Identity">
         <Field
-          label="Name"
+          label="First name"
           required
-          error={errors.name?.message}
-          input={<Input {...register("name")} autoFocus />}
+          error={errors.firstName?.message}
+          input={<Input {...register("firstName")} autoFocus />}
         />
         <Field
-          label="Preferred name"
-          hint="What they actually go by, if different."
-          input={<Input {...register("preferredName")} />}
+          label="Last initial"
+          hint="Just the first letter of their last name."
+          error={errors.lastInitial?.message}
+          input={<Input maxLength={1} {...register("lastInitial")} />}
         />
-        <Field label="Phone" input={<Input {...register("phone")} />} />
+      </Section>
+
+      <Section title="Contact">
+        <Field
+          label="Preferred contact method"
+          hint="We keep only this one channel on file."
+          input={
+            <Select {...register("preferredContact")}>
+              {PREFERRED_CONTACT_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {PREFERRED_CONTACT_LABELS[m]}
+                </option>
+              ))}
+            </Select>
+          }
+        />
+        {preferredContact === "phone" ? (
+          <Field
+            label="Phone"
+            error={errors.phone?.message}
+            input={<Input type="tel" {...register("phone")} />}
+          />
+        ) : (
+          <Field
+            label="Email"
+            error={errors.email?.message}
+            input={<Input type="email" {...register("email")} />}
+          />
+        )}
       </Section>
 
       <Section title="Demographics">
         <Field
           label="Birth year"
           input={<Input type="number" {...register("birthYear")} />}
-        />
-        <Field
-          label="Yearly income"
-          hint="Used for benefit projection."
-          input={
-            <Input
-              type="number"
-              step="0.01"
-              {...register("yearlyIncome")}
-            />
-          }
-        />
-        <Field
-          label="Household size"
-          input={<Input type="number" {...register("householdSize")} />}
-        />
-        <Field
-          label="Dependent status"
-          input={
-            <Select {...register("dependentStatus")}>
-              <option value="">—</option>
-              {DEPENDENT_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {DEPENDENT_STATUS_LABELS[s]}
-                </option>
-              ))}
-            </Select>
-          }
-        />
-      </Section>
-
-      <Section title="Service">
-        <Field
-          label="Branch"
-          input={
-            <Select {...register("branch")}>
-              <option value="">—</option>
-              {BRANCHES.map((b) => (
-                <option key={b} value={b}>
-                  {BRANCH_LABELS[b]}
-                </option>
-              ))}
-            </Select>
-          }
-        />
-        <Field
-          label="Discharge status"
-          input={
-            <Select {...register("dischargeStatus")}>
-              <option value="">—</option>
-              {DISCHARGE_STATUSES.map((d) => (
-                <option key={d} value={d}>
-                  {DISCHARGE_STATUS_LABELS[d]}
-                </option>
-              ))}
-            </Select>
-          }
-        />
-        <Field
-          label="Service from"
-          input={<Input type="date" {...register("serviceFrom")} />}
-        />
-        <Field
-          label="Service to"
-          input={<Input type="date" {...register("serviceTo")} />}
-        />
-        <Field
-          label="Housing status"
-          input={
-            <Select {...register("housingStatus")}>
-              <option value="">—</option>
-              {HOUSING_STATUSES.map((h) => (
-                <option key={h} value={h}>
-                  {HOUSING_STATUS_LABELS[h]}
-                </option>
-              ))}
-            </Select>
-          }
         />
       </Section>
 
@@ -412,19 +330,6 @@ export function VeteranForm({
                 </option>
               ))}
             </Select>
-          }
-        />
-      </Section>
-
-      <Section title="Notes">
-        <Field
-          label=""
-          input={
-            <textarea
-              {...register("notes")}
-              rows={5}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
           }
         />
       </Section>

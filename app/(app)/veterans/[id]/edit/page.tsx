@@ -7,6 +7,7 @@ import { listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { listVsos } from "@/lib/db/vsos";
 import { formatUsd } from "@/lib/format";
+import { formatShortName } from "@/lib/name";
 import type { Veteran } from "@/lib/schemas";
 import { VeteranForm } from "../../veteran-form";
 
@@ -38,7 +39,7 @@ export default async function EditVeteranPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-          Edit {veteran.name}
+          Edit {formatShortName(veteran.firstName, veteran.lastInitial)}
         </h1>
         <p className="text-sm text-muted-foreground">
           Stage changes append a pipeline history entry and stamp the
@@ -74,18 +75,12 @@ export default async function EditVeteranPage({
 
 function veteranToFormValues(v: Veteran) {
   return {
-    name: v.name,
-    preferredName: v.preferredName ?? "",
+    firstName: v.firstName,
+    lastInitial: v.lastInitial ?? "",
+    preferredContact: v.preferredContact,
     phone: v.phone ?? "",
+    email: v.email ?? "",
     birthYear: v.birthYear?.toString() ?? "",
-    yearlyIncome: v.yearlyIncome?.toString() ?? "",
-    householdSize: v.householdSize?.toString() ?? "",
-    dependentStatus: v.dependentStatus ?? "",
-    branch: v.branch ?? "",
-    dischargeStatus: v.dischargeStatus ?? "",
-    serviceFrom: v.serviceFrom ?? "",
-    serviceTo: v.serviceTo ?? "",
-    housingStatus: v.housingStatus ?? "",
     assigneeUid: v.assigneeUid ?? "",
     pipelineStage: v.pipelineStage,
     lifeExpectancyAtFound: v.lifeExpectancyAtFound?.toString() ?? "",
@@ -94,7 +89,6 @@ function veteranToFormValues(v: Veteran) {
     actualRateCode: v.actualRateCode ?? "",
     vsoIds: v.vsoIds,
     assignedPhoneId: v.assignedPhoneId ?? "",
-    notes: v.notes ?? "",
   };
 }
 

@@ -1,16 +1,33 @@
 import Link from "next/link";
-import { listVeterans, type VeteranListItem } from "@/lib/db/veterans";
+import {
+  countVeteransByStage,
+  listVeterans,
+  type VeteranListItem,
+} from "@/lib/db/veterans";
+import { PIPELINE_LABELS, type PipelineStage } from "@/lib/schemas";
 import { VeteransTable } from "./veterans-table";
 
 export const dynamic = "force-dynamic";
 
+const STAGE_ORDER: PipelineStage[] = [
+  "found",
+  "connected",
+  "filed",
+  "won",
+  "lost",
+];
+
 export default async function VeteransPage() {
-  const veterans = await listVeterans();
+  const [veterans, counts] = await Promise.all([
+    listVeterans(),
+    countVeteransByStage(),
+  ]);
+  const total = STAGE_ORDER.reduce((sum, s) => sum + counts[s], 0);
 
   const rows: VeteranListItem[] = veterans.map((v) => ({
     id: v.id,
-    name: v.name,
-    preferredName: v.preferredName ?? null,
+    firstName: v.firstName,
+    lastInitial: v.lastInitial ?? "",
     pipelineStage: v.pipelineStage,
     assigneeUid: v.assigneeUid,
     dateFound: v.dateFound?.toISOString() ?? null,
@@ -36,12 +53,27 @@ export default async function VeteransPage() {
         </Link>
       </div>
 
+      <section>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
+          Pipeline
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
+          {STAGE_ORDER.map((stage) => (
+            <StageCard key={stage} stage={stage} count={counts[stage]} />
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {total === 0
+            ? "No veterans yet. Add the first one to start the pipeline."
+            : `${total} ${total === 1 ? "veteran" : "veterans"} total.`}
+        </p>
+      </section>
+
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-10 text-center">
           <p className="text-sm font-bold">No veterans yet.</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Once you add the first one, the AirTable import script can backfill
-            the rest.
+            Add veterans as outreach identifies them.
           </p>
           <Link
             href="/veterans/new"
@@ -53,6 +85,23 @@ export default async function VeteransPage() {
       ) : (
         <VeteransTable rows={rows} />
       )}
+    </div>
+  );
+}
+
+function StageCard({
+  stage,
+  count,
+}: {
+  stage: PipelineStage;
+  count: number;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+        {PIPELINE_LABELS[stage]}
+      </p>
+      <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{count}</p>
     </div>
   );
 }

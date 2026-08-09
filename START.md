@@ -45,7 +45,6 @@ An internal CRM web application to replace AirTable. Single source of truth for 
 - Veterans collection (CRUD, pipeline stages, encounters, assignment)
 - VSOs collection (CRUD, national rolodex)
 - Audit log (every veteran read/write, who and when)
-- AirTable CSV import script (one-time, run manually)
 - Brand-themed UI (gold/near-black/cream, Source Sans 3)
 
 ### Explicitly out of v1
@@ -73,28 +72,33 @@ Stored in Firestore, mirrored from Firebase Auth.
 | `lastLoginAt` | timestamp | |
 
 ### `veterans`
-The heart of the system. Every veteran WTW has identified.
+The heart of the system. Every veteran WTW has identified. Deliberately
+minimized — we keep only what's needed to run the pipeline and project the
+benefit, nothing more.
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | auto-generated |
-| `firstName`, `lastName` | string | required |
-| `preferredName` | string | optional |
-| `dob` | date | optional but recommended |
-| `last4SSN` | string | optional, encrypted at rest |
-| `branch` | enum | Army, Navy, Marines, Air Force, Space Force, Coast Guard |
-| `serviceDates` | { from, to } | optional |
-| `dischargeStatus` | enum | Honorable, General, OTH, BCD, DD, Unknown |
-| `housingStatus` | enum | Unsheltered, Transitional, Housed, Unknown |
-| `contact` | object | phone, email, address (all optional) |
+| `firstName` | string | required |
+| `lastInitial` | string | single letter; full last name is not stored |
+| `preferredContact` | enum | `phone` \| `email` — the only channel kept |
+| `phone` \| `email` | string | exactly one is stored, matching `preferredContact` |
+| `birthYear` | number | optional |
 | `pipelineStage` | enum | `found` \| `connected` \| `filed` \| `won` \| `lost` |
 | `pipelineHistory` | array | { stage, enteredAt, byUid } — auto-appended on stage change |
-| `assignedTo` | string | uid of the staff member running point |
-| `connectedVsoId` | string | reference to `vsos` collection, set when stage hits `connected` |
-| `notes` | string | freeform |
-| `tags` | string[] | optional, freeform |
+| `dateFound` … `dateLost` | timestamp | stamped as the veteran hits each stage |
+| `assigneeUid` | string | uid of the staff member running point |
+| `lifeExpectancyAtFound`, `ageAtFound` | number | benefit-projection inputs |
+| `anticipatedRateCode`, `actualRateCode` | string | look up monthly amount in `rateTable` |
+| `vsoIds` | string[] | linked VSO partners |
+| `assignedPhoneId` | string | linked Straight Talk loaner |
 | `createdBy`, `createdAt` | | |
 | `updatedBy`, `updatedAt` | | |
+
+> Note: income, household size, dependent status, branch, discharge status,
+> service dates, housing status, and free-text notes were removed in the
+> data-minimization pass, along with the separate life/service **intake**
+> feature. See `scripts/migrate-data-minimization.ts`.
 
 ### `veterans/{id}/encounters` (subcollection)
 Every interaction with a veteran — replaces the AirTable encounter form.
@@ -227,14 +231,13 @@ Footer of every authenticated page:
 
 ## AirTable migration
 
-**Not part of the initial build.** Once v1 is running on a small set of test data, build a one-off import script:
-
-1. Export each AirTable view to CSV (Veterans, VSOs, Encounters)
-2. Cory shares the CSVs and field-mapping notes
-3. Claude Code writes a Node script that reads the CSVs, transforms to the schema above, and writes via the Firebase Admin SDK
-4. Run once against staging, verify counts and a handful of records by hand, then run against production
-
-The schema above is intentionally flexible enough that fields not in current AirTable can be left empty; fields *only* in AirTable can be added as a `legacy` object on each veteran.
+**Done and retired.** The one-time CSV import was run and its tooling
+(`scripts/seed-veterans.ts`, `scripts/seed-vsos.ts`, the `airtable-*-mapping`
+helpers, and the raw `data/airtable-*.csv` exports) has since been removed —
+it imported fields that the data-minimization pass later dropped, so keeping a
+runnable importer would have re-introduced them. Veterans and VSOs are now
+added directly through the app. The VA rate table is still seeded via
+`npm run seed-rates`.
 
 ---
 

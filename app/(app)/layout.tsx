@@ -29,7 +29,6 @@ export default async function AuthenticatedLayout({
   const navItems: NavItem[] = socialOnly
     ? [{ href: "/social", label: "Social" }]
     : [
-        { href: "/", label: "Dashboard" },
         { href: "/veterans", label: "Veterans" },
         { href: "/vsos", label: "VSOs" },
         { href: "/orgs", label: "Orgs" },
@@ -45,7 +44,7 @@ export default async function AuthenticatedLayout({
     <div className="flex min-h-full flex-1 flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">
-          <Link href="/" className="flex min-w-0 items-center gap-2">
+          <Link href="/veterans" className="flex min-w-0 items-center gap-2">
             <Image
               src="/wtw-logo.png"
               alt=""

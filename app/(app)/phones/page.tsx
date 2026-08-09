@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/firebase/session";
 import { listPhones } from "@/lib/db/phones";
 import { listVeterans } from "@/lib/db/veterans";
+import { formatShortName } from "@/lib/name";
 import { PhonesTable } from "./phones-table";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,10 @@ export default async function PhonesPage() {
   const veteransByPhone = new Map<string, string>();
   for (const v of veterans) {
     if (v.assignedPhoneId) {
-      veteransByPhone.set(v.assignedPhoneId, v.name);
+      veteransByPhone.set(
+        v.assignedPhoneId,
+        formatShortName(v.firstName, v.lastInitial),
+      );
     }
   }
 

@@ -6,21 +6,18 @@ import {
   canEditVeteran,
 } from "@/lib/permissions";
 import { listEncounters } from "@/lib/db/encounters";
-import { listIntakes } from "@/lib/db/intakes";
 import { getPhone } from "@/lib/db/phones";
 import { getRate } from "@/lib/db/rates";
 import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
 import { formatDate, formatUsd } from "@/lib/format";
+import { formatShortName } from "@/lib/name";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
-  BRANCH_LABELS,
-  DEPENDENT_STATUS_LABELS,
-  DISCHARGE_STATUS_LABELS,
-  HOUSING_STATUS_LABELS,
   lifetimeBenefit,
   PIPELINE_LABELS,
+  PREFERRED_CONTACT_LABELS,
   type PipelineStage,
 } from "@/lib/schemas";
 import { EncounterForm } from "./encounter-form";
@@ -46,7 +43,7 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, intakes, allUsers, session] =
+  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, allUsers, session] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
       veteran.anticipatedRateCode
@@ -58,10 +55,11 @@ export default async function VeteranDetailPage({
         ? getPhone(veteran.assignedPhoneId)
         : null,
       listEncounters(veteran.id),
-      listIntakes(veteran.id),
       listUsers(),
       getSession(),
     ]);
+
+  const shortName = formatShortName(veteran.firstName, veteran.lastInitial);
 
   const canEdit = canEditVeteran(session, veteran);
   const canDelete = canDeleteVeteran(session);
@@ -91,7 +89,7 @@ export default async function VeteranDetailPage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-              {veteran.name}
+              {shortName}
             </h1>
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STAGE_TINT[veteran.pipelineStage]}`}
@@ -99,11 +97,6 @@ export default async function VeteranDetailPage({
               {PIPELINE_LABELS[veteran.pipelineStage]}
             </span>
           </div>
-          {veteran.preferredName && (
-            <p className="text-sm text-muted-foreground">
-              Goes by {veteran.preferredName}
-            </p>
-          )}
         </div>
         <div className="flex items-center gap-2">
           {canEdit && (
@@ -117,63 +110,33 @@ export default async function VeteranDetailPage({
           {canDelete && (
             <DeleteVeteranButton
               veteranId={veteran.id}
-              veteranName={veteran.name}
+              veteranName={shortName}
             />
           )}
         </div>
       </div>
 
-      <Card title="Identity">
-        <Row label="Phone" value={veteran.phone} />
+      <Card title="Identity & contact">
         <Row
-          label="Assignee"
+          label="Preferred contact"
+          value={PREFERRED_CONTACT_LABELS[veteran.preferredContact]}
+        />
+        <Row
+          label={veteran.preferredContact === "email" ? "Email" : "Phone"}
           value={
-            assignee ? (assignee.displayName ?? assignee.email) : "Unassigned"
+            veteran.preferredContact === "email"
+              ? veteran.email
+              : veteran.phone
           }
         />
-      </Card>
-
-      <Card title="Demographics">
         <Row
           label="Birth year"
           value={veteran.birthYear?.toString() ?? null}
         />
-        <Row label="Yearly income" value={formatUsd(veteran.yearlyIncome)} />
         <Row
-          label="Household size"
-          value={veteran.householdSize?.toString() ?? null}
-        />
-        <Row
-          label="Dependent status"
+          label="Assignee"
           value={
-            veteran.dependentStatus
-              ? DEPENDENT_STATUS_LABELS[veteran.dependentStatus]
-              : null
-          }
-        />
-      </Card>
-
-      <Card title="Service">
-        <Row
-          label="Branch"
-          value={veteran.branch ? BRANCH_LABELS[veteran.branch] : null}
-        />
-        <Row
-          label="Discharge status"
-          value={
-            veteran.dischargeStatus
-              ? DISCHARGE_STATUS_LABELS[veteran.dischargeStatus]
-              : null
-          }
-        />
-        <Row label="Service from" value={veteran.serviceFrom} />
-        <Row label="Service to" value={veteran.serviceTo} />
-        <Row
-          label="Housing status"
-          value={
-            veteran.housingStatus
-              ? HOUSING_STATUS_LABELS[veteran.housingStatus]
-              : null
+            assignee ? (assignee.displayName ?? assignee.email) : "Unassigned"
           }
         />
       </Card>
@@ -271,12 +234,6 @@ export default async function VeteranDetailPage({
         <Row label="IMEI / Serial" value={phone?.imeiSerial ?? null} />
       </Card>
 
-      {veteran.notes && (
-        <Card title="Notes">
-          <p className="whitespace-pre-wrap text-sm">{veteran.notes}</p>
-        </Card>
-      )}
-
       <Card title="Pipeline history">
         {veteran.pipelineHistory.length === 0 ? (
           <p className="text-sm text-muted-foreground">No history yet.</p>
@@ -301,63 +258,6 @@ export default async function VeteranDetailPage({
           </ol>
         )}
       </Card>
-
-      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-        <div className="mb-4 flex items-baseline justify-between gap-3">
-          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
-            Life & Service Intakes ({intakes.length})
-          </h2>
-          <Link
-            href={`/veterans/${veteran.id}/intakes/new`}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
-          >
-            New intake
-          </Link>
-        </div>
-        {intakes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No intakes yet. Start one to capture the veteran&rsquo;s story for
-            a VSO handoff.
-          </p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {intakes.map((intake) => (
-              <li
-                key={intake.id}
-                className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border pb-2 last:border-b-0"
-              >
-                <div>
-                  <Link
-                    href={`/veterans/${veteran.id}/intakes/${intake.id}`}
-                    className="font-bold underline-offset-4 hover:underline"
-                  >
-                    {intake.status === "complete"
-                      ? `Completed ${formatDate(intake.completedAt)}`
-                      : `Draft (updated ${formatDate(intake.updatedAt)})`}
-                  </Link>
-                  <span
-                    className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${
-                      intake.status === "complete"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-[color:var(--wtw-deep-gold)]/15 text-[color:var(--wtw-deep-gold)]"
-                    }`}
-                  >
-                    {intake.status}
-                  </span>
-                </div>
-                {intake.status === "draft" && (
-                  <Link
-                    href={`/veterans/${veteran.id}/intakes/${intake.id}/edit`}
-                    className="text-xs font-bold text-[color:var(--wtw-deep-gold)] underline-offset-4 hover:underline"
-                  >
-                    Continue
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="mb-4 flex items-baseline justify-between gap-3">
