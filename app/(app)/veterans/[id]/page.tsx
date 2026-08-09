@@ -61,7 +61,7 @@ export default async function VeteranDetailPage({
 
   const usersByUid = new Map(allUsers.map((u) => [u.uid, u]));
   function nameForUid(uid: string): string {
-    if (uid === "system-import") return "AirTable import";
+    if (uid === "system-import") return "Import";
     const u = usersByUid.get(uid);
     if (!u) return "Unknown";
     return u.displayName ?? u.email;

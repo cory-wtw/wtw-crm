@@ -6,6 +6,5 @@ export * from "./resource";
 export * from "./phone";
 export * from "./veteran";
 export * from "./encounter";
-export * from "./org";
 export * from "./media";
 export * from "./audit";

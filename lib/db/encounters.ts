@@ -1,7 +1,7 @@
 import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
-import type { Encounter, TransactionType } from "@/lib/schemas";
+import type { Encounter } from "@/lib/schemas";
 
 function tsToDate(value: unknown): Date | null {
   if (!value) return null;
@@ -22,8 +22,6 @@ function deserialize(
     summary: data.summary ?? "",
     nextStep: data.nextStep ?? undefined,
     nextStepDueAt: tsToDate(data.nextStepDueAt),
-    amount: typeof data.amount === "number" ? data.amount : undefined,
-    transactionType: data.transactionType as TransactionType | undefined,
     createdAt: tsToDate(data.createdAt) ?? new Date(),
   };
 }
@@ -34,18 +32,6 @@ export async function listEncounters(
   const snap = await adminDb
     .collection("veterans")
     .doc(veteranId)
-    .collection("encounters")
-    .orderBy("occurredAt", "desc")
-    .get();
-  return snap.docs.map((d) => deserialize(d.id, d.data()));
-}
-
-export async function listOrgEncounters(
-  orgId: string,
-): Promise<Encounter[]> {
-  const snap = await adminDb
-    .collection("orgs")
-    .doc(orgId)
     .collection("encounters")
     .orderBy("occurredAt", "desc")
     .get();

@@ -1,7 +1,6 @@
 import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
-import { logAudit } from "@/lib/audit";
 import type {
   PipelineHistoryEntry,
   PipelineStage,
@@ -81,13 +80,6 @@ export async function listVeterans(): Promise<Veteran[]> {
 export async function getVeteran(id: string): Promise<Veteran | null> {
   const doc = await adminDb.collection(COLLECTION).doc(id).get();
   if (!doc.exists) return null;
-  // Audit every full-record read. List views don't log per-record because
-  // they only surface summary fields; PII only renders on the detail page.
-  await logAudit({
-    action: "read",
-    resourceType: "veteran",
-    resourceId: id,
-  });
   return deserialize(doc.id, doc.data()!);
 }
 

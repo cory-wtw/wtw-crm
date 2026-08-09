@@ -168,11 +168,9 @@ Audit log entries are written by Cloud Functions triggers on every relevant coll
 | View VSO rolodex | ✅ | ✅ |
 | Create/edit VSO | ✅ | ✅ |
 | Create/edit phone | ✅ | ✅ |
-| Create/edit org | ✅ | ✅ |
-| Delete VSO / phone / org | ✅ | ❌ |
+| Delete VSO / phone | ✅ | ❌ |
 | View audit log | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
-| Run CSV import | ✅ | ❌ |
 
 Enforce in both:
 1. **Firestore Security Rules** (server-side, authoritative)
