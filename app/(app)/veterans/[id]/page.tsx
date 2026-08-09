@@ -134,6 +134,12 @@ export default async function VeteranDetailPage({
           value={veteran.birthYear?.toString() ?? null}
         />
         <Row
+          label="Location"
+          value={
+            [veteran.city, veteran.state].filter(Boolean).join(", ") || null
+          }
+        />
+        <Row
           label="Assignee"
           value={
             assignee ? (assignee.displayName ?? assignee.email) : "Unassigned"

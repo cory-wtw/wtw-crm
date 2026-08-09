@@ -81,6 +81,8 @@ function veteranToFormValues(v: Veteran) {
     phone: v.phone ?? "",
     email: v.email ?? "",
     birthYear: v.birthYear?.toString() ?? "",
+    city: v.city ?? "",
+    state: v.state ?? "",
     assigneeUid: v.assigneeUid ?? "",
     pipelineStage: v.pipelineStage,
     lifeExpectancyAtFound: v.lifeExpectancyAtFound?.toString() ?? "",

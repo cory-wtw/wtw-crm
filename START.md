@@ -84,6 +84,7 @@ benefit, nothing more.
 | `preferredContact` | enum | `phone` \| `email` — the only channel kept |
 | `phone` \| `email` | string | exactly one is stored, matching `preferredContact` |
 | `birthYear` | number | optional |
+| `city`, `state` | string | optional |
 | `pipelineStage` | enum | `found` \| `connected` \| `filed` \| `won` \| `lost` |
 | `pipelineHistory` | array | { stage, enteredAt, byUid } — auto-appended on stage change |
 | `dateFound` … `dateLost` | timestamp | stamped as the veteran hits each stage |

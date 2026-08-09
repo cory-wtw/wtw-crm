@@ -28,6 +28,19 @@ describe("veteranInputSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts optional city and state", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      city: "Chattanooga",
+      state: "TN",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.city).toBe("Chattanooga");
+      expect(result.data.state).toBe("TN");
+    }
+  });
+
   it("upper-cases the last initial", () => {
     const result = veteranInputSchema.safeParse({ ...base, lastInitial: "d" });
     expect(result.success).toBe(true);

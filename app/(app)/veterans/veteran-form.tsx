@@ -45,6 +45,8 @@ const formSchema = z.object({
   email: z.string().optional(),
 
   birthYear: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
 
   assigneeUid: z.string().optional(),
   pipelineStage: z.enum(PIPELINE_STAGES),
@@ -92,6 +94,8 @@ export function VeteranForm({
       phone: "",
       email: "",
       birthYear: "",
+      city: "",
+      state: "",
       assigneeUid: "",
       pipelineStage: "found",
       lifeExpectancyAtFound: "",
@@ -118,6 +122,8 @@ export function VeteranForm({
       phone: usePhone ? values.phone || undefined : "",
       email: !usePhone ? values.email || undefined : "",
       birthYear: toNumber(values.birthYear),
+      city: values.city || undefined,
+      state: values.state || undefined,
       assigneeUid: values.assigneeUid || null,
       pipelineStage: values.pipelineStage,
       lifeExpectancyAtFound: toNumber(values.lifeExpectancyAtFound),
@@ -191,6 +197,8 @@ export function VeteranForm({
           label="Birth year"
           input={<Input type="number" {...register("birthYear")} />}
         />
+        <Field label="City" input={<Input {...register("city")} />} />
+        <Field label="State" input={<Input {...register("state")} />} />
       </Section>
 
       <Section title="Pipeline">

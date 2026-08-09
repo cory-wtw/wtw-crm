@@ -44,6 +44,10 @@ export const veteranSchema = z.object({
     .max(currentYear, "Future year")
     .optional(),
 
+  // Location
+  city: z.string().optional(),
+  state: z.string().optional(),
+
   // Ownership
   assigneeUid: z.string().nullable().default(null),
 
