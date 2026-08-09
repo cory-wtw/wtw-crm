@@ -2,10 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { canCreateVeteran, canReassignVeteran } from "@/lib/permissions";
 import { listPhones } from "@/lib/db/phones";
-import { listRates } from "@/lib/db/rates";
 import { listUsers } from "@/lib/db/users";
 import { listVsos } from "@/lib/db/vsos";
-import { formatUsd } from "@/lib/format";
 import { VeteranForm } from "../veteran-form";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +13,8 @@ export default async function NewVeteranPage() {
   if (!canCreateVeteran(session)) redirect("/veterans");
   const canReassign = canReassignVeteran(session);
 
-  const [users, rates, vsos, phones] = await Promise.all([
+  const [users, vsos, phones] = await Promise.all([
     listUsers(),
-    listRates(),
     listVsos(),
     listPhones(),
   ]);
@@ -38,10 +35,6 @@ export default async function NewVeteranPage() {
           uid: u.uid,
           label: u.displayName ?? u.email,
         }))}
-        rates={rates.map((r) => ({
-          code: r.rateCode,
-          label: `${r.rateCode} · ${r.rating} ${rateDependentSuffix(r.dependentStatus)} · ${formatUsd(r.monthlyAmount)}/mo`,
-        }))}
         vsos={vsos.map((v) => ({
           id: v.id,
           label: v.affiliation
@@ -59,17 +52,4 @@ export default async function NewVeteranPage() {
       />
     </div>
   );
-}
-
-function rateDependentSuffix(status: string): string {
-  switch (status) {
-    case "alone":
-      return "alone";
-    case "with_spouse":
-      return "+ spouse";
-    case "with_spouse_kids":
-      return "+ spouse & kids";
-    default:
-      return "";
-  }
 }

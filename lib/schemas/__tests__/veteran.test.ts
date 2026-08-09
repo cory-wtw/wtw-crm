@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lifetimeBenefit, veteranInputSchema } from "..";
+import { monthlyBenefitLift, veteranInputSchema } from "..";
 
 const base = {
   firstName: "Test",
@@ -152,26 +152,53 @@ describe("veteranInputSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts before/after monthly benefit amounts", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      monthlyBenefitBefore: 0,
+      monthlyBenefitAfter: 1850,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a negative monthly benefit", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      monthlyBenefitAfter: -100,
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
-describe("lifetimeBenefit", () => {
-  it("matches Cory's row: 50 years × 12 × $4,928.81 = $2,957,286", () => {
-    expect(lifetimeBenefit(4928.81, 50)).toBeCloseTo(2957286, 0);
+describe("monthlyBenefitLift", () => {
+  it("is after minus before", () => {
+    expect(monthlyBenefitLift(0, 1850)).toBe(1850);
+    expect(monthlyBenefitLift(500, 2000)).toBe(1500);
   });
 
-  it("multiplies monthly amount by 12 by life expectancy at found", () => {
-    expect(lifetimeBenefit(1000, 30)).toBe(360_000);
+  it("never goes negative", () => {
+    expect(monthlyBenefitLift(2000, 500)).toBe(0);
   });
 
-  it("returns 0 when monthly amount is missing", () => {
-    expect(lifetimeBenefit(null, 30)).toBe(0);
-    expect(lifetimeBenefit(undefined, 30)).toBe(0);
-    expect(lifetimeBenefit(0, 30)).toBe(0);
+  it("treats missing values as 0", () => {
+    expect(monthlyBenefitLift(null, 1000)).toBe(1000);
+    expect(monthlyBenefitLift(undefined, undefined)).toBe(0);
+  });
+});
+
+describe("monthlyBenefitLift", () => {
+  it("is after minus before", () => {
+    expect(monthlyBenefitLift(0, 1850)).toBe(1850);
+    expect(monthlyBenefitLift(500, 2000)).toBe(1500);
   });
 
-  it("returns 0 when life expectancy is missing", () => {
-    expect(lifetimeBenefit(1000, null)).toBe(0);
-    expect(lifetimeBenefit(1000, undefined)).toBe(0);
-    expect(lifetimeBenefit(1000, 0)).toBe(0);
+  it("never goes negative", () => {
+    expect(monthlyBenefitLift(2000, 500)).toBe(0);
+  });
+
+  it("treats missing values as 0", () => {
+    expect(monthlyBenefitLift(null, 1000)).toBe(1000);
+    expect(monthlyBenefitLift(undefined, undefined)).toBe(0);
   });
 });

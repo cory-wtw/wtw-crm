@@ -14,7 +14,6 @@ import {
 import { createVeteranAction, editVeteranAction } from "./actions";
 
 export type AssigneeOption = { uid: string; label: string };
-export type RateOption = { code: string; label: string };
 export type VsoOption = { id: string; label: string };
 export type PhoneOption = { id: string; label: string };
 
@@ -29,7 +28,6 @@ type Props = {
    *  Standard users always self-assign and don't see the field. */
   canReassign: boolean;
   assignees: AssigneeOption[];
-  rates: RateOption[];
   vsos: VsoOption[];
   phones: PhoneOption[];
 };
@@ -51,11 +49,8 @@ const formSchema = z.object({
   assigneeUid: z.string().optional(),
   pipelineStage: z.enum(PIPELINE_STAGES),
 
-  lifeExpectancyAtFound: z.string().optional(),
-  ageAtFound: z.string().optional(),
-
-  anticipatedRateCode: z.string().optional(),
-  actualRateCode: z.string().optional(),
+  monthlyBenefitBefore: z.string().optional(),
+  monthlyBenefitAfter: z.string().optional(),
 
   vsoIds: z.array(z.string()),
   assignedPhoneId: z.string().optional(),
@@ -72,7 +67,6 @@ export function VeteranForm({
   initial,
   canReassign,
   assignees,
-  rates,
   vsos,
   phones,
 }: Props) {
@@ -98,10 +92,8 @@ export function VeteranForm({
       state: "",
       assigneeUid: "",
       pipelineStage: "found",
-      lifeExpectancyAtFound: "",
-      ageAtFound: "",
-      anticipatedRateCode: "",
-      actualRateCode: "",
+      monthlyBenefitBefore: "",
+      monthlyBenefitAfter: "",
       vsoIds: [],
       assignedPhoneId: "",
       ...initial?.values,
@@ -126,9 +118,8 @@ export function VeteranForm({
       state: values.state || undefined,
       assigneeUid: values.assigneeUid || null,
       pipelineStage: values.pipelineStage,
-      lifeExpectancyAtFound: toNumber(values.lifeExpectancyAtFound),
-      anticipatedRateCode: values.anticipatedRateCode || null,
-      actualRateCode: values.actualRateCode || null,
+      monthlyBenefitBefore: toNumber(values.monthlyBenefitBefore) ?? 0,
+      monthlyBenefitAfter: toNumber(values.monthlyBenefitAfter) ?? 0,
       vsoIds: values.vsoIds,
       assignedPhoneId: values.assignedPhoneId || null,
     };
@@ -246,50 +237,27 @@ export function VeteranForm({
         )}
       </Section>
 
-      <Section title="Win math">
+      <Section title="Monthly benefit">
         <Field
-          label="Life expectancy at found"
-          hint="Expected remaining years from the moment they were found. Drives lifetime benefit."
+          label="Before WTW ($/mo)"
+          hint="What they were already receiving before we got involved. Usually 0."
           input={
             <Input
               type="number"
-              {...register("lifeExpectancyAtFound")}
+              step="0.01"
+              {...register("monthlyBenefitBefore")}
             />
           }
         />
         <Field
-          label="Age at found"
-          input={<Input type="number" {...register("ageAtFound")} />}
-        />
-      </Section>
-
-      <Section title="Benefits">
-        <Field
-          label="Anticipated rate code"
-          hint="What rating we expect them to receive."
+          label="After WTW ($/mo)"
+          hint="What they receive now that we've connected them."
           input={
-            <Select {...register("anticipatedRateCode")}>
-              <option value="">—</option>
-              {rates.map((r) => (
-                <option key={r.code} value={r.code}>
-                  {r.label}
-                </option>
-              ))}
-            </Select>
-          }
-        />
-        <Field
-          label="Actual rate code"
-          hint="What the VA actually awarded. Fill in after Won."
-          input={
-            <Select {...register("actualRateCode")}>
-              <option value="">—</option>
-              {rates.map((r) => (
-                <option key={r.code} value={r.code}>
-                  {r.label}
-                </option>
-              ))}
-            </Select>
+            <Input
+              type="number"
+              step="0.01"
+              {...register("monthlyBenefitAfter")}
+            />
           }
         />
       </Section>

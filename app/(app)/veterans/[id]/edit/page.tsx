@@ -2,11 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { canEditVeteran, canReassignVeteran } from "@/lib/permissions";
 import { listPhones } from "@/lib/db/phones";
-import { listRates } from "@/lib/db/rates";
 import { listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { listVsos } from "@/lib/db/vsos";
-import { formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import type { Veteran } from "@/lib/schemas";
 import { VeteranForm } from "../../veteran-form";
@@ -28,9 +26,8 @@ export default async function EditVeteranPage({
   }
   const canReassign = canReassignVeteran(session);
 
-  const [users, rates, vsos, phones] = await Promise.all([
+  const [users, vsos, phones] = await Promise.all([
     listUsers(),
-    listRates(),
     listVsos(),
     listPhones(),
   ]);
@@ -53,10 +50,6 @@ export default async function EditVeteranPage({
         assignees={users.map((u) => ({
           uid: u.uid,
           label: u.displayName ?? u.email,
-        }))}
-        rates={rates.map((r) => ({
-          code: r.rateCode,
-          label: `${r.rateCode} · ${r.rating} ${rateDependentSuffix(r.dependentStatus)} · ${formatUsd(r.monthlyAmount)}/mo`,
         }))}
         vsos={vsos.map((v) => ({
           id: v.id,
@@ -85,24 +78,13 @@ function veteranToFormValues(v: Veteran) {
     state: v.state ?? "",
     assigneeUid: v.assigneeUid ?? "",
     pipelineStage: v.pipelineStage,
-    lifeExpectancyAtFound: v.lifeExpectancyAtFound?.toString() ?? "",
-    ageAtFound: v.ageAtFound?.toString() ?? "",
-    anticipatedRateCode: v.anticipatedRateCode ?? "",
-    actualRateCode: v.actualRateCode ?? "",
+    monthlyBenefitBefore: v.monthlyBenefitBefore
+      ? v.monthlyBenefitBefore.toString()
+      : "",
+    monthlyBenefitAfter: v.monthlyBenefitAfter
+      ? v.monthlyBenefitAfter.toString()
+      : "",
     vsoIds: v.vsoIds,
     assignedPhoneId: v.assignedPhoneId ?? "",
   };
-}
-
-function rateDependentSuffix(status: string): string {
-  switch (status) {
-    case "alone":
-      return "alone";
-    case "with_spouse":
-      return "+ spouse";
-    case "with_spouse_kids":
-      return "+ spouse & kids";
-    default:
-      return "";
-  }
 }

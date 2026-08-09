@@ -7,7 +7,6 @@ import {
 } from "@/lib/permissions";
 import { listEncounters } from "@/lib/db/encounters";
 import { getPhone } from "@/lib/db/phones";
-import { getRate } from "@/lib/db/rates";
 import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
@@ -15,7 +14,7 @@ import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
-  lifetimeBenefit,
+  monthlyBenefitLift,
   PIPELINE_LABELS,
   PREFERRED_CONTACT_LABELS,
   type PipelineStage,
@@ -43,13 +42,9 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, anticipatedRate, actualRate, vsos, phone, encounters, allUsers, session] =
+  const [assignee, vsos, phone, encounters, allUsers, session] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
-      veteran.anticipatedRateCode
-        ? getRate(veteran.anticipatedRateCode)
-        : null,
-      veteran.actualRateCode ? getRate(veteran.actualRateCode) : null,
       getVsosByIds(veteran.vsoIds),
       veteran.assignedPhoneId
         ? getPhone(veteran.assignedPhoneId)
@@ -72,15 +67,9 @@ export default async function VeteranDetailPage({
     return u.displayName ?? u.email;
   }
 
-  const anticipatedMonthly = anticipatedRate?.monthlyAmount ?? null;
-  const actualMonthly = actualRate?.monthlyAmount ?? null;
-  const anticipatedLifetime = lifetimeBenefit(
-    anticipatedMonthly,
-    veteran.lifeExpectancyAtFound,
-  );
-  const actualLifetime = lifetimeBenefit(
-    actualMonthly,
-    veteran.lifeExpectancyAtFound,
+  const monthlyLift = monthlyBenefitLift(
+    veteran.monthlyBenefitBefore,
+    veteran.monthlyBenefitAfter,
   );
 
   return (
@@ -167,47 +156,18 @@ export default async function VeteranDetailPage({
         )}
       </Card>
 
-      <Card title="Benefits">
+      <Card title="Monthly benefit">
         <Row
-          label="Life expectancy at found"
-          value={
-            veteran.lifeExpectancyAtFound
-              ? `${veteran.lifeExpectancyAtFound} years`
-              : null
-          }
+          label="Before WTW"
+          value={formatUsd(veteran.monthlyBenefitBefore)}
         />
         <Row
-          label="Age at found"
-          value={veteran.ageAtFound?.toString() ?? null}
+          label="After WTW"
+          value={formatUsd(veteran.monthlyBenefitAfter)}
         />
         <Row
-          label="Anticipated rate"
-          value={
-            anticipatedRate
-              ? `${anticipatedRate.rateCode} (${anticipatedRate.rating})`
-              : null
-          }
-        />
-        <Row
-          label="Anticipated monthly"
-          value={formatUsd(anticipatedMonthly)}
-        />
-        <Row
-          label="Anticipated lifetime"
-          value={anticipatedLifetime ? formatUsd(anticipatedLifetime) : "—"}
-        />
-        <Row
-          label="Actual rate"
-          value={
-            actualRate
-              ? `${actualRate.rateCode} (${actualRate.rating})`
-              : null
-          }
-        />
-        <Row label="Actual monthly" value={formatUsd(actualMonthly)} />
-        <Row
-          label="Actual lifetime"
-          value={actualLifetime ? formatUsd(actualLifetime) : "—"}
+          label="WTW monthly impact"
+          value={monthlyLift ? formatUsd(monthlyLift) : "—"}
         />
       </Card>
 
