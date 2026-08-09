@@ -1,7 +1,6 @@
 import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
-import { logAudit } from "@/lib/audit";
 import type {
   PipelineHistoryEntry,
   PipelineStage,
@@ -32,6 +31,8 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     phone: data.phone ?? undefined,
     email: data.email ?? undefined,
     birthYear: data.birthYear ?? undefined,
+    city: data.city ?? undefined,
+    state: data.state ?? undefined,
     assigneeUid: data.assigneeUid ?? null,
     pipelineStage: data.pipelineStage ?? "found",
     pipelineHistory: history.map(
@@ -46,10 +47,8 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     dateFiled: tsToDate(data.dateFiled),
     dateWon: tsToDate(data.dateWon),
     dateLost: tsToDate(data.dateLost),
-    lifeExpectancyAtFound: data.lifeExpectancyAtFound ?? undefined,
-    ageAtFound: data.ageAtFound ?? undefined,
-    anticipatedRateCode: data.anticipatedRateCode ?? null,
-    actualRateCode: data.actualRateCode ?? null,
+    monthlyBenefitBefore: data.monthlyBenefitBefore ?? 0,
+    monthlyBenefitAfter: data.monthlyBenefitAfter ?? 0,
     vsoIds: data.vsoIds ?? [],
     assignedPhoneId: data.assignedPhoneId ?? null,
     createdBy: data.createdBy ?? "",
@@ -67,8 +66,7 @@ export type VeteranListItem = {
   assigneeUid: string | null;
   dateFound: string | null;
   updatedAt: string;
-  anticipatedMonthly: number | null;
-  actualMonthly: number | null;
+  monthlyBenefitAfter: number;
 };
 
 export async function listVeterans(): Promise<Veteran[]> {
@@ -82,13 +80,6 @@ export async function listVeterans(): Promise<Veteran[]> {
 export async function getVeteran(id: string): Promise<Veteran | null> {
   const doc = await adminDb.collection(COLLECTION).doc(id).get();
   if (!doc.exists) return null;
-  // Audit every full-record read. List views don't log per-record because
-  // they only surface summary fields; PII only renders on the detail page.
-  await logAudit({
-    action: "read",
-    resourceType: "veteran",
-    resourceId: id,
-  });
   return deserialize(doc.id, doc.data()!);
 }
 

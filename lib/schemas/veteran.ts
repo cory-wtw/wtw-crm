@@ -44,6 +44,10 @@ export const veteranSchema = z.object({
     .max(currentYear, "Future year")
     .optional(),
 
+  // Location
+  city: z.string().optional(),
+  state: z.string().optional(),
+
   // Ownership
   assigneeUid: z.string().nullable().default(null),
 
@@ -56,16 +60,11 @@ export const veteranSchema = z.object({
   dateWon: z.date().nullable().default(null),
   dateLost: z.date().nullable().default(null),
 
-  // Benefit projection.
-  // `lifeExpectancyAtFound` is the expected REMAINING years at the moment
-  // we found them (not absolute life expectancy). Lifetime benefit =
-  // monthlyAmount × 12 × lifeExpectancyAtFound.
-  lifeExpectancyAtFound: z.number().positive().optional(),
-  ageAtFound: z.number().int().nonnegative().optional(),
-
-  // Rate codes look up the monthly amount in rateTable.
-  anticipatedRateCode: z.string().nullable().default(null),
-  actualRateCode: z.string().nullable().default(null),
+  // Monthly VA benefit, in dollars. `before` is what they were receiving
+  // before WTW got involved (usually 0); `after` is what they receive now
+  // that we've connected them. WTW's impact is after − before.
+  monthlyBenefitBefore: z.number().nonnegative().default(0),
+  monthlyBenefitAfter: z.number().nonnegative().default(0),
 
   // Links
   vsoIds: z.array(z.string()).default([]),
@@ -132,7 +131,6 @@ export const veteranInputSchema = veteranSchema
     dateFiled: true,
     dateWon: true,
     dateLost: true,
-    ageAtFound: true,
     createdBy: true,
     createdAt: true,
     updatedBy: true,
@@ -141,15 +139,11 @@ export const veteranInputSchema = veteranSchema
   .superRefine(refineSingleContact);
 export type VeteranInput = z.infer<typeof veteranInputSchema>;
 
-/**
- * Lifetime benefit = monthlyAmount × 12 × lifeExpectancyAtFound, where
- * lifeExpectancyAtFound is the expected remaining years at Found. Returns
- * 0 when either input is missing.
- */
-export function lifetimeBenefit(
-  monthlyAmount: number | undefined | null,
-  lifeExpectancyAtFound: number | undefined | null,
+/** WTW's monthly impact for a veteran: what they get now minus what they got
+ *  before we connected them. Never negative. */
+export function monthlyBenefitLift(
+  before: number | undefined | null,
+  after: number | undefined | null,
 ): number {
-  if (!monthlyAmount || !lifeExpectancyAtFound) return 0;
-  return monthlyAmount * 12 * lifeExpectancyAtFound;
+  return Math.max(0, (after ?? 0) - (before ?? 0));
 }

@@ -32,8 +32,7 @@ export default async function VeteransPage() {
     assigneeUid: v.assigneeUid,
     dateFound: v.dateFound?.toISOString() ?? null,
     updatedAt: v.updatedAt.toISOString(),
-    anticipatedMonthly: null, // Computed from rate code in detail view
-    actualMonthly: null,
+    monthlyBenefitAfter: v.monthlyBenefitAfter ?? 0,
   }));
 
   return (

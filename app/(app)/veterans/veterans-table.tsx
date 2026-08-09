@@ -11,7 +11,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { PIPELINE_LABELS, type PipelineStage } from "@/lib/schemas";
 import type { VeteranListItem } from "@/lib/db/veterans";
@@ -51,6 +51,16 @@ const columns: ColumnDef<VeteranListItem>[] = [
         </span>
       );
     },
+  },
+  {
+    accessorKey: "monthlyBenefitAfter",
+    header: "Monthly (now)",
+    cell: ({ row }) =>
+      row.original.monthlyBenefitAfter
+        ? formatUsd(row.original.monthlyBenefitAfter)
+        : "—",
+    sortingFn: (a, b) =>
+      a.original.monthlyBenefitAfter - b.original.monthlyBenefitAfter,
   },
   {
     accessorKey: "dateFound",

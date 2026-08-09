@@ -84,12 +84,13 @@ benefit, nothing more.
 | `preferredContact` | enum | `phone` \| `email` — the only channel kept |
 | `phone` \| `email` | string | exactly one is stored, matching `preferredContact` |
 | `birthYear` | number | optional |
+| `city`, `state` | string | optional |
 | `pipelineStage` | enum | `found` \| `connected` \| `filed` \| `won` \| `lost` |
 | `pipelineHistory` | array | { stage, enteredAt, byUid } — auto-appended on stage change |
 | `dateFound` … `dateLost` | timestamp | stamped as the veteran hits each stage |
 | `assigneeUid` | string | uid of the staff member running point |
-| `lifeExpectancyAtFound`, `ageAtFound` | number | benefit-projection inputs |
-| `anticipatedRateCode`, `actualRateCode` | string | look up monthly amount in `rateTable` |
+| `monthlyBenefitBefore` | number | monthly VA benefit ($) before WTW — usually 0 |
+| `monthlyBenefitAfter` | number | monthly VA benefit ($) after we connected them |
 | `vsoIds` | string[] | linked VSO partners |
 | `assignedPhoneId` | string | linked Straight Talk loaner |
 | `createdBy`, `createdAt` | | |
@@ -98,7 +99,10 @@ benefit, nothing more.
 > Note: income, household size, dependent status, branch, discharge status,
 > service dates, housing status, and free-text notes were removed in the
 > data-minimization pass, along with the separate life/service **intake**
-> feature. See `scripts/migrate-data-minimization.ts`.
+> feature (see `scripts/migrate-data-minimization.ts`). A later pass replaced
+> the rate-code/life-expectancy/lifetime projection with the two plain
+> `monthlyBenefit*` figures and deleted the VA `rateTable` subsystem (see
+> `scripts/migrate-benefits-model.ts`). Impact = after − before.
 
 ### `veterans/{id}/encounters` (subcollection)
 Every interaction with a veteran — replaces the AirTable encounter form.
@@ -164,11 +168,9 @@ Audit log entries are written by Cloud Functions triggers on every relevant coll
 | View VSO rolodex | ✅ | ✅ |
 | Create/edit VSO | ✅ | ✅ |
 | Create/edit phone | ✅ | ✅ |
-| Create/edit org | ✅ | ✅ |
-| Delete VSO / phone / org | ✅ | ❌ |
+| Delete VSO / phone | ✅ | ❌ |
 | View audit log | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
-| Run CSV import | ✅ | ❌ |
 
 Enforce in both:
 1. **Firestore Security Rules** (server-side, authoritative)
@@ -236,8 +238,8 @@ Footer of every authenticated page:
 helpers, and the raw `data/airtable-*.csv` exports) has since been removed —
 it imported fields that the data-minimization pass later dropped, so keeping a
 runnable importer would have re-introduced them. Veterans and VSOs are now
-added directly through the app. The VA rate table is still seeded via
-`npm run seed-rates`.
+added directly through the app. (The VA `rateTable` and its `seed-rates`
+script were also removed when benefits moved to plain dollar amounts.)
 
 ---
 
