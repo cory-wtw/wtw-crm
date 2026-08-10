@@ -6,11 +6,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
+  DEPENDENT_STATUS_LABELS,
+  DEPENDENT_STATUSES,
   PIPELINE_LABELS,
   PIPELINE_STAGES,
   PREFERRED_CONTACT_LABELS,
   PREFERRED_CONTACT_METHODS,
 } from "@/lib/schemas";
+import { VA_RATINGS } from "@/lib/rate-lookup";
 import { createVeteranAction, editVeteranAction } from "./actions";
 
 export type AssigneeOption = { uid: string; label: string };
@@ -49,8 +52,9 @@ const formSchema = z.object({
   assigneeUid: z.string().optional(),
   pipelineStage: z.enum(PIPELINE_STAGES),
 
-  monthlyBenefitBefore: z.string().optional(),
-  monthlyBenefitAfter: z.string().optional(),
+  dependentStatus: z.enum(DEPENDENT_STATUSES),
+  ratingBefore: z.string(),
+  ratingAfter: z.string(),
 
   vsoIds: z.array(z.string()),
   assignedPhoneId: z.string().optional(),
@@ -92,8 +96,9 @@ export function VeteranForm({
       state: "",
       assigneeUid: "",
       pipelineStage: "found",
-      monthlyBenefitBefore: "",
-      monthlyBenefitAfter: "",
+      dependentStatus: "alone",
+      ratingBefore: "0",
+      ratingAfter: "0",
       vsoIds: [],
       assignedPhoneId: "",
       ...initial?.values,
@@ -118,8 +123,9 @@ export function VeteranForm({
       state: values.state || undefined,
       assigneeUid: values.assigneeUid || null,
       pipelineStage: values.pipelineStage,
-      monthlyBenefitBefore: toNumber(values.monthlyBenefitBefore) ?? 0,
-      monthlyBenefitAfter: toNumber(values.monthlyBenefitAfter) ?? 0,
+      dependentStatus: values.dependentStatus,
+      ratingBefore: toNumber(values.ratingBefore) ?? 0,
+      ratingAfter: toNumber(values.ratingAfter) ?? 0,
       vsoIds: values.vsoIds,
       assignedPhoneId: values.assignedPhoneId || null,
     };
@@ -237,27 +243,45 @@ export function VeteranForm({
         )}
       </Section>
 
-      <Section title="Monthly benefit">
+      <Section title="Benefit">
         <Field
-          label="Before WTW ($/mo)"
-          hint="What they were already receiving before we got involved. Usually 0."
+          label="Dependents"
+          hint="Drives which VA rate column applies."
           input={
-            <Input
-              type="number"
-              step="0.01"
-              {...register("monthlyBenefitBefore")}
-            />
+            <Select {...register("dependentStatus")}>
+              {DEPENDENT_STATUSES.map((d) => (
+                <option key={d} value={d}>
+                  {DEPENDENT_STATUS_LABELS[d]}
+                </option>
+              ))}
+            </Select>
+          }
+        />
+        <div className="hidden md:block" aria-hidden />
+        <Field
+          label="Rating before WTW"
+          hint="Their VA disability rating before we got involved. Usually 0%."
+          input={
+            <Select {...register("ratingBefore")}>
+              {VA_RATINGS.map((r) => (
+                <option key={r} value={r}>
+                  {r}%
+                </option>
+              ))}
+            </Select>
           }
         />
         <Field
-          label="After WTW ($/mo)"
-          hint="What they receive now that we've connected them."
+          label="Rating after WTW"
+          hint="Where they landed once we connected them. Dollars are computed from the current VA rates."
           input={
-            <Input
-              type="number"
-              step="0.01"
-              {...register("monthlyBenefitAfter")}
-            />
+            <Select {...register("ratingAfter")}>
+              {VA_RATINGS.map((r) => (
+                <option key={r} value={r}>
+                  {r}%
+                </option>
+              ))}
+            </Select>
           }
         />
       </Section>

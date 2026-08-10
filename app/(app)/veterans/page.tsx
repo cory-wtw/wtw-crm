@@ -4,6 +4,8 @@ import {
   listVeterans,
   type VeteranListItem,
 } from "@/lib/db/veterans";
+import { loadCurrentRateAmounts } from "@/lib/db/rates";
+import { monthlyForRating } from "@/lib/rate-lookup";
 import { PIPELINE_LABELS, type PipelineStage } from "@/lib/schemas";
 import { VeteransTable } from "./veterans-table";
 
@@ -18,9 +20,10 @@ const STAGE_ORDER: PipelineStage[] = [
 ];
 
 export default async function VeteransPage() {
-  const [veterans, counts] = await Promise.all([
+  const [veterans, counts, { amounts }] = await Promise.all([
     listVeterans(),
     countVeteransByStage(),
+    loadCurrentRateAmounts(),
   ]);
   const total = STAGE_ORDER.reduce((sum, s) => sum + counts[s], 0);
 
@@ -32,7 +35,7 @@ export default async function VeteransPage() {
     assigneeUid: v.assigneeUid,
     dateFound: v.dateFound?.toISOString() ?? null,
     updatedAt: v.updatedAt.toISOString(),
-    monthlyBenefitAfter: v.monthlyBenefitAfter ?? 0,
+    monthlyAfter: monthlyForRating(v.ratingAfter, v.dependentStatus, amounts),
   }));
 
   return (

@@ -78,12 +78,9 @@ function veteranToFormValues(v: Veteran) {
     state: v.state ?? "",
     assigneeUid: v.assigneeUid ?? "",
     pipelineStage: v.pipelineStage,
-    monthlyBenefitBefore: v.monthlyBenefitBefore
-      ? v.monthlyBenefitBefore.toString()
-      : "",
-    monthlyBenefitAfter: v.monthlyBenefitAfter
-      ? v.monthlyBenefitAfter.toString()
-      : "",
+    dependentStatus: v.dependentStatus,
+    ratingBefore: v.ratingBefore.toString(),
+    ratingAfter: v.ratingAfter.toString(),
     vsoIds: v.vsoIds,
     assignedPhoneId: v.assignedPhoneId ?? "",
   };

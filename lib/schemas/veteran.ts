@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dependentStatusSchema } from "./rate";
 import {
   pipelineHistoryEntrySchema,
   pipelineStageSchema,
@@ -60,11 +61,14 @@ export const veteranSchema = z.object({
   dateWon: z.date().nullable().default(null),
   dateLost: z.date().nullable().default(null),
 
-  // Monthly VA benefit, in dollars. `before` is what they were receiving
-  // before WTW got involved (usually 0); `after` is what they receive now
-  // that we've connected them. WTW's impact is after − before.
-  monthlyBenefitBefore: z.number().nonnegative().default(0),
-  monthlyBenefitAfter: z.number().nonnegative().default(0),
+  // Benefit as rating % + dependency category, not a fixed dollar amount —
+  // the dollars are looked up from the current VA rate table at read time, so
+  // they stay accurate as the VA raises rates. `ratingBefore` is their VA
+  // disability rating before WTW (usually 0); `ratingAfter` is where they
+  // landed after we connected them. Income unlocked = after$ − before$.
+  dependentStatus: dependentStatusSchema.default("alone"),
+  ratingBefore: z.number().int().min(0).max(100).default(0),
+  ratingAfter: z.number().int().min(0).max(100).default(0),
 
   // Links
   vsoIds: z.array(z.string()).default([]),
@@ -138,12 +142,3 @@ export const veteranInputSchema = veteranSchema
   })
   .superRefine(refineSingleContact);
 export type VeteranInput = z.infer<typeof veteranInputSchema>;
-
-/** WTW's monthly impact for a veteran: what they get now minus what they got
- *  before we connected them. Never negative. */
-export function monthlyBenefitLift(
-  before: number | undefined | null,
-  after: number | undefined | null,
-): number {
-  return Math.max(0, (after ?? 0) - (before ?? 0));
-}

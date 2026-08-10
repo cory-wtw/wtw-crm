@@ -7,14 +7,16 @@ import {
 } from "@/lib/permissions";
 import { listEncounters } from "@/lib/db/encounters";
 import { getPhone } from "@/lib/db/phones";
+import { loadCurrentRateAmounts } from "@/lib/db/rates";
 import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
 import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
+import { monthlyForRating, monthlyLift } from "@/lib/rate-lookup";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
-  monthlyBenefitLift,
+  DEPENDENT_STATUS_LABELS,
   PIPELINE_LABELS,
   PREFERRED_CONTACT_LABELS,
   type PipelineStage,
@@ -42,7 +44,7 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, vsos, phone, encounters, allUsers, session] =
+  const [assignee, vsos, phone, encounters, allUsers, session, rates] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
       getVsosByIds(veteran.vsoIds),
@@ -52,6 +54,7 @@ export default async function VeteranDetailPage({
       listEncounters(veteran.id),
       listUsers(),
       getSession(),
+      loadCurrentRateAmounts(),
     ]);
 
   const shortName = formatShortName(veteran.firstName, veteran.lastInitial);
@@ -67,10 +70,17 @@ export default async function VeteranDetailPage({
     return u.displayName ?? u.email;
   }
 
-  const monthlyLift = monthlyBenefitLift(
-    veteran.monthlyBenefitBefore,
-    veteran.monthlyBenefitAfter,
+  const beforeMonthly = monthlyForRating(
+    veteran.ratingBefore,
+    veteran.dependentStatus,
+    rates.amounts,
   );
+  const afterMonthly = monthlyForRating(
+    veteran.ratingAfter,
+    veteran.dependentStatus,
+    rates.amounts,
+  );
+  const lift = monthlyLift(beforeMonthly, afterMonthly);
 
   return (
     <div className="space-y-8">
@@ -156,19 +166,29 @@ export default async function VeteranDetailPage({
         )}
       </Card>
 
-      <Card title="Monthly benefit">
+      <Card title="Benefit">
         <Row
-          label="Before WTW"
-          value={formatUsd(veteran.monthlyBenefitBefore)}
+          label="Dependents"
+          value={DEPENDENT_STATUS_LABELS[veteran.dependentStatus]}
         />
         <Row
-          label="After WTW"
-          value={formatUsd(veteran.monthlyBenefitAfter)}
+          label="Rating before WTW"
+          value={`${veteran.ratingBefore}%`}
+        />
+        <Row label="Rating after WTW" value={`${veteran.ratingAfter}%`} />
+        <Row label="Monthly before" value={formatUsd(beforeMonthly)} />
+        <Row label="Monthly after" value={formatUsd(afterMonthly)} />
+        <Row
+          label="Monthly unlocked"
+          value={lift ? formatUsd(lift) : "—"}
         />
         <Row
-          label="WTW monthly impact"
-          value={monthlyLift ? formatUsd(monthlyLift) : "—"}
+          label="Annual unlocked"
+          value={lift ? formatUsd(lift * 12) : "—"}
         />
+        {rates.year && (
+          <Row label="Rates" value={`${rates.year} VA table`} />
+        )}
       </Card>
 
       <Card title="VSO partners">

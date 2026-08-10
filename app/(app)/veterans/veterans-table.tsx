@@ -53,14 +53,11 @@ const columns: ColumnDef<VeteranListItem>[] = [
     },
   },
   {
-    accessorKey: "monthlyBenefitAfter",
+    accessorKey: "monthlyAfter",
     header: "Monthly (now)",
     cell: ({ row }) =>
-      row.original.monthlyBenefitAfter
-        ? formatUsd(row.original.monthlyBenefitAfter)
-        : "—",
-    sortingFn: (a, b) =>
-      a.original.monthlyBenefitAfter - b.original.monthlyBenefitAfter,
+      row.original.monthlyAfter ? formatUsd(row.original.monthlyAfter) : "—",
+    sortingFn: (a, b) => a.original.monthlyAfter - b.original.monthlyAfter,
   },
   {
     accessorKey: "dateFound",

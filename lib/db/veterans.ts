@@ -47,8 +47,9 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     dateFiled: tsToDate(data.dateFiled),
     dateWon: tsToDate(data.dateWon),
     dateLost: tsToDate(data.dateLost),
-    monthlyBenefitBefore: data.monthlyBenefitBefore ?? 0,
-    monthlyBenefitAfter: data.monthlyBenefitAfter ?? 0,
+    dependentStatus: data.dependentStatus ?? "alone",
+    ratingBefore: data.ratingBefore ?? 0,
+    ratingAfter: data.ratingAfter ?? 0,
     vsoIds: data.vsoIds ?? [],
     assignedPhoneId: data.assignedPhoneId ?? null,
     createdBy: data.createdBy ?? "",
@@ -66,7 +67,7 @@ export type VeteranListItem = {
   assigneeUid: string | null;
   dateFound: string | null;
   updatedAt: string;
-  monthlyBenefitAfter: number;
+  monthlyAfter: number;
 };
 
 export async function listVeterans(): Promise<Veteran[]> {

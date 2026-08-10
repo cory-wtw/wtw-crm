@@ -11,8 +11,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "make-admin": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/make-admin.ts",
+    "seed-rates": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/seed-rates.ts",
     "migrate-data-minimization": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/migrate-data-minimization.ts",
-    "migrate-benefits-model": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/migrate-benefits-model.ts",
+    "migrate-benefit-ratings": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/migrate-benefit-ratings.ts",
     "purge-orgs": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/purge-orgs.ts",
     "deploy-rules": "firebase deploy --only firestore:rules,storage --project=wtw-crm-31aef"
   },
