@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { monthlyBenefitLift, veteranInputSchema } from "..";
+import { veteranInputSchema } from "..";
 
 const base = {
   firstName: "Test",
@@ -153,52 +153,33 @@ describe("veteranInputSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts before/after monthly benefit amounts", () => {
+  it("accepts dependency + before/after ratings", () => {
     const result = veteranInputSchema.safeParse({
       ...base,
-      monthlyBenefitBefore: 0,
-      monthlyBenefitAfter: 1850,
+      dependentStatus: "with_spouse",
+      ratingBefore: 0,
+      ratingAfter: 70,
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects a negative monthly benefit", () => {
-    const result = veteranInputSchema.safeParse({
-      ...base,
-      monthlyBenefitAfter: -100,
-    });
+  it("defaults dependency to alone and ratings to 0", () => {
+    const result = veteranInputSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.dependentStatus).toBe("alone");
+      expect(result.data.ratingBefore).toBe(0);
+      expect(result.data.ratingAfter).toBe(0);
+    }
+  });
+
+  it("rejects a rating above 100", () => {
+    const result = veteranInputSchema.safeParse({ ...base, ratingAfter: 120 });
     expect(result.success).toBe(false);
   });
-});
 
-describe("monthlyBenefitLift", () => {
-  it("is after minus before", () => {
-    expect(monthlyBenefitLift(0, 1850)).toBe(1850);
-    expect(monthlyBenefitLift(500, 2000)).toBe(1500);
-  });
-
-  it("never goes negative", () => {
-    expect(monthlyBenefitLift(2000, 500)).toBe(0);
-  });
-
-  it("treats missing values as 0", () => {
-    expect(monthlyBenefitLift(null, 1000)).toBe(1000);
-    expect(monthlyBenefitLift(undefined, undefined)).toBe(0);
-  });
-});
-
-describe("monthlyBenefitLift", () => {
-  it("is after minus before", () => {
-    expect(monthlyBenefitLift(0, 1850)).toBe(1850);
-    expect(monthlyBenefitLift(500, 2000)).toBe(1500);
-  });
-
-  it("never goes negative", () => {
-    expect(monthlyBenefitLift(2000, 500)).toBe(0);
-  });
-
-  it("treats missing values as 0", () => {
-    expect(monthlyBenefitLift(null, 1000)).toBe(1000);
-    expect(monthlyBenefitLift(undefined, undefined)).toBe(0);
+  it("rejects a negative rating", () => {
+    const result = veteranInputSchema.safeParse({ ...base, ratingBefore: -10 });
+    expect(result.success).toBe(false);
   });
 });

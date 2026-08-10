@@ -1,0 +1,32 @@
+Rate Code,Rating,Dependent Status,Monthly Amount,Rate Year
+10-A,10%,Alone,175.51,2026
+10-S,10%,With Spouse,175.51,2026
+10-SK,10%,With Spouse + Kids,175.51,2026
+20-A,20%,Alone,346.95,2026
+20-S,20%,With Spouse,346.95,2026
+20-SK,20%,With Spouse + Kids,346.95,2026
+30-A,30%,Alone,537.42,2026
+30-S,30%,With Spouse,600.89,2026
+30-SK,30%,With Spouse + Kids,647.81,2026
+40-A,40%,Alone,774.16,2026
+40-S,40%,With Spouse,859.04,2026
+40-SK,40%,With Spouse + Kids,922.51,2026
+50-A,50%,Alone,1102.04,2026
+50-S,50%,With Spouse,1208.71,2026
+50-SK,50%,With Spouse + Kids,1293.59,2026
+60-A,60%,Alone,1395.93,2026
+60-S,60%,With Spouse,1524.05,2026
+60-SK,60%,With Spouse + Kids,1629.43,2026
+70-A,70%,Alone,1759.19,2026
+70-S,70%,With Spouse,1908.43,2026
+70-SK,70%,With Spouse + Kids,2018.21,2026
+80-A,80%,Alone,2044.89,2026
+80-S,80%,With Spouse,2215.95,2026
+80-SK,80%,With Spouse + Kids,2341.62,2026
+90-A,90%,Alone,2297.96,2026
+90-S,90%,With Spouse,2489.82,2026
+90-SK,90%,With Spouse + Kids,2630.54,2026
+100-A,100%,Alone,3831.30,2026
+100-S,100%,With Spouse,4044.91,2026
+100-SK,100%,With Spouse + Kids,4201.35,2026
+100-SMCS-SK,100%,With Spouse + Kids,4928.81,2026

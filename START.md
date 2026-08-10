@@ -89,8 +89,9 @@ benefit, nothing more.
 | `pipelineHistory` | array | { stage, enteredAt, byUid } — auto-appended on stage change |
 | `dateFound` … `dateLost` | timestamp | stamped as the veteran hits each stage |
 | `assigneeUid` | string | uid of the staff member running point |
-| `monthlyBenefitBefore` | number | monthly VA benefit ($) before WTW — usually 0 |
-| `monthlyBenefitAfter` | number | monthly VA benefit ($) after we connected them |
+| `dependentStatus` | enum | alone / with_spouse / with_spouse_kids — picks the VA rate column |
+| `ratingBefore` | number | VA disability rating % before WTW — usually 0 |
+| `ratingAfter` | number | VA disability rating % after we connected them |
 | `vsoIds` | string[] | linked VSO partners |
 | `assignedPhoneId` | string | linked Straight Talk loaner |
 | `createdBy`, `createdAt` | | |
@@ -99,10 +100,11 @@ benefit, nothing more.
 > Note: income, household size, dependent status, branch, discharge status,
 > service dates, housing status, and free-text notes were removed in the
 > data-minimization pass, along with the separate life/service **intake**
-> feature (see `scripts/migrate-data-minimization.ts`). A later pass replaced
-> the rate-code/life-expectancy/lifetime projection with the two plain
-> `monthlyBenefit*` figures and deleted the VA `rateTable` subsystem (see
-> `scripts/migrate-benefits-model.ts`). Impact = after − before.
+> feature (see `scripts/migrate-data-minimization.ts`). Benefits are stored as
+> a VA rating % + dependency category, not fixed dollars: the monthly amount is
+> looked up from the current `rateTable` at read time (so it stays accurate as
+> the VA raises rates), and the **Reports** page totals income unlocked across
+> the roster (after$ − before$). See `scripts/migrate-benefit-ratings.ts`.
 
 ### `veterans/{id}/encounters` (subcollection)
 Every interaction with a veteran — replaces the AirTable encounter form.
@@ -238,8 +240,8 @@ Footer of every authenticated page:
 helpers, and the raw `data/airtable-*.csv` exports) has since been removed —
 it imported fields that the data-minimization pass later dropped, so keeping a
 runnable importer would have re-introduced them. Veterans and VSOs are now
-added directly through the app. (The VA `rateTable` and its `seed-rates`
-script were also removed when benefits moved to plain dollar amounts.)
+added directly through the app. (The VA `rateTable` is still seeded via
+`npm run seed-rates`; benefit dollars are computed from it at read time.)
 
 ---
 
