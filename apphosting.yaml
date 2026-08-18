@@ -42,3 +42,7 @@ env:
     value: 1:259965531521:web:dc7f51cbbfde75be092480
     availability:
       - BUILD
+  - variable: ANTHROPIC_API_KEY
+    secret: ANTHROPIC_API_KEY
+  - variable: VA_FACILITIES_API_KEY
+    secret: VA_FACILITIES_API_KEY
