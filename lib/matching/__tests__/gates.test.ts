@@ -290,14 +290,32 @@ describe("dependents", () => {
   it("requires a definite yes", () => {
     const resource = aResource({ requiresDependents: true });
     expect(
-      passesGates(aVeteran({ hasDependents: true }), resource).passes,
+      passesGates(aVeteran({ hasDependents: "yes" }), resource).passes,
     ).toBe(true);
     expect(
-      passesGates(aVeteran({ hasDependents: false }), resource).failures,
+      passesGates(aVeteran({ hasDependents: "no" }), resource).failures,
+    ).toContain("dependents");
+  });
+
+  it("fails closed on unsure and on unasked alike", () => {
+    // They differ on the record — one was asked, one wasn't — but neither is
+    // grounds for sending someone to a door that will turn them away.
+    const resource = aResource({ requiresDependents: true });
+    expect(
+      passesGates(aVeteran({ hasDependents: "unsure" }), resource).failures,
     ).toContain("dependents");
     expect(
       passesGates(aVeteran({ hasDependents: undefined }), resource).failures,
     ).toContain("dependents");
+  });
+
+  it("ignores the answer entirely when the resource doesn't require it", () => {
+    const resource = aResource({ requiresDependents: false });
+    for (const answer of ["yes", "no", "unsure", undefined] as const) {
+      expect(
+        passesGates(aVeteran({ hasDependents: answer }), resource).passes,
+      ).toBe(true);
+    }
   });
 });
 

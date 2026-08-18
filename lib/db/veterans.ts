@@ -38,7 +38,13 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     dischargeCharacter: data.dischargeCharacter ?? undefined,
     serviceEra: data.serviceEra ?? undefined,
     idStatus: data.idStatus ?? undefined,
-    hasDependents: data.hasDependents ?? undefined,
+    // Booleans predate the tri-state answer; read them forward.
+    hasDependents:
+      typeof data.hasDependents === "boolean"
+        ? data.hasDependents
+          ? "yes"
+          : "no"
+        : (data.hasDependents ?? undefined),
     assigneeUid: data.assigneeUid ?? null,
     pipelineStage: data.pipelineStage ?? "found",
     pipelineHistory: history.map(

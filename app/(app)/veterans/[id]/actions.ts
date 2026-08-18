@@ -16,7 +16,9 @@ import {
   type MatchInput,
 } from "@/lib/matching";
 import { canAccessCrm, canRunIntake } from "@/lib/permissions";
+import { mergeEligibility, type EligibilityAnswers } from "@/lib/intake";
 import {
+  dependentsAnswerSchema,
   dischargeCharacterSchema,
   idStatusSchema,
   receivingVaBenefitsSchema,
@@ -47,7 +49,7 @@ const intakeInputSchema = z.object({
   dischargeCharacter: dischargeCharacterSchema.optional(),
   serviceEra: serviceEraSchema.optional(),
   idStatus: idStatusSchema.optional(),
-  hasDependents: z.boolean().optional(),
+  hasDependents: dependentsAnswerSchema.optional(),
 });
 export type IntakeInput = z.infer<typeof intakeInputSchema>;
 
@@ -141,27 +143,43 @@ export async function runIntakeAction(
 
   // Only the four eligibility keys are persisted. Everything else the form
   // collected routes this call and is then discarded.
+  //
+  // A blank answer means "not asked this time", never "clear it" — see
+  // mergeEligibility. Skipping a question on a rushed follow-up call must not
+  // wipe what a colleague collected in a better conversation.
   const now = new Date();
-  const eligibility = {
-    dischargeCharacter: input.dischargeCharacter ?? null,
-    serviceEra: input.serviceEra ?? null,
-    idStatus: input.idStatus ?? null,
-    hasDependents: input.hasDependents ?? null,
+  const stored: EligibilityAnswers = {
+    dischargeCharacter: existing.dischargeCharacter ?? undefined,
+    serviceEra: existing.serviceEra ?? undefined,
+    idStatus: existing.idStatus ?? undefined,
+    hasDependents:
+      typeof existing.hasDependents === "boolean"
+        ? existing.hasDependents
+          ? "yes"
+          : "no"
+        : (existing.hasDependents ?? undefined),
   };
 
-  const diff = computeDiff(
-    existing as Record<string, unknown>,
-    eligibility as unknown as Record<string, unknown>,
-    Object.keys(eligibility),
-  );
-
-  await docRef.update({
-    ...eligibility,
-    updatedBy: session.uid,
-    updatedAt: now,
+  const { updates, effective } = mergeEligibility(stored, {
+    dischargeCharacter: input.dischargeCharacter,
+    serviceEra: input.serviceEra,
+    idStatus: input.idStatus,
+    hasDependents: input.hasDependents,
   });
 
-  if (Object.keys(diff).length > 0) {
+  if (Object.keys(updates).length > 0) {
+    const diff = computeDiff(
+      stored as Record<string, unknown>,
+      updates as Record<string, unknown>,
+      Object.keys(updates),
+    );
+
+    await docRef.update({
+      ...updates,
+      updatedBy: session.uid,
+      updatedAt: now,
+    });
+
     await logAudit({
       action: "update",
       resourceType: "veteran",
@@ -176,10 +194,12 @@ export async function runIntakeAction(
     safeTonight: input.safeTonight,
     state: existing.state ?? undefined,
     city: existing.city ?? undefined,
-    dischargeCharacter: input.dischargeCharacter,
-    serviceEra: input.serviceEra,
-    idStatus: input.idStatus,
-    hasDependents: input.hasDependents,
+    // Everything we know, not just what was asked today — a question skipped
+    // this call still matches on the answer given last week.
+    dischargeCharacter: effective.dischargeCharacter,
+    serviceEra: effective.serviceEra,
+    idStatus: effective.idStatus,
+    hasDependents: effective.hasDependents,
     receivingVaBenefits: input.receivingVaBenefits,
     needs: input.needs,
   };

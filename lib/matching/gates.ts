@@ -137,7 +137,9 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
     failures.push("era");
   }
 
-  if (r.requiresDependents && v.hasDependents !== true) {
+  // Only a stated "yes" opens this one. "unsure" fails closed like every other
+  // unknown: better a shorter list than a wasted trip.
+  if (r.requiresDependents && v.hasDependents !== "yes") {
     failures.push("dependents");
   }
 

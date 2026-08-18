@@ -15,6 +15,7 @@ import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
+  DEPENDENTS_ANSWER_LABELS,
   DISCHARGE_CHARACTER_LABELS,
   ID_STATUS_LABELS,
   monthlyBenefitLift,
@@ -171,11 +172,9 @@ export default async function VeteranDetailPage({
         <Row
           label="Dependents"
           value={
-            veteran.hasDependents === undefined
-              ? null
-              : veteran.hasDependents
-                ? "Yes"
-                : "No"
+            veteran.hasDependents
+              ? DEPENDENTS_ANSWER_LABELS[veteran.hasDependents]
+              : null
           }
         />
       </Card>

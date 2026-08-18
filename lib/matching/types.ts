@@ -1,5 +1,6 @@
 import type {
   Bucket,
+  DependentsAnswer,
   DischargeCharacter,
   IdStatus,
   ReceivingVaBenefits,
@@ -37,7 +38,7 @@ export type MatchInput = {
   dischargeCharacter?: DischargeCharacter;
   serviceEra?: ServiceEra;
   idStatus?: IdStatus;
-  hasDependents?: boolean;
+  hasDependents?: DependentsAnswer;
   receivingVaBenefits?: ReceivingVaBenefits;
 
   /** The buckets checked during intake. A resource must serve at least one. */

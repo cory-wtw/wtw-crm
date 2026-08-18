@@ -69,7 +69,7 @@ export function aVeteran(overrides: Partial<MatchInput> = {}): MatchInput {
     dischargeCharacter: "honorable",
     serviceEra: "post911",
     idStatus: "valid",
-    hasDependents: false,
+    hasDependents: "no",
     receivingVaBenefits: "yes",
     needs: ["housing"],
     ...overrides,

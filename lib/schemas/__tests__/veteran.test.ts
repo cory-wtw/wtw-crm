@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEPENDENTS_ANSWERS,
+  DEPENDENTS_ANSWER_LABELS,
   ID_STATUSES,
   ID_STATUS_LABELS,
   RECEIVING_VA_BENEFITS,
@@ -228,9 +230,30 @@ describe("eligibility keys", () => {
       dischargeCharacter: "general",
       serviceEra: "vietnam",
       idStatus: "expired",
-      hasDependents: true,
+      hasDependents: "yes",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("records uncertainty on every one of them", () => {
+    // "Not sure" is an answer. A blank field is silence. The two mean
+    // different things and the schema has to be able to hold both.
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      dischargeCharacter: "unsure",
+      serviceEra: "unsure",
+      idStatus: "unsure",
+      hasDependents: "unsure",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("no longer accepts a boolean for dependents", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      hasDependents: true,
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects a value outside the enum", () => {
@@ -252,6 +275,9 @@ describe("eligibility keys", () => {
     }
     for (const answer of RECEIVING_VA_BENEFITS) {
       expect(RECEIVING_VA_BENEFITS_LABELS[answer]).toBeTruthy();
+    }
+    for (const answer of DEPENDENTS_ANSWERS) {
+      expect(DEPENDENTS_ANSWER_LABELS[answer]).toBeTruthy();
     }
   });
 });

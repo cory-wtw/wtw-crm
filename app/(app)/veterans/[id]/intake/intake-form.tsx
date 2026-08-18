@@ -9,6 +9,8 @@ import {
   BUCKET_CODES,
   BUCKET_LABELS,
   BUCKET_PROMPTS,
+  DEPENDENTS_ANSWERS,
+  DEPENDENTS_ANSWER_LABELS,
   DISCHARGE_CHARACTERS,
   DISCHARGE_CHARACTER_LABELS,
   ID_STATUSES,
@@ -19,6 +21,7 @@ import {
   SERVICE_ERA_LABELS,
   type Bucket,
 } from "@/lib/schemas";
+import { ELIGIBILITY_FIELDS } from "@/lib/intake";
 import { runIntakeAction, type IntakeResult } from "../actions";
 import { IntakeResults } from "./intake-results";
 
@@ -32,7 +35,7 @@ const formSchema = z.object({
   idStatus: z.enum(["", ...ID_STATUSES]),
   dischargeCharacter: z.enum(["", ...DISCHARGE_CHARACTERS]),
   serviceEra: z.enum(["", ...SERVICE_ERAS]),
-  hasDependents: z.enum(["", "yes", "no"]),
+  hasDependents: z.enum(["", ...DEPENDENTS_ANSWERS]),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -77,6 +80,18 @@ export function IntakeForm({
   });
 
   const safeTonight = watch("safeTonight");
+  const current = watch();
+
+  /**
+   * What the record already held for a field, and whether this call has changed
+   * it. Staff should never have to guess which answers they just gave and which
+   * came off the record — a pre-filled radio looks identical to one they set.
+   */
+  function provenance(field: keyof FormValues): Provenance {
+    const stored = initial[field];
+    if (!stored) return null;
+    return current[field] === stored ? "stored" : "changed";
+  }
   // Nowhere safe tonight collapses the rest of the call. Everything below the
   // triage section waits until they're somewhere safe.
   const inCrisis = safeTonight === "no";
@@ -95,8 +110,9 @@ export function IntakeForm({
       idStatus: values.idStatus || undefined,
       dischargeCharacter: values.dischargeCharacter || undefined,
       serviceEra: values.serviceEra || undefined,
-      hasDependents:
-        values.hasDependents === "" ? undefined : values.hasDependents === "yes",
+      // Blank stays blank all the way to the server, where it means "not asked
+      // this time" and leaves any stored answer alone.
+      hasDependents: values.hasDependents || undefined,
     };
 
     const response = await runIntakeAction(veteranId, input);
@@ -120,8 +136,26 @@ export function IntakeForm({
     );
   }
 
+  const prefilledCount = ELIGIBILITY_FIELDS.filter(
+    (field) => initial[field],
+  ).length;
+
   return (
     <form onSubmit={onSubmit} className="space-y-8">
+      {prefilledCount > 0 && (
+        <p className="rounded-lg border border-border bg-secondary/30 p-4 text-sm">
+          <span className="font-bold">
+            {prefilledCount} answer{prefilledCount === 1 ? "" : "s"} already on
+            the record
+          </span>{" "}
+          <span className="text-muted-foreground">
+            — marked below. Leave anything you don&rsquo;t ask about alone and
+            it stays as it is; nothing here is erased by skipping it. If an
+            answer is genuinely unknown, say so with &ldquo;Not sure&rdquo;.
+          </span>
+        </p>
+      )}
+
       <Section
         title="Triage"
         blurb="Ask this first, every time."
@@ -194,7 +228,10 @@ export function IntakeForm({
             title="Eligibility keys"
             blurb="Four answers that decide which doors open."
           >
-            <Question prompt="Do you have a current state ID or driver's license on you? Expired counts, just tell me it's expired.">
+            <Question
+              prompt="Do you have a current state ID or driver's license on you? Expired counts, just tell me it's expired."
+              provenance={provenance("idStatus")}
+            >
               <Radios
                 name="idStatus"
                 register={register}
@@ -205,7 +242,10 @@ export function IntakeForm({
               />
             </Question>
 
-            <Question prompt="What's on your discharge paperwork? Honorable, general, something else, or you're not sure.">
+            <Question
+              prompt="What's on your discharge paperwork? Honorable, general, something else, or you're not sure."
+              provenance={provenance("dischargeCharacter")}
+            >
               <Radios
                 name="dischargeCharacter"
                 register={register}
@@ -220,7 +260,7 @@ export function IntakeForm({
               </p>
             </Question>
 
-            <Question prompt="When did you serve?">
+            <Question prompt="When did you serve?" provenance={provenance("serviceEra")}>
               <select
                 {...register("serviceEra")}
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -234,14 +274,17 @@ export function IntakeForm({
               </select>
             </Question>
 
-            <Question prompt="Anybody depending on you? Kids, a spouse, an aging parent.">
+            <Question
+              prompt="Anybody depending on you? Kids, a spouse, an aging parent."
+              provenance={provenance("hasDependents")}
+            >
               <Radios
                 name="hasDependents"
                 register={register}
-                options={[
-                  { value: "yes", label: "Yes" },
-                  { value: "no", label: "No" },
-                ]}
+                options={DEPENDENTS_ANSWERS.map((value) => ({
+                  value,
+                  label: DEPENDENTS_ANSWER_LABELS[value],
+                }))}
               />
             </Question>
           </Section>
@@ -324,17 +367,33 @@ function Section({
   );
 }
 
+type Provenance = "stored" | "changed" | null;
+
 /** One question. The prompt IS the label — it's what staff says out loud. */
 function Question({
   prompt,
+  provenance,
   children,
 }: {
   prompt: string;
+  provenance?: Provenance;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-2">
-      <p className="text-sm font-bold">{prompt}</p>
+      <div className="flex flex-wrap items-baseline gap-2">
+        <p className="text-sm font-bold">{prompt}</p>
+        {provenance === "stored" && (
+          <span className="inline-flex shrink-0 items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+            From the record
+          </span>
+        )}
+        {provenance === "changed" && (
+          <span className="inline-flex shrink-0 items-center rounded-full bg-[color:var(--wtw-deep-gold)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--wtw-deep-gold)]">
+            Changed this call
+          </span>
+        )}
+      </div>
       {children}
     </div>
   );

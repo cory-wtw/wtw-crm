@@ -51,12 +51,7 @@ export default async function IntakePage({
           dischargeCharacter: veteran.dischargeCharacter ?? "",
           serviceEra: veteran.serviceEra ?? "",
           idStatus: veteran.idStatus ?? "",
-          hasDependents:
-            veteran.hasDependents === undefined
-              ? ""
-              : veteran.hasDependents
-                ? "yes"
-                : "no",
+          hasDependents: veteran.hasDependents ?? "",
         }}
       />
     </div>

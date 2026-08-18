@@ -20,8 +20,13 @@ export const PREFERRED_CONTACT_LABELS: Record<PreferredContact, string> = {
  * Whether they have a current state ID or driver's licence on them. Expired
  * counts as its own answer — it changes which doors open, and it's the single
  * most common thing blocking a voucher, a job, and a bank account.
+ *
+ * `unsure` exists so uncertainty is recordable and distinct from silence. A
+ * blank field means nobody asked; `unsure` means somebody asked and the answer
+ * was "I don't know". Both fail closed at the gates, but only one of them is
+ * worth asking again.
  */
-export const ID_STATUSES = ["valid", "expired", "none"] as const;
+export const ID_STATUSES = ["valid", "expired", "none", "unsure"] as const;
 export const idStatusSchema = z.enum(ID_STATUSES);
 export type IdStatus = z.infer<typeof idStatusSchema>;
 
@@ -29,6 +34,23 @@ export const ID_STATUS_LABELS: Record<IdStatus, string> = {
   valid: "Has a current ID",
   expired: "Has one, expired",
   none: "No ID",
+  unsure: "Not sure",
+};
+
+/**
+ * Whether anybody depends on them. A tri-state rather than a boolean for the
+ * same reason as `idStatus`: custody and caregiving are genuinely unclear to
+ * plenty of people on a first call, and "I don't know" is an answer worth
+ * keeping. Legacy boolean values read forward in lib/db/veterans.ts.
+ */
+export const DEPENDENTS_ANSWERS = ["yes", "no", "unsure"] as const;
+export const dependentsAnswerSchema = z.enum(DEPENDENTS_ANSWERS);
+export type DependentsAnswer = z.infer<typeof dependentsAnswerSchema>;
+
+export const DEPENDENTS_ANSWER_LABELS: Record<DependentsAnswer, string> = {
+  yes: "Yes",
+  no: "No",
+  unsure: "Not sure",
 };
 
 /**
@@ -96,7 +118,7 @@ export const veteranSchema = z.object({
   dischargeCharacter: dischargeCharacterSchema.optional(),
   serviceEra: serviceEraSchema.optional(),
   idStatus: idStatusSchema.optional(),
-  hasDependents: z.boolean().optional(),
+  hasDependents: dependentsAnswerSchema.optional(),
 
   // Ownership
   assigneeUid: z.string().nullable().default(null),
