@@ -31,6 +31,7 @@ import { createResourceAction, editResourceAction } from "./actions";
 // are typed as what they are.
 const formSchema = z.object({
   organizationName: z.string().min(1, "Required"),
+  parentOrg: z.string().optional(),
   website: z.string().optional(),
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
@@ -102,6 +103,7 @@ export function ResourceForm({ initial }: Props) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       organizationName: "",
+      parentOrg: "",
       website: "",
       contactName: "",
       contactPhone: "",
@@ -139,6 +141,7 @@ export function ResourceForm({ initial }: Props) {
     setServerError(null);
     const input = {
       organizationName: values.organizationName,
+      parentOrg: values.parentOrg || undefined,
       website: values.website || undefined,
       contactName: values.contactName || undefined,
       contactPhone: values.contactPhone || undefined,
@@ -194,6 +197,12 @@ export function ResourceForm({ initial }: Props) {
           error={errors.organizationName?.message}
         >
           <Input {...register("organizationName")} autoFocus />
+        </Field>
+        <Field
+          label="Parent organization"
+          hint="The national body or health system this one sits under, if any."
+        >
+          <Input {...register("parentOrg")} />
         </Field>
         <Field label="Website" hint="e.g. https://example.org">
           <Input {...register("website")} />

@@ -54,6 +54,7 @@ describe("resourceInputSchema", () => {
       description: "Provides emergency housing and rent assistance.",
       eligibility: "Low-income households in Hamilton County.",
       services: "Rent assistance, utility help, food pantry",
+      parentOrg: "Catholic Charities USA",
       buckets: ["housing", "essentials"],
       geoScope: "local",
       geoStates: ["TN"],
@@ -150,6 +151,19 @@ describe("resourceInputSchema", () => {
       });
       expect(result.success).toBe(false);
     }
+  });
+
+  it("keeps parentOrg optional", () => {
+    // Most organizations have no parent; the ones that do shouldn't have it
+    // folded into their name, because the name is what's on the door.
+    expect(resourceInputSchema.parse({ organizationName: "MASH" }).parentOrg)
+      .toBeUndefined();
+    expect(
+      resourceInputSchema.parse({
+        organizationName: "Hamilton County office",
+        parentOrg: "Catholic Charities USA",
+      }).parentOrg,
+    ).toBe("Catholic Charities USA");
   });
 
   it("accepts a blank email", () => {

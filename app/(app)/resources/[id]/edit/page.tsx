@@ -29,6 +29,7 @@ export default async function EditResourcePage({
           id: resource.id,
           values: {
             organizationName: resource.organizationName,
+            parentOrg: resource.parentOrg ?? "",
             website: resource.website ?? "",
             contactName: resource.contactName ?? "",
             contactPhone: resource.contactPhone ?? "",

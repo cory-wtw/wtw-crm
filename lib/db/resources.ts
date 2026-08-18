@@ -37,6 +37,7 @@ function deserialize(
   return {
     id,
     organizationName: data.organizationName ?? "",
+    parentOrg: data.parentOrg ?? undefined,
     website: data.website ?? undefined,
     contactName: data.contactName ?? undefined,
     contactPhone: data.contactPhone ?? undefined,

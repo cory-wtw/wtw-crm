@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { proposalToInput } from "@/lib/enrich";
 import {
   ACCESS_METHOD_LABELS,
   ACCESS_METHODS,
@@ -24,6 +25,7 @@ import { approveProposalAction, type EnrichResult } from "./actions";
 
 type Draft = {
   organizationName: string;
+  parentOrg: string;
   description: string;
   website: string;
   buckets: Bucket[];
@@ -50,33 +52,35 @@ function splitList(value: string, upper = false): string[] {
 }
 
 /**
- * Seed the form from the proposal.
+ * Seed the form from the proposal, through the same null-to-default mapping the
+ * script writes with — so what a reviewer sees pre-filled and what an unattended
+ * batch stores are the same thing.
  *
- * Where the model answered null, the field falls back to the schema's
- * permissive default — and `unanswered` marks it on screen, so a default is
- * never mistaken for a finding. The permissive direction matters: an
- * unanswered gate that defaulted to `true` would hide the resource from
- * veterans on a fact nobody established.
+ * Every field that fell back is marked "page didn't say" on screen, so a
+ * default is never mistaken for a finding. The permissive direction matters: an
+ * unanswered gate defaulting to `true` would hide the resource from veterans on
+ * a fact nobody established.
  */
 function toDraft(result: EnrichResult): Draft {
-  const p = result.proposal;
+  const input = proposalToInput(result.proposal, result.url);
   return {
-    organizationName: p.name ?? "",
-    description: p.description ?? "",
-    website: result.url,
-    buckets: p.buckets ?? [],
-    geoScope: p.geoScope ?? "national",
-    geoStates: (p.geoStates ?? []).join(", "),
-    geoLocalities: (p.geoLocalities ?? []).join(", "),
-    minDischarge: p.minDischarge ?? "any",
-    requiresVaEnrollment: p.requiresVaEnrollment ?? false,
-    requiresValidId: p.requiresValidId ?? false,
-    requiresDependents: p.requiresDependents ?? false,
-    crisisCapable: p.crisisCapable ?? false,
-    accessMethod: p.accessMethod ?? "phone",
-    accessValue: p.accessValue ?? "",
-    whatToBring: p.whatToBring ?? "",
-    typicalWait: p.typicalWait ?? "unknown",
+    organizationName: input.organizationName,
+    parentOrg: input.parentOrg ?? "",
+    description: input.description ?? "",
+    website: input.website,
+    buckets: input.buckets,
+    geoScope: input.geoScope,
+    geoStates: input.geoStates.join(", "),
+    geoLocalities: input.geoLocalities.join(", "),
+    minDischarge: input.minDischarge,
+    requiresVaEnrollment: input.requiresVaEnrollment,
+    requiresValidId: input.requiresValidId,
+    requiresDependents: input.requiresDependents,
+    crisisCapable: input.crisisCapable,
+    accessMethod: input.accessMethod,
+    accessValue: input.accessValue ?? "",
+    whatToBring: input.whatToBring ?? "",
+    typicalWait: input.typicalWait,
   };
 }
 
@@ -117,6 +121,7 @@ export function ProposalReview({
       const response = await approveProposalAction(
         {
           organizationName: draft.organizationName,
+          parentOrg: draft.parentOrg || undefined,
           website: draft.website || undefined,
           description: draft.description || undefined,
           buckets: draft.buckets,
@@ -139,7 +144,6 @@ export function ProposalReview({
           fragility: "fragile",
         },
         result.externalId,
-        result.url,
       );
       if (!response.ok) {
         setError(response.error);
@@ -171,19 +175,6 @@ export function ProposalReview({
         </button>
       </div>
 
-      {result.proposal.parentOrg && (
-        <p className="text-sm">
-          <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-            Parent org{" "}
-          </span>
-          {result.proposal.parentOrg}
-          <span className="text-xs text-muted-foreground">
-            {" "}
-            — not stored; fold it into the name or description if it matters.
-          </span>
-        </p>
-      )}
-
       {result.existingResourceId && (
         <p className="rounded-lg border border-border bg-secondary/30 p-3 text-sm">
           This page is already in the directory. Approving updates that record
@@ -211,6 +202,16 @@ export function ProposalReview({
             <Input
               value={draft.organizationName}
               onChange={(v) => update({ organizationName: v })}
+            />
+          </Field>
+
+          <Field
+            label="Parent organization"
+            unanswered={unanswered.has("parentOrg")}
+          >
+            <Input
+              value={draft.parentOrg}
+              onChange={(v) => update({ parentOrg: v })}
             />
           </Field>
 

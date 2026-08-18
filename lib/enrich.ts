@@ -249,3 +249,37 @@ export function parseUrlList(input: string): {
 
   return { urls, invalid };
 }
+
+/**
+ * A proposal as resource input, with every unanswered field at the schema's
+ * permissive default.
+ *
+ * One definition, used by the review form to seed itself and by the script to
+ * write directly — so what a reviewer sees pre-filled and what a batch run
+ * stores are the same thing. Permissive matters: an unanswered gate defaulting
+ * to `true` would hide the resource on a fact nobody established.
+ */
+export function proposalToInput(proposal: Proposal, url: string) {
+  return {
+    organizationName: proposal.name ?? "",
+    parentOrg: proposal.parentOrg ?? undefined,
+    description: proposal.description ?? undefined,
+    website: url,
+    buckets: proposal.buckets ?? [],
+    geoScope: proposal.geoScope ?? "national",
+    geoStates: proposal.geoStates ?? [],
+    geoLocalities: proposal.geoLocalities ?? [],
+    minDischarge: proposal.minDischarge ?? "any",
+    requiresVaEnrollment: proposal.requiresVaEnrollment ?? false,
+    requiresValidId: proposal.requiresValidId ?? false,
+    eraRestriction: proposal.eraRestriction ?? [],
+    requiresDependents: proposal.requiresDependents ?? false,
+    crisisCapable: proposal.crisisCapable ?? false,
+    accessMethod: proposal.accessMethod ?? "phone",
+    accessValue: proposal.accessValue ?? undefined,
+    whatToBring: proposal.whatToBring ?? undefined,
+    typicalWait: proposal.typicalWait ?? "unknown",
+    verificationStatus: "flagged" as const,
+    fragility: "fragile" as const,
+  };
+}

@@ -28,6 +28,7 @@ export default async function ClassifyResourcesPage() {
       website: r.website ?? null,
       input: {
         organizationName: r.organizationName,
+        parentOrg: r.parentOrg,
         website: r.website,
         contactName: r.contactName,
         contactPhone: r.contactPhone,

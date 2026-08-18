@@ -89,6 +89,11 @@ export default async function ResourceDetailPage({
           <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
             {resource.organizationName}
           </h1>
+          {resource.parentOrg && (
+            <p className="text-sm text-muted-foreground">
+              Part of {resource.parentOrg}
+            </p>
+          )}
           {resource.website && (
             <a
               href={websiteHref(resource.website)}

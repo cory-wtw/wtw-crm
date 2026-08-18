@@ -127,6 +127,14 @@ export const STALE_AFTER_DAYS = 180;
 export const resourceSchema = z.object({
   id: z.string(),
   organizationName: z.string().min(1, "Required"),
+  /**
+   * The larger organization this one sits under, when there is one — a
+   * chapter's national body, a clinic's health system. Kept separate from the
+   * name rather than folded into it: staff searching "Catholic Charities"
+   * should find the diocese office that operates under it, and a veteran being
+   * told where to go needs the name on the door, not the one on the letterhead.
+   */
+  parentOrg: z.string().optional(),
   website: z.string().optional(),
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
