@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { bucketSchema, minDischargeSchema, serviceEraSchema } from "./bucket";
+import {
+  bucketSchema,
+  minDischargeSchema,
+  serviceEraSchema,
+  type Bucket,
+} from "./bucket";
 
 // A Community Resource is an outside organization we can point veterans to —
 // food banks, rent-assistance funds, housing programs, etc. It's a searchable
@@ -269,4 +274,49 @@ export function derivedVerificationStatus(
 /** Whether a resource is fresh enough to appear in matches. */
 export function isMatchable(status: VerificationStatus): boolean {
   return status === "live" || status === "aging";
+}
+
+/**
+ * Ways a record is classified too thinly to reach anybody.
+ *
+ * Distinct from `verificationStatus`, which is about whether the organization
+ * is still there. These are about whether we've told the matcher enough to
+ * offer it: a live, well-verified resource with no buckets is invisible.
+ */
+export const CLASSIFICATION_GAPS = ["no-buckets", "no-states"] as const;
+export type ClassificationGap = (typeof CLASSIFICATION_GAPS)[number];
+
+export const CLASSIFICATION_GAP_LABELS: Record<ClassificationGap, string> = {
+  "no-buckets": "No needs set",
+  "no-states": "No states set",
+};
+
+/**
+ * What's missing before this record can match anybody.
+ *
+ * Both gaps make a resource unreachable rather than merely imprecise: no
+ * bucket overlap fails the gate outright, and a scoped record whose state list
+ * is empty fails the geography gate for every veteran alive. An empty result
+ * means the matcher can offer this resource to somebody.
+ */
+export function classificationGaps(resource: {
+  buckets: Bucket[];
+  geoScope: GeoScope;
+  geoStates: string[];
+}): ClassificationGap[] {
+  const gaps: ClassificationGap[] = [];
+  if (resource.buckets.length === 0) gaps.push("no-buckets");
+  if (resource.geoScope !== "national" && resource.geoStates.length === 0) {
+    gaps.push("no-states");
+  }
+  return gaps;
+}
+
+/** True when this record cannot currently be offered to anybody. */
+export function needsClassification(resource: {
+  buckets: Bucket[];
+  geoScope: GeoScope;
+  geoStates: string[];
+}): boolean {
+  return classificationGaps(resource).length > 0;
 }

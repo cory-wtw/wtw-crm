@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   AGING_AFTER_DAYS,
+  CLASSIFICATION_GAPS,
+  CLASSIFICATION_GAP_LABELS,
+  classificationGaps,
+  needsClassification,
   STALE_AFTER_DAYS,
   derivedVerificationStatus,
   isMatchable,
@@ -215,5 +219,66 @@ describe("isMatchable", () => {
     expect(isMatchable("aging")).toBe(true);
     expect(isMatchable("flagged")).toBe(false);
     expect(isMatchable("retired")).toBe(false);
+  });
+});
+
+describe("classificationGaps", () => {
+  const classified = {
+    buckets: ["housing"] as const,
+    geoScope: "national" as const,
+    geoStates: [],
+  };
+
+  it("reports nothing for a record the matcher can offer", () => {
+    expect(classificationGaps({ ...classified, buckets: ["housing"] })).toEqual(
+      [],
+    );
+    expect(needsClassification({ ...classified, buckets: ["housing"] })).toBe(
+      false,
+    );
+  });
+
+  it("catches a record with no buckets", () => {
+    // Every resource in the directory starts here, and stays invisible until
+    // somebody classifies it.
+    const gaps = classificationGaps({ ...classified, buckets: [] });
+    expect(gaps).toContain("no-buckets");
+    expect(needsClassification({ ...classified, buckets: [] })).toBe(true);
+  });
+
+  it("catches a scoped record with no states", () => {
+    // The geography gate checks states first, so an empty list turns away
+    // every veteran alive.
+    for (const geoScope of ["state", "local"] as const) {
+      expect(
+        classificationGaps({
+          buckets: ["housing"],
+          geoScope,
+          geoStates: [],
+        }),
+      ).toContain("no-states");
+    }
+  });
+
+  it("asks nothing of a national record's state list", () => {
+    expect(
+      classificationGaps({
+        buckets: ["housing"],
+        geoScope: "national",
+        geoStates: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it("reports both gaps at once", () => {
+    expect(
+      classificationGaps({ buckets: [], geoScope: "state", geoStates: [] }),
+    ).toEqual(["no-buckets", "no-states"]);
+  });
+
+  it("labels every gap", () => {
+    for (const gap of CLASSIFICATION_GAPS) {
+      expect(CLASSIFICATION_GAP_LABELS[gap]).toBeTruthy();
+    }
   });
 });
