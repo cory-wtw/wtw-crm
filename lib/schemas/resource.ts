@@ -283,40 +283,57 @@ export function isMatchable(status: VerificationStatus): boolean {
  * is still there. These are about whether we've told the matcher enough to
  * offer it: a live, well-verified resource with no buckets is invisible.
  */
-export const CLASSIFICATION_GAPS = ["no-buckets", "no-states"] as const;
+export const CLASSIFICATION_GAPS = [
+  "no-buckets",
+  "no-states",
+  "no-localities",
+] as const;
 export type ClassificationGap = (typeof CLASSIFICATION_GAPS)[number];
 
 export const CLASSIFICATION_GAP_LABELS: Record<ClassificationGap, string> = {
   "no-buckets": "No needs set",
   "no-states": "No states set",
+  "no-localities": "No cities set",
+};
+
+type ClassifiableResource = {
+  buckets: Bucket[];
+  geoScope: GeoScope;
+  geoStates: string[];
+  geoLocalities: string[];
 };
 
 /**
  * What's missing before this record can match anybody.
  *
- * Both gaps make a resource unreachable rather than merely imprecise: no
- * bucket overlap fails the gate outright, and a scoped record whose state list
- * is empty fails the geography gate for every veteran alive. An empty result
- * means the matcher can offer this resource to somebody.
+ * Every gap here makes a resource unreachable rather than merely imprecise. No
+ * bucket overlap fails the gate outright. A scoped record with an empty state
+ * list fails the geography gate for every veteran alive, and a local record
+ * that clears the state check then falls at the locality check does the same —
+ * the gate walks states first, so a missing locality list hides a record that
+ * otherwise looks configured.
+ *
+ * An empty result means the matcher can offer this resource to somebody.
+ *
+ * New saves can't produce the geography gaps — the input schema refuses them —
+ * but records written before that validation existed still can, which is
+ * exactly the backlog this is for.
  */
-export function classificationGaps(resource: {
-  buckets: Bucket[];
-  geoScope: GeoScope;
-  geoStates: string[];
-}): ClassificationGap[] {
+export function classificationGaps(
+  resource: ClassifiableResource,
+): ClassificationGap[] {
   const gaps: ClassificationGap[] = [];
   if (resource.buckets.length === 0) gaps.push("no-buckets");
   if (resource.geoScope !== "national" && resource.geoStates.length === 0) {
     gaps.push("no-states");
   }
+  if (isSubStateScope(resource.geoScope) && resource.geoLocalities.length === 0) {
+    gaps.push("no-localities");
+  }
   return gaps;
 }
 
 /** True when this record cannot currently be offered to anybody. */
-export function needsClassification(resource: {
-  buckets: Bucket[];
-  geoScope: GeoScope;
-  geoStates: string[];
-}): boolean {
+export function needsClassification(resource: ClassifiableResource): boolean {
   return classificationGaps(resource).length > 0;
 }

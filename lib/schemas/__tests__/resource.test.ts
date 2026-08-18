@@ -227,6 +227,7 @@ describe("classificationGaps", () => {
     buckets: ["housing"] as const,
     geoScope: "national" as const,
     geoStates: [],
+    geoLocalities: [],
   };
 
   it("reports nothing for a record the matcher can offer", () => {
@@ -255,25 +256,55 @@ describe("classificationGaps", () => {
           buckets: ["housing"],
           geoScope,
           geoStates: [],
+          geoLocalities: ["Chattanooga"],
         }),
       ).toContain("no-states");
     }
   });
 
-  it("asks nothing of a national record's state list", () => {
+  it("catches a local record that clears states and falls at localities", () => {
+    // The gate walks states first, so this one looks configured right up until
+    // it turns away every veteran.
+    const gaps = classificationGaps({
+      buckets: ["housing"],
+      geoScope: "local",
+      geoStates: ["TN"],
+      geoLocalities: [],
+    });
+    expect(gaps).toEqual(["no-localities"]);
+  });
+
+  it("asks nothing of a statewide record's locality list", () => {
+    expect(
+      classificationGaps({
+        buckets: ["housing"],
+        geoScope: "state",
+        geoStates: ["TN"],
+        geoLocalities: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it("asks nothing of a national record's geography", () => {
     expect(
       classificationGaps({
         buckets: ["housing"],
         geoScope: "national",
         geoStates: [],
+        geoLocalities: [],
       }),
     ).toEqual([]);
   });
 
-  it("reports both gaps at once", () => {
+  it("reports every gap at once", () => {
     expect(
-      classificationGaps({ buckets: [], geoScope: "state", geoStates: [] }),
-    ).toEqual(["no-buckets", "no-states"]);
+      classificationGaps({
+        buckets: [],
+        geoScope: "local",
+        geoStates: [],
+        geoLocalities: [],
+      }),
+    ).toEqual(["no-buckets", "no-states", "no-localities"]);
   });
 
   it("labels every gap", () => {

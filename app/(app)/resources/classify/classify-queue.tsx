@@ -6,6 +6,8 @@ import { useState } from "react";
 import {
   BUCKET_CODES,
   BUCKET_LABELS,
+  CLASSIFICATION_GAP_LABELS,
+  classificationGaps,
   GEO_SCOPES,
   GEO_SCOPE_LABELS,
   type Bucket,
@@ -154,6 +156,15 @@ export function ClassifyQueue({ queue }: { queue: ClassifyItem[] }) {
 
   const needsStates = current.geoScope !== "national";
   const needsLocalities = current.geoScope === "local";
+
+  // Judge the edits in progress by the same rule the queue was built from, so
+  // saving can't leave a record that reappears the moment the page reloads.
+  const remainingGaps = classificationGaps({
+    buckets: current.buckets,
+    geoScope: current.geoScope,
+    geoStates: splitList(current.states, true),
+    geoLocalities: splitList(current.localities),
+  });
 
   return (
     <div className="space-y-6">
@@ -306,7 +317,7 @@ export function ClassifyQueue({ queue }: { queue: ClassifyItem[] }) {
         <button
           type="button"
           onClick={save}
-          disabled={saving || current.buckets.length === 0}
+          disabled={saving || remainingGaps.length > 0}
           className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
           {saving
@@ -323,10 +334,13 @@ export function ClassifyQueue({ queue }: { queue: ClassifyItem[] }) {
         >
           Skip
         </button>
-        {current.buckets.length === 0 && (
+        {remainingGaps.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            Pick at least one need — a record with none can&rsquo;t be offered
-            to anybody.
+            Still missing:{" "}
+            {remainingGaps
+              .map((gap) => CLASSIFICATION_GAP_LABELS[gap].toLowerCase())
+              .join(", ")}
+            . A record with any of these can&rsquo;t be offered to anybody.
           </p>
         )}
       </div>

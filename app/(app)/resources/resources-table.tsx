@@ -76,11 +76,16 @@ const columns: ColumnDef<ResourceRow>[] = [
               {BUCKET_LABELS[bucket]}
             </span>
           ))}
-          {gaps.includes("no-states") && (
-            <span className="inline-flex items-center rounded-full bg-[color:var(--wtw-deep-gold)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--wtw-deep-gold)]">
-              {CLASSIFICATION_GAP_LABELS["no-states"]}
-            </span>
-          )}
+          {gaps
+            .filter((gap) => gap !== "no-buckets")
+            .map((gap) => (
+              <span
+                key={gap}
+                className="inline-flex items-center rounded-full bg-[color:var(--wtw-deep-gold)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--wtw-deep-gold)]"
+              >
+                {CLASSIFICATION_GAP_LABELS[gap]}
+              </span>
+            ))}
         </div>
       );
     },
