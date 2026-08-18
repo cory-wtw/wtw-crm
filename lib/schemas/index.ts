@@ -4,6 +4,7 @@ export * from "./invite";
 export * from "./vso";
 export * from "./bucket";
 export * from "./resource";
+export * from "./verification";
 export * from "./phone";
 export * from "./veteran";
 export * from "./encounter";

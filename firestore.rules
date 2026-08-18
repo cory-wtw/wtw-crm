@@ -99,6 +99,16 @@ service cloud.firestore {
                         resource.data.createdBy == request.auth.uid);
     }
 
+    match /verifications/{id} {
+      // Append-only log of resource verification checks. Written only by the
+      // server (Admin SDK), in the same batch as the resource status change it
+      // justifies — never by a client, and never edited or deleted once
+      // written. CRM users can read it so the resource detail and the Phase 7
+      // review queue can show why a record was flagged.
+      allow read: if canAccessCrm();
+      allow write: if false;
+    }
+
     match /auditLog/{id} {
       // Written only by the server (Admin SDK). Admins can read via the
       // /admin/audit page; the rule below is belt-and-suspenders.

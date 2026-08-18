@@ -94,9 +94,18 @@ export const FRAGILITY_LABELS: Record<Fragility, string> = {
   fragile: "Fragile",
 };
 
-/** Days at which a `live` record is considered aging, and an aging one flagged. */
+/** Days after which a `live` record reads as `aging`. */
 export const AGING_AFTER_DAYS = 90;
-export const FLAG_AFTER_DAYS = 180;
+
+/**
+ * Days after which a record is stale enough to rank last.
+ *
+ * This is a RANKING threshold, not a gate. A record this old still matches and
+ * is still shown — it just scores 0 on freshness (Phase 2 ranking: 60 under
+ * 90d, 30 for 90–180d, 0 past this) and therefore sorts below fresher options.
+ * Nothing here removes it from the corpus.
+ */
+export const STALE_AFTER_DAYS = 180;
 
 export const resourceSchema = z.object({
   id: z.string(),
@@ -183,28 +192,33 @@ export type ResourceInput = z.infer<typeof resourceInputSchema>;
 /**
  * Age a record's verification status from `lastVerified`, at read time.
  *
- * There is no scheduler in this system, so the two purely time-based
- * transitions in the status diagram have to be derived rather than written:
+ * There is no scheduler, so the one purely time-based transition in the status
+ * diagram is derived rather than written:
  *
- *   live  --(90d)--> aging --(180d)--> flagged
+ *   live --(90d)--> aging
  *
- * The stored value is never mutated by this — a record that a human set to
- * `live` stays `live` in Firestore and simply reads as `aging` once it goes
- * stale. `flagged` and `retired` are human/verifier states and pass through
- * untouched, as does a record with no `lastVerified` yet (nothing to age from).
+ * That is the whole of it. Aging never ripens into `flagged` on its own: a
+ * stale record keeps matching and is handled by ranking, which scores freshness
+ * 0 past STALE_AFTER_DAYS so it sorts last instead of disappearing. Dropping a
+ * resource out of the corpus because a clock ran is exactly the silent removal
+ * nobody ever finds out about.
+ *
+ * `flagged` is reachable only two ways, both of which write a `verifications`
+ * doc: a human decision, or a Phase 7 check. Neither happens here.
+ *
+ * The stored value is never mutated by this — a record a human set to `live`
+ * stays `live` in Firestore and simply reads as `aging` once it goes stale.
  */
 export function derivedVerificationStatus(
   stored: VerificationStatus,
   lastVerified: Date | null | undefined,
   now: Date = new Date(),
 ): VerificationStatus {
-  if (stored !== "live" && stored !== "aging") return stored;
+  if (stored !== "live") return stored;
   if (!lastVerified) return stored;
 
   const days = (now.getTime() - lastVerified.getTime()) / 86_400_000;
-  if (days >= FLAG_AFTER_DAYS) return "flagged";
-  if (stored === "live" && days >= AGING_AFTER_DAYS) return "aging";
-  return stored;
+  return days >= AGING_AFTER_DAYS ? "aging" : "live";
 }
 
 /** Whether a resource is fresh enough to appear in matches. */

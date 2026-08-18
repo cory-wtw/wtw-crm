@@ -50,8 +50,10 @@ function deserialize(
     typicalWait: data.typicalWait ?? "unknown",
 
     // Age the stored status forward from lastVerified on the way out. There's
-    // no scheduler, so live -> aging -> flagged is derived here rather than
-    // written by a job. See derivedVerificationStatus.
+    // no scheduler, so live -> aging is derived here rather than written by a
+    // job. That is the only transition derived from the clock: aging records
+    // stay matchable and are handled by ranking, and `flagged` comes only from
+    // a human or a Phase 7 check. See derivedVerificationStatus.
     verificationStatus: derivedVerificationStatus(
       data.verificationStatus ?? "live",
       lastVerified,

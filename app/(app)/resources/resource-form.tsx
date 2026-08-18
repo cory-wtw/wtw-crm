@@ -424,7 +424,7 @@ export function ResourceForm({ initial }: Props) {
       <Section title="Verification">
         <Field
           label="Status"
-          hint="Live and Aging are suggested to staff. Flagged and Retired are held back until someone confirms them."
+          hint="Live and Aging are both suggested to staff — an aging record just ranks lower. Flagged and Retired are held back. Changing this records a verification entry against the resource."
         >
           <Select {...register("verificationStatus")}>
             {VERIFICATION_STATUSES.map((status) => (

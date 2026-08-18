@@ -6,7 +6,13 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import { canAccessCrm } from "@/lib/permissions";
-import { derivedVerificationStatus, resourceInputSchema } from "@/lib/schemas";
+import {
+  derivedVerificationStatus,
+  resourceInputSchema,
+  resultForStatus,
+  VERIFICATION_STATUS_LABELS,
+} from "@/lib/schemas";
+import { stageVerification } from "@/lib/verifications";
 
 function dropUndefined<T extends Record<string, unknown>>(
   obj: T,
@@ -58,7 +64,30 @@ export async function createResourceAction(
     updatedAt: now,
   });
 
-  const ref = await adminDb.collection("resources").add(doc);
+  const ref = adminDb.collection("resources").doc();
+  const batch = adminDb.batch();
+  batch.set(ref, doc);
+
+  // Log the status the record was entered at. A record can only reach
+  // `flagged` through a human decision or a Phase 7 check, and either way the
+  // decision has to be on the record — so it commits in the same batch.
+  const result = resultForStatus(input.verificationStatus);
+  if (result) {
+    stageVerification(
+      batch,
+      {
+        resourceId: ref.id,
+        checkType: "manual",
+        result,
+        detail: `Entered by hand as ${VERIFICATION_STATUS_LABELS[input.verificationStatus].toLowerCase()}.`,
+        checkedBy: session.uid,
+      },
+      now,
+    );
+  }
+
+  await batch.commit();
+
   await logAudit({
     action: "create",
     resourceType: "resource",
@@ -125,7 +154,33 @@ export async function editResourceAction(
     Object.keys(input),
   );
 
-  await ref.update(updates);
+  const batch = adminDb.batch();
+  batch.update(ref, updates);
+
+  // Any human decision that moves the status — into flagged, into retired, or
+  // back into live — is a verification event and commits with the change it
+  // justifies. `aging` is excluded because nobody decides it: it's derived from
+  // lastVerified at read time, so there's no check to log.
+  const result =
+    input.verificationStatus !== existingStatus
+      ? resultForStatus(input.verificationStatus)
+      : null;
+  if (result) {
+    stageVerification(
+      batch,
+      {
+        resourceId: id,
+        checkType: "manual",
+        result,
+        detail: `Status changed from ${VERIFICATION_STATUS_LABELS[existingStatus].toLowerCase()} to ${VERIFICATION_STATUS_LABELS[input.verificationStatus].toLowerCase()} from the resource form.`,
+        checkedBy: session.uid,
+      },
+      now,
+    );
+  }
+
+  await batch.commit();
+
   await logAudit({
     action: "update",
     resourceType: "resource",

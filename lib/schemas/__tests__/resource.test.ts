@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AGING_AFTER_DAYS,
-  FLAG_AFTER_DAYS,
+  STALE_AFTER_DAYS,
   derivedVerificationStatus,
   isMatchable,
   resourceInputSchema,
@@ -125,12 +125,18 @@ describe("derivedVerificationStatus", () => {
     expect(derivedVerificationStatus("live", daysAgo(120), NOW)).toBe("aging");
   });
 
-  it("flags anything past 180 days", () => {
+  it("never flags on age alone — a stale record stays aging and stays matchable", () => {
+    // Only a human action or a Phase 7 check may set flagged, and both write a
+    // verifications doc. A clock running out is neither.
     expect(
-      derivedVerificationStatus("live", daysAgo(FLAG_AFTER_DAYS), NOW),
-    ).toBe("flagged");
-    expect(derivedVerificationStatus("aging", daysAgo(200), NOW)).toBe(
-      "flagged",
+      derivedVerificationStatus("live", daysAgo(STALE_AFTER_DAYS), NOW),
+    ).toBe("aging");
+    expect(derivedVerificationStatus("live", daysAgo(2000), NOW)).toBe("aging");
+    expect(derivedVerificationStatus("aging", daysAgo(2000), NOW)).toBe(
+      "aging",
+    );
+    expect(isMatchable(derivedVerificationStatus("live", daysAgo(2000), NOW))).toBe(
+      true,
     );
   });
 
