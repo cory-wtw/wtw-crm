@@ -344,9 +344,16 @@ export function extractLinks(html: string, baseUrl: string): PageLink[] {
     }
 
     const url = normalizeUrl(resolved.toString());
-    if (!url || url === normalizeUrl(baseUrl)) continue;
-    if (seen.has(url)) continue;
-    seen.add(url);
+    const self = normalizeUrl(baseUrl);
+    if (!url) continue;
+    // Dedupe case-insensitively — a site linking both Eligibility.asp and
+    // eligibility.asp otherwise burns two of the five crawl slots on one page.
+    // The first spelling seen is what gets fetched, because some servers do
+    // care about case even when their own links don't.
+    const key = url.toLowerCase();
+    if (self && key === self.toLowerCase()) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
     const text = match[2]
       .replace(/<[^>]+>/g, " ")
@@ -373,7 +380,12 @@ const LINK_SIGNALS: { pattern: RegExp; weight: number }[] = [
   { pattern: /\bapply\b|how (to|do i) (get|start|apply)|getting started|get help|intake/i, weight: 70 },
   { pattern: /services|programs|what we (do|offer)|support/i, weight: 55 },
   { pattern: /\bfaq\b|frequently asked|questions/i, weight: 45 },
-  { pattern: /locations?|find (a|us)|near you|directory|centers?/i, weight: 35 },
+  // Not a bare "center": on vetcenter.va.gov every page says "Vet Center",
+  // which scored a call-centre PSA page into the crawl's link list.
+  {
+    pattern: /locations?|find (a|an|us|your)\b|near you|directory|locator/i,
+    weight: 35,
+  },
   { pattern: /contact|reach us|phone/i, weight: 25 },
   { pattern: /about/i, weight: 15 },
 ];

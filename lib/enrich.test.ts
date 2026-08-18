@@ -428,3 +428,75 @@ describe("combinePages", () => {
     expect(combinePages([])).toBe("");
   });
 });
+
+describe("extractLinks case handling", () => {
+  const base = "https://www.vetcenter.va.gov/";
+
+  it("treats links differing only in case as one page", () => {
+    // Observed on vetcenter.va.gov: both spellings were fetched, burning one
+    // of the five crawl slots on a page already read.
+    const links = extractLinks(
+      '<a href="/VETCENTER/Eligibility.asp">Eligibility</a><a href="/vetcenter/eligibility.asp">Am I eligible?</a>',
+      base,
+    );
+    expect(links).toHaveLength(1);
+  });
+
+  it("fetches the first spelling seen, not a lowercased guess", () => {
+    // Some servers do care about case even when their own links don't.
+    const links = extractLinks(
+      '<a href="/VETCENTER/Eligibility.asp">Eligibility</a>',
+      base,
+    );
+    expect(links[0].url).toBe(
+      "https://www.vetcenter.va.gov/VETCENTER/Eligibility.asp",
+    );
+  });
+
+  it("drops a self-link that differs only in case", () => {
+    const links = extractLinks(
+      '<a href="https://WWW.VetCenter.va.gov/">Home</a><a href="/help">Help</a>',
+      base,
+    );
+    expect(links.map((l) => l.url)).toEqual([
+      "https://www.vetcenter.va.gov/help",
+    ]);
+  });
+});
+
+describe("scoreLink on the pages that answer gates", () => {
+  it("ranks a mixed-case eligibility path above a press page", () => {
+    expect(
+      scoreLink({
+        url: "https://www.vetcenter.va.gov/VETCENTER/Eligibility.asp",
+        text: "Eligibility",
+      }),
+    ).toBeGreaterThan(
+      scoreLink({
+        url: "https://www.vetcenter.va.gov/psa.asp",
+        text: "Public service announcements",
+      }),
+    );
+  });
+});
+
+describe("scoreLink does not match a bare organization word", () => {
+  it("ignores 'Center' on a site where everything is a Vet Center", () => {
+    // This is how a call-centre PSA page got offered to the model: the
+    // locations pattern matched the word every page on the site contains.
+    expect(
+      scoreLink({
+        url: "https://www.vetcenter.va.gov/psa.asp",
+        text: "Vet Center Call Center PSA",
+      }),
+    ).toBe(0);
+  });
+
+  it("still catches a real locations page", () => {
+    for (const text of ["Find a location", "Locations", "Center locator"]) {
+      expect(
+        scoreLink({ url: "https://x.org/p", text }),
+      ).toBeGreaterThan(0);
+    }
+  });
+});
