@@ -15,8 +15,10 @@ import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
+  CONCIERGE_STATUS_LABELS,
   DEPENDENTS_ANSWER_LABELS,
   DISCHARGE_CHARACTER_LABELS,
+  ENCOUNTER_TYPE_LABELS,
   ID_STATUS_LABELS,
   monthlyBenefitLift,
   PIPELINE_LABELS,
@@ -179,6 +181,18 @@ export default async function VeteranDetailPage({
         />
       </Card>
 
+      <Card title="Concierge">
+        <Row
+          label="Status"
+          value={
+            veteran.conciergeStatus
+              ? CONCIERGE_STATUS_LABELS[veteran.conciergeStatus]
+              : CONCIERGE_STATUS_LABELS.none
+          }
+        />
+        <Row label="Follow-up due" value={formatDate(veteran.followUpDue)} />
+      </Card>
+
       <Card title="Pipeline">
         <Row label="Stage" value={PIPELINE_LABELS[veteran.pipelineStage]} />
         <Row label="Date found" value={formatDate(veteran.dateFound)} />
@@ -288,6 +302,11 @@ export default async function VeteranDetailPage({
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-sm font-bold">
+                    {e.type !== "note" && (
+                      <span className="mr-2 inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]">
+                        {ENCOUNTER_TYPE_LABELS[e.type]}
+                      </span>
+                    )}
                     {formatDate(e.occurredAt)}
                     {e.location && (
                       <span className="text-muted-foreground">
@@ -301,6 +320,30 @@ export default async function VeteranDetailPage({
                   </p>
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-sm">{e.summary}</p>
+                {e.referrals.length > 0 && (
+                  <ol className="mt-2 space-y-0.5 text-xs">
+                    {e.referrals.map((referral) => (
+                      <li key={referral.resourceId}>
+                        <span className="text-muted-foreground">
+                          {referral.rank + 1}.{" "}
+                        </span>
+                        <Link
+                          href={`/resources/${referral.resourceId}`}
+                          className="font-bold underline-offset-4 hover:underline"
+                        >
+                          {referral.resourceName}
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {e.followUpDue && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Follow-up due {formatDate(e.followUpDue)}
+                    {e.followUpCompleted &&
+                      ` · completed ${formatDate(e.followUpCompleted)}`}
+                  </p>
+                )}
                 {e.nextStep && (
                   <p className="mt-2 text-xs">
                     <span className="font-bold uppercase tracking-[0.15em] text-[color:var(--wtw-deep-gold)]">

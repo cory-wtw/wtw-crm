@@ -102,3 +102,12 @@ export async function getResource(id: string): Promise<Resource | null> {
   if (!doc.exists) return null;
   return deserialize(doc.id, doc.data()!);
 }
+
+/** Several resources by id, skipping any that no longer exist. */
+export async function getResourcesByIds(ids: string[]): Promise<Resource[]> {
+  if (ids.length === 0) return [];
+  const docs = await Promise.all(
+    ids.map((id) => adminDb.collection(COLLECTION).doc(id).get()),
+  );
+  return docs.filter((d) => d.exists).map((d) => deserialize(d.id, d.data()!));
+}

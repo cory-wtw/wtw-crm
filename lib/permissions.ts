@@ -71,6 +71,20 @@ export function canRunIntake(
   return canEditVeteran(session, veteran);
 }
 
+/**
+ * Approving a referral packet writes to the veteran's timeline and sets their
+ * concierge status, so it needs the same authority as editing the record.
+ *
+ * Nothing else in the system may write a referral. There is no auto-send and no
+ * background path — a person picks the resources and approves them, every time.
+ */
+export function canCreateReferral(
+  session: SessionLike | null,
+  veteran: VeteranLike,
+): boolean {
+  return canEditVeteran(session, veteran);
+}
+
 /** Only admins can change the assignee of a veteran (reassign). */
 export function canReassignVeteran(session: SessionLike | null): boolean {
   return isAdmin(session);

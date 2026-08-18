@@ -54,6 +54,29 @@ export const DEPENDENTS_ANSWER_LABELS: Record<DependentsAnswer, string> = {
 };
 
 /**
+ * Where this veteran sits in the concierge loop. Deliberately a separate axis
+ * from `pipelineStage`, which tracks a claim: someone who receives five program
+ * referrals never files anything and would otherwise sit at `connected`
+ * forever, skewing the stage counts. A veteran can be `connected` on the claims
+ * pipeline and `closed` on concierge at the same time.
+ */
+export const CONCIERGE_STATUSES = [
+  "none",
+  "referred",
+  "followUpDue",
+  "closed",
+] as const;
+export const conciergeStatusSchema = z.enum(CONCIERGE_STATUSES);
+export type ConciergeStatus = z.infer<typeof conciergeStatusSchema>;
+
+export const CONCIERGE_STATUS_LABELS: Record<ConciergeStatus, string> = {
+  none: "Not started",
+  referred: "Referred",
+  followUpDue: "Follow-up due",
+  closed: "Closed",
+};
+
+/**
  * Whether the veteran has ever filed with the VA. Asked at intake to route the
  * claims lane to an accredited partner — the system never assesses a claim.
  *
@@ -119,6 +142,11 @@ export const veteranSchema = z.object({
   serviceEra: serviceEraSchema.optional(),
   idStatus: idStatusSchema.optional(),
   hasDependents: dependentsAnswerSchema.optional(),
+
+  // Concierge loop. Written by the referral and follow-up actions, never typed
+  // into a form.
+  conciergeStatus: conciergeStatusSchema.optional(),
+  followUpDue: z.date().nullable().default(null),
 
   // Ownership
   assigneeUid: z.string().nullable().default(null),
@@ -197,6 +225,8 @@ function refineSingleContact(
 export const veteranInputSchema = veteranSchema
   .omit({
     id: true,
+    conciergeStatus: true,
+    followUpDue: true,
     pipelineHistory: true,
     dateFound: true,
     dateConnected: true,
@@ -207,6 +237,17 @@ export const veteranInputSchema = veteranSchema
     createdAt: true,
     updatedBy: true,
     updatedAt: true,
+  })
+  // The eligibility keys accept an explicit null here, which the four optional
+  // fields on the domain schema don't. That null is how a stored answer gets
+  // cleared: the edit form sends it deliberately, and dropUndefined keeps it so
+  // it reaches Firestore. Intake never sends null — a blank answer there means
+  // "not asked this time" and leaves the stored value alone.
+  .extend({
+    dischargeCharacter: dischargeCharacterSchema.nullish(),
+    serviceEra: serviceEraSchema.nullish(),
+    idStatus: idStatusSchema.nullish(),
+    hasDependents: dependentsAnswerSchema.nullish(),
   })
   .superRefine(refineSingleContact);
 export type VeteranInput = z.infer<typeof veteranInputSchema>;

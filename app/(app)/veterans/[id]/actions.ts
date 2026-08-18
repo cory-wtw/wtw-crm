@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
-import { listResources } from "@/lib/db/resources";
+import { getResourcesByIds, listResources } from "@/lib/db/resources";
 import { getSession } from "@/lib/firebase/session";
 import {
   findCandidates,
@@ -15,7 +15,12 @@ import {
   type MatchFlag,
   type MatchInput,
 } from "@/lib/matching";
-import { canAccessCrm, canRunIntake } from "@/lib/permissions";
+import { buildReferralText } from "@/lib/referral-text";
+import {
+  canAccessCrm,
+  canCreateReferral,
+  canRunIntake,
+} from "@/lib/permissions";
 import { mergeEligibility, type EligibilityAnswers } from "@/lib/intake";
 import {
   dependentsAnswerSchema,
@@ -26,6 +31,7 @@ import {
   bucketSchema,
   type AccessMethod,
   type Bucket,
+  type ReferredResource,
   type TypicalWait,
   type VerificationStatus,
 } from "@/lib/schemas";
@@ -80,6 +86,10 @@ export type ExcludedResource = {
 
 export type IntakeResult = {
   candidates: Candidate[];
+  /** The buckets staff checked on the call. Recorded on the referral encounter
+   *  as bucketsIdentified — what the veteran said they needed, not what the
+   *  short list happened to cover. */
+  needs: Bucket[];
   excluded: ExcludedResource[];
   /** Flags about the intake itself, e.g. an unconfirmed discharge. */
   flags: MatchFlag[];
@@ -248,6 +258,7 @@ export async function runIntakeAction(
     ok: true,
     result: {
       candidates,
+      needs: input.needs,
       excluded,
       flags: intakeFlags(matchInput),
       crisis: input.safeTonight === false,
@@ -255,6 +266,170 @@ export async function runIntakeAction(
         input.receivingVaBenefits === "no" ||
         input.receivingVaBenefits === "unsure",
       consideredCount: resources.length,
+    },
+  };
+}
+
+/** Two weeks, per §5.2 — the follow-up queue reads this date. */
+const FOLLOW_UP_DAYS = 14;
+
+const referralInputSchema = z.object({
+  bucketsIdentified: z.array(bucketSchema).default([]),
+  referrals: z
+    .array(
+      z.object({
+        resourceId: z.string().min(1),
+        // What the matcher put on the list staff actually saw. Recorded as
+        // provenance, not recomputed: the ranking depended on answers (crisis,
+        // above all) that are deliberately never stored.
+        rank: z.number().int().nonnegative(),
+        score: z.number(),
+      }),
+    )
+    .min(1, "Pick at least one resource."),
+});
+
+export type ReferralResult = {
+  encounterId: string;
+  /** The block staff copies into an email and sends themselves. */
+  referralText: string;
+  followUpDue: string;
+};
+
+/**
+ * Approve a referral packet: write it to the veteran's timeline, put them in
+ * the concierge loop, and hand back the text.
+ *
+ * This is the ONLY path that writes a referral, and it exists solely to be
+ * called by a person clicking approve. Nothing sends the text — no mail
+ * provider is configured and this action does not add one. Staff copies it into
+ * their own mail client, reads it once more, and sends it themselves.
+ */
+export async function createReferralAction(
+  veteranId: string,
+  rawInput: unknown,
+): Promise<
+  { ok: true; result: ReferralResult } | { ok: false; error: string }
+> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session)) {
+    return { ok: false, error: "Your account doesn't have access to this." };
+  }
+
+  const parsed = referralInputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: formatIssues(parsed.error.issues) };
+  }
+  const input = parsed.data;
+
+  const veteranRef = adminDb.collection("veterans").doc(veteranId);
+  const snap = await veteranRef.get();
+  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  const existing = snap.data()!;
+
+  if (
+    !canCreateReferral(session, { assigneeUid: existing.assigneeUid ?? null })
+  ) {
+    return {
+      ok: false,
+      error: "You can only send referrals for veterans assigned to you.",
+    };
+  }
+
+  // Read the resources fresh rather than trusting names off the client: the
+  // packet is a record of what the veteran was handed, and it should say what
+  // the directory says.
+  const resources = await getResourcesByIds(
+    input.referrals.map((r) => r.resourceId),
+  );
+  const byId = new Map(resources.map((r) => [r.id, r]));
+
+  const missing = input.referrals.filter((r) => !byId.has(r.resourceId));
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      error:
+        "One of those resources no longer exists. Re-run the intake and try again.",
+    };
+  }
+
+  const ordered = [...input.referrals].sort((a, b) => a.rank - b.rank);
+  const referrals: ReferredResource[] = ordered.map((r) => ({
+    resourceId: r.resourceId,
+    resourceName: byId.get(r.resourceId)!.organizationName,
+    rank: r.rank,
+    score: r.score,
+  }));
+
+  const now = new Date();
+  const followUpDue = new Date(
+    now.getTime() + FOLLOW_UP_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  const referralText = buildReferralText({
+    firstName: existing.firstName ?? "",
+    resources: ordered.map((r) => {
+      const resource = byId.get(r.resourceId)!;
+      return {
+        organizationName: resource.organizationName,
+        description: resource.description ?? null,
+        services: resource.services ?? null,
+        accessMethod: resource.accessMethod,
+        accessValue: resource.accessValue ?? null,
+        whatToBring: resource.whatToBring ?? null,
+      };
+    }),
+  });
+
+  const encounterRef = veteranRef.collection("encounters").doc();
+
+  // The encounter and the veteran's status commit together: a veteran marked
+  // "referred" with no packet on their timeline would send the Phase 5 queue
+  // chasing a follow-up nobody can see the contents of.
+  const batch = adminDb.batch();
+  batch.set(encounterRef, {
+    type: "referral",
+    occurredAt: now,
+    loggedBy: session.uid,
+    summary: `Sent ${referrals.length} ${
+      referrals.length === 1 ? "resource" : "resources"
+    }: ${referrals.map((r) => r.resourceName).join(", ")}`,
+    bucketsIdentified: input.bucketsIdentified,
+    referrals,
+    followUpDue,
+    followUpCompleted: null,
+    createdAt: now,
+  });
+  batch.update(veteranRef, {
+    conciergeStatus: "referred",
+    followUpDue,
+    updatedBy: session.uid,
+    updatedAt: now,
+  });
+  await batch.commit();
+
+  await logAudit({
+    action: "create",
+    resourceType: "encounter",
+    resourceId: `${veteranId}/${encounterRef.id}`,
+    diff: {
+      referrals: {
+        before: null,
+        after: referrals.map((r) => r.resourceName),
+      },
+    },
+  });
+
+  revalidatePath(`/veterans/${veteranId}`);
+  revalidatePath("/veterans");
+
+  return {
+    ok: true,
+    result: {
+      encounterId: encounterRef.id,
+      referralText,
+      followUpDue: followUpDue.toISOString(),
     },
   };
 }

@@ -7,6 +7,7 @@ import {
   canEditMedia,
   canEditPhone,
   canEditVeteran,
+  canCreateReferral,
   canRunIntake,
   canEditVso,
   canManageUsers,
@@ -225,5 +226,29 @@ describe("canRunIntake", () => {
 
   it("keeps social-only users out", () => {
     expect(canRunIntake(SOCIAL, { assigneeUid: "u-a" })).toBe(false);
+  });
+});
+
+describe("canCreateReferral", () => {
+  it("tracks canEditVeteran exactly", () => {
+    for (const veteran of [
+      { assigneeUid: "u-a" },
+      { assigneeUid: "u-b" },
+      { assigneeUid: null },
+    ]) {
+      for (const session of [ADMIN, STANDARD_A, SOCIAL, null]) {
+        expect(canCreateReferral(session, veteran)).toBe(
+          canEditVeteran(session, veteran),
+        );
+      }
+    }
+  });
+
+  it("keeps a standard user off someone else's veteran", () => {
+    expect(canCreateReferral(STANDARD_A, { assigneeUid: "u-b" })).toBe(false);
+  });
+
+  it("keeps social-only users out entirely", () => {
+    expect(canCreateReferral(SOCIAL, { assigneeUid: "u-a" })).toBe(false);
   });
 });

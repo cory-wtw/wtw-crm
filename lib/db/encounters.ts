@@ -16,12 +16,18 @@ function deserialize(
 ): Encounter {
   return {
     id,
+    // Encounters written before referrals existed are plain notes.
+    type: data.type ?? "note",
     occurredAt: tsToDate(data.occurredAt) ?? new Date(),
     loggedBy: data.loggedBy ?? "",
     location: data.location ?? undefined,
     summary: data.summary ?? "",
     nextStep: data.nextStep ?? undefined,
     nextStepDueAt: tsToDate(data.nextStepDueAt),
+    bucketsIdentified: data.bucketsIdentified ?? [],
+    referrals: data.referrals ?? [],
+    followUpDue: tsToDate(data.followUpDue),
+    followUpCompleted: tsToDate(data.followUpCompleted),
     createdAt: tsToDate(data.createdAt) ?? new Date(),
   };
 }

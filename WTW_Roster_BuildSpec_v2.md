@@ -52,14 +52,16 @@ Add to `veteranSchema` in `lib/schemas/veteran.ts`:
 |---|---|---|
 | `dischargeCharacter` | enum, optional | `honorable` / `general` / `other` / `unsure` |
 | `serviceEra` | enum, optional | `post911` / `gulf` / `vietnam` / `pre911` / `other` / `unsure` |
-| `idStatus` | enum, optional | `valid` / `expired` / `none` |
-| `hasDependents` | bool, optional | |
+| `idStatus` | enum, optional | `valid` / `expired` / `none` / `unsure` |
+| `hasDependents` | enum, optional | `yes` / `no` / `unsure` |
 | `conciergeStatus` | enum, optional | `none` / `referred` / `followUpDue` / `closed` |
 | `followUpDue` | Date, optional | Set at referral, +14 days |
 
 All optional so no backfill is required. `lib/db/veterans.ts:deserialize` defaults every missing field, which is the existing convention.
 
 **Not stored, ever.** Diagnoses, conditions, medications, income figures, household composition, claim history detail, SSN, date of birth, VA file number, full street address, full surname. The line: facts needed to route someone, nothing about their health or their money.
+
+**On `unsure`.** Every eligibility field carries an `unsure` value, and it is not the same as a blank. Blank means nobody asked; `unsure` means somebody asked and the answer was "I don't know". Both fail closed at the gates, but only one of them is worth asking again — and only the blank one is safe for a later intake to overwrite. `runIntakeAction` treats a blank answer as "not asked this time" and leaves the stored value intact; clearing a stored answer is done from the veteran edit form, deliberately, by a person.
 
 **`safeTonight` is deliberately not a stored field.** A crisis answer is true at a moment, not about a person, and a stale `safeTonight: false` on a record read three months later is worse than no data. It is a transient form value that routes the call and is not persisted.
 
@@ -72,9 +74,9 @@ The resource directory becomes the matching corpus. Add to `lib/schemas/resource
 | Field | Type | Notes |
 |---|---|---|
 | `buckets` | array of enum | One or more, see §2.5 |
-| `geoScope` | enum | `national` / `state` / `metro` / `county` |
+| `geoScope` | enum | `national` / `state` / `local` |
 | `geoStates` | array of string | Two-letter codes. Empty when national |
-| `geoLocalities` | array of string | Cities or counties, for metro and county scope |
+| `geoLocalities` | array of string | Cities or counties, required for `local` scope |
 | `minDischarge` | enum | `any` / `general` / `honorable` |
 | `requiresVaEnrollment` | bool | |
 | `requiresValidId` | bool | |
@@ -289,7 +291,7 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
   if (r.eraRestriction.length && !r.eraRestriction.includes(v.serviceEra ?? "unsure"))
     failures.push("era");
 
-  if (r.requiresDependents && v.hasDependents !== true) failures.push("dependents");
+  if (r.requiresDependents && v.hasDependents !== "yes") failures.push("dependents");
 
   if (!r.buckets.some(b => v.needs.includes(b))) failures.push("no bucket overlap");
 
