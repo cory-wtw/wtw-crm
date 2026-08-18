@@ -6,6 +6,7 @@
 //   npm run import-va-facilities -- --type=vet_center
 //   npm run import-va-facilities -- --limit=50 --commit
 //   npm run import-va-facilities -- --remap-gates --commit
+//   npm run import-va-facilities -- --sandbox --limit=25
 //
 // Pulls health, vet_center, and benefits facilities nationally from
 // developer.va.gov and writes them into `resources`, keyed on the VA facility
@@ -18,6 +19,14 @@
 // summary below.
 //
 // Needs VA_FACILITIES_API_KEY in .env.local (free key from developer.va.gov).
+//
+// Sandbox vs production:
+//   A sandbox key only authenticates against the sandbox host, and a
+//   production key only against the production one — pointing either at the
+//   wrong base returns 401, which looks exactly like a bad key. Pass
+//   --sandbox (or set VA_FACILITIES_API_BASE) to switch. Sandbox data may be a
+//   limited or synthetic subset, so read what the dry run reports before
+//   committing it into a directory staff will use.
 //
 // Re-run behaviour:
 //   By default an existing record has only its API-owned facts refreshed —
@@ -46,7 +55,16 @@ function argValue(name: string): string | undefined {
 const ONLY_TYPE = argValue("type") as VaFacilityType | undefined;
 const LIMIT = Number(argValue("limit") ?? "") || undefined;
 
-const API_ROOT = "https://api.va.gov/services/va_facilities/v1/facilities";
+const PRODUCTION_BASE = "https://api.va.gov/services/va_facilities/v1";
+const SANDBOX_BASE = "https://sandbox-api.va.gov/services/va_facilities/v1";
+
+const SANDBOX = process.argv.includes("--sandbox");
+/** Explicit override wins, then --sandbox, then production. */
+const API_BASE = (
+  process.env.VA_FACILITIES_API_BASE ??
+  (SANDBOX ? SANDBOX_BASE : PRODUCTION_BASE)
+).replace(/\/$/, "");
+const API_ROOT = `${API_BASE}/facilities`;
 const PAGE_SIZE = 100;
 /** Stop rather than hammer the API if pagination ever fails to terminate. */
 const MAX_PAGES = 200;
@@ -83,8 +101,12 @@ async function fetchPage(
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
+    const hint =
+      response.status === 401 || response.status === 403
+        ? ` — a sandbox key only works against ${SANDBOX_BASE} and a production key only against ${PRODUCTION_BASE}. Currently using ${API_BASE}. Pass --sandbox to switch.`
+        : "";
     throw new Error(
-      `VA Facilities API ${response.status} on ${type} page ${page}: ${body.slice(0, 300)}`,
+      `VA Facilities API ${response.status} on ${type} page ${page}: ${body.slice(0, 300)}${hint}`,
     );
   }
 
@@ -207,6 +229,12 @@ async function main(): Promise<void> {
     );
   }
   if (LIMIT) console.log(`  --limit=${LIMIT} per type.`);
+  console.log(`  Endpoint: ${API_BASE}`);
+  if (API_BASE !== PRODUCTION_BASE && COMMIT) {
+    console.log(
+      "  WARNING: committing non-production data into the resources directory.",
+    );
+  }
 
   const existing = await loadExistingByExternalId();
   console.log(`Loaded ${existing.size} previously imported records.\n`);
