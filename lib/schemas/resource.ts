@@ -178,6 +178,13 @@ export const resourceSchema = z.object({
   flagReason: z.string().optional(),
   /** Where the record came from — a grant list, an API, a phone call. */
   sourceName: z.string().optional(),
+  /**
+   * Stable id in whatever system this record was imported from, namespaced by
+   * source (e.g. "va-facilities:vc_0101V"). Importers key on it so a re-run
+   * updates a record rather than duplicating it. Machine-owned: it is not on
+   * the input schema, so no form can overwrite or clear it.
+   */
+  externalId: z.string().optional(),
 
   createdBy: z.string(),
   createdAt: z.date(),
@@ -227,6 +234,7 @@ function refineGeography(
 export const resourceInputSchema = resourceSchema
   .omit({
     id: true,
+    externalId: true,
     lastVerified: true,
     lastVerifiedBy: true,
     contentHash: true,

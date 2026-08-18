@@ -81,6 +81,7 @@ function deserialize(
     contentHash: data.contentHash ?? undefined,
     flagReason: data.flagReason ?? undefined,
     sourceName: data.sourceName ?? undefined,
+    externalId: data.externalId ?? undefined,
 
     createdBy: data.createdBy ?? "",
     createdAt: tsToDate(data.createdAt) ?? new Date(),

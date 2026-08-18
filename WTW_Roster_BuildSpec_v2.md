@@ -106,6 +106,7 @@ The resource directory becomes the matching corpus. Add to `lib/schemas/resource
 | `contentHash` | string, optional | For diff checks |
 | `flagReason` | string, optional | |
 | `sourceName` | string, optional | Where the record came from |
+| `externalId` | string, optional | Source-namespaced id (e.g. `va-facilities:vc_0101V`). Importers key on it so a re-run updates rather than duplicates. Not on the input schema |
 
 **On `minDischarge`.** Values are inclusive upward. `any` accepts everything including other-than-honorable. `general` accepts general and honorable. Getting this wrong on Vet Center records silently hides the single most useful resource for this population, since Vet Centers accept any character of discharge and require no VA enrollment.
 
