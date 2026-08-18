@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { monthlyBenefitLift, veteranInputSchema } from "..";
+import {
+  DEPENDENTS_ANSWERS,
+  DEPENDENTS_ANSWER_LABELS,
+  ID_STATUSES,
+  ID_STATUS_LABELS,
+  RECEIVING_VA_BENEFITS,
+  RECEIVING_VA_BENEFITS_LABELS,
+  monthlyBenefitLift,
+  veteranInputSchema,
+} from "..";
 
 const base = {
   firstName: "Test",
@@ -200,5 +209,75 @@ describe("monthlyBenefitLift", () => {
   it("treats missing values as 0", () => {
     expect(monthlyBenefitLift(null, 1000)).toBe(1000);
     expect(monthlyBenefitLift(undefined, undefined)).toBe(0);
+  });
+});
+
+describe("eligibility keys", () => {
+  it("accepts a record with none of them — a call can end early", () => {
+    const result = veteranInputSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.dischargeCharacter).toBeUndefined();
+      expect(result.data.serviceEra).toBeUndefined();
+      expect(result.data.idStatus).toBeUndefined();
+      expect(result.data.hasDependents).toBeUndefined();
+    }
+  });
+
+  it("accepts all four", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      dischargeCharacter: "general",
+      serviceEra: "vietnam",
+      idStatus: "expired",
+      hasDependents: "yes",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("records uncertainty on every one of them", () => {
+    // "Not sure" is an answer. A blank field is silence. The two mean
+    // different things and the schema has to be able to hold both.
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      dischargeCharacter: "unsure",
+      serviceEra: "unsure",
+      idStatus: "unsure",
+      hasDependents: "unsure",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("no longer accepts a boolean for dependents", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      hasDependents: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a value outside the enum", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      idStatus: "maybe",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("never accepts safeTonight — it is form state, not a stored fact", () => {
+    const result = veteranInputSchema.parse({ ...base, safeTonight: false });
+    expect(result).not.toHaveProperty("safeTonight");
+  });
+
+  it("labels every id status and VA-benefits answer", () => {
+    for (const status of ID_STATUSES) {
+      expect(ID_STATUS_LABELS[status]).toBeTruthy();
+    }
+    for (const answer of RECEIVING_VA_BENEFITS) {
+      expect(RECEIVING_VA_BENEFITS_LABELS[answer]).toBeTruthy();
+    }
+    for (const answer of DEPENDENTS_ANSWERS) {
+      expect(DEPENDENTS_ANSWER_LABELS[answer]).toBeTruthy();
+    }
   });
 });

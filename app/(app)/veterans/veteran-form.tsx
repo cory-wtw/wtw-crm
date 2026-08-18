@@ -6,10 +6,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
+  DEPENDENTS_ANSWERS,
+  DEPENDENTS_ANSWER_LABELS,
+  DISCHARGE_CHARACTERS,
+  DISCHARGE_CHARACTER_LABELS,
+  ID_STATUSES,
+  ID_STATUS_LABELS,
   PIPELINE_LABELS,
   PIPELINE_STAGES,
   PREFERRED_CONTACT_LABELS,
   PREFERRED_CONTACT_METHODS,
+  SERVICE_ERAS,
+  SERVICE_ERA_LABELS,
 } from "@/lib/schemas";
 import { createVeteranAction, editVeteranAction } from "./actions";
 
@@ -45,6 +53,13 @@ const formSchema = z.object({
   birthYear: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+
+  // Eligibility keys. Blank here means "no answer on file" and is written as
+  // an explicit clear — unlike intake, where blank means "not asked".
+  dischargeCharacter: z.enum(["", ...DISCHARGE_CHARACTERS]),
+  serviceEra: z.enum(["", ...SERVICE_ERAS]),
+  idStatus: z.enum(["", ...ID_STATUSES]),
+  hasDependents: z.enum(["", ...DEPENDENTS_ANSWERS]),
 
   assigneeUid: z.string().optional(),
   pipelineStage: z.enum(PIPELINE_STAGES),
@@ -90,6 +105,10 @@ export function VeteranForm({
       birthYear: "",
       city: "",
       state: "",
+      dischargeCharacter: "",
+      serviceEra: "",
+      idStatus: "",
+      hasDependents: "",
       assigneeUid: "",
       pipelineStage: "found",
       monthlyBenefitBefore: "",
@@ -116,6 +135,13 @@ export function VeteranForm({
       birthYear: toNumber(values.birthYear),
       city: values.city || undefined,
       state: values.state || undefined,
+      // null, not undefined: this form is the one place a stored eligibility
+      // answer can be cleared, and undefined would be dropped before it ever
+      // reached Firestore.
+      dischargeCharacter: values.dischargeCharacter || null,
+      serviceEra: values.serviceEra || null,
+      idStatus: values.idStatus || null,
+      hasDependents: values.hasDependents || null,
       assigneeUid: values.assigneeUid || null,
       pipelineStage: values.pipelineStage,
       monthlyBenefitBefore: toNumber(values.monthlyBenefitBefore) ?? 0,
@@ -190,6 +216,62 @@ export function VeteranForm({
         />
         <Field label="City" input={<Input {...register("city")} />} />
         <Field label="State" input={<Input {...register("state")} />} />
+      </Section>
+
+      <Section title="Eligibility keys">
+        <Field
+          label="Discharge"
+          hint="Normally captured during intake. Blank clears whatever is on file."
+          input={
+            <Select {...register("dischargeCharacter")}>
+              <option value="">No answer on file</option>
+              {DISCHARGE_CHARACTERS.map((value) => (
+                <option key={value} value={value}>
+                  {DISCHARGE_CHARACTER_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          }
+        />
+        <Field
+          label="Service era"
+          input={
+            <Select {...register("serviceEra")}>
+              <option value="">No answer on file</option>
+              {SERVICE_ERAS.map((value) => (
+                <option key={value} value={value}>
+                  {SERVICE_ERA_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          }
+        />
+        <Field
+          label="ID"
+          input={
+            <Select {...register("idStatus")}>
+              <option value="">No answer on file</option>
+              {ID_STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {ID_STATUS_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          }
+        />
+        <Field
+          label="Dependents"
+          input={
+            <Select {...register("hasDependents")}>
+              <option value="">No answer on file</option>
+              {DEPENDENTS_ANSWERS.map((value) => (
+                <option key={value} value={value}>
+                  {DEPENDENTS_ANSWER_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          }
+        />
       </Section>
 
       <Section title="Pipeline">

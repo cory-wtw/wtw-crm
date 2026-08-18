@@ -11,6 +11,12 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import {
+  BUCKET_LABELS,
+  CLASSIFICATION_GAP_LABELS,
+  type Bucket,
+  type ClassificationGap,
+} from "@/lib/schemas";
 
 export type ResourceRow = {
   id: string;
@@ -22,6 +28,9 @@ export type ResourceRow = {
   services: string | null;
   description: string | null;
   eligibility: string | null;
+  buckets: Bucket[];
+  /** Empty when the matcher can offer this record to somebody. */
+  gaps: ClassificationGap[];
 };
 
 function truncate(value: string | null, max = 90): string {
@@ -43,6 +52,43 @@ const columns: ColumnDef<ResourceRow>[] = [
         {row.original.organizationName}
       </Link>
     ),
+  },
+  {
+    id: "buckets",
+    header: "Needs served",
+    enableSorting: false,
+    cell: ({ row }) => {
+      const { buckets, gaps } = row.original;
+      if (buckets.length === 0) {
+        return (
+          <span className="text-xs font-bold text-[color:var(--wtw-deep-gold)]">
+            {CLASSIFICATION_GAP_LABELS["no-buckets"]}
+          </span>
+        );
+      }
+      return (
+        <div className="flex flex-wrap gap-1">
+          {buckets.map((bucket) => (
+            <span
+              key={bucket}
+              className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]"
+            >
+              {BUCKET_LABELS[bucket]}
+            </span>
+          ))}
+          {gaps
+            .filter((gap) => gap !== "no-buckets")
+            .map((gap) => (
+              <span
+                key={gap}
+                className="inline-flex items-center rounded-full bg-[color:var(--wtw-deep-gold)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--wtw-deep-gold)]"
+              >
+                {CLASSIFICATION_GAP_LABELS[gap]}
+              </span>
+            ))}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "services",
@@ -97,11 +143,18 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
     { id: "organizationName", desc: false },
   ]);
   const [query, setQuery] = useState("");
+  const [onlyGaps, setOnlyGaps] = useState(false);
+
+  const gapCount = useMemo(
+    () => rows.filter((r) => r.gaps.length > 0).length,
+    [rows],
+  );
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return rows;
+    const pool = onlyGaps ? rows.filter((r) => r.gaps.length > 0) : rows;
+    if (!query.trim()) return pool;
     const q = query.toLowerCase();
-    return rows.filter((r) =>
+    return pool.filter((r) =>
       [
         r.organizationName,
         r.services,
@@ -113,7 +166,7 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
         .filter(Boolean)
         .some((field) => (field as string).toLowerCase().includes(q)),
     );
-  }, [rows, query]);
+  }, [rows, query, onlyGaps]);
 
   const table = useReactTable({
     data: filtered,
@@ -127,14 +180,30 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <input
-          type="search"
-          placeholder="Search by need, service, org, or description…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <input
+            type="search"
+            placeholder="Search by need, service, org, or description…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {gapCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setOnlyGaps((v) => !v)}
+              aria-pressed={onlyGaps}
+              className={`inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-3 text-xs font-bold transition-colors ${
+                onlyGaps
+                  ? "border-[color:var(--wtw-deep-gold)] bg-[color:var(--wtw-deep-gold)]/15 text-[color:var(--wtw-deep-gold)]"
+                  : "border-border bg-card hover:bg-secondary"
+              }`}
+            >
+              {onlyGaps ? "Showing" : "Show"} {gapCount} not yet matchable
+            </button>
+          )}
+        </div>
         <span className="shrink-0 text-xs text-muted-foreground">
           {filtered.length} of {rows.length}
         </span>
@@ -192,7 +261,9 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
         </table>
         {filtered.length === 0 && (
           <p className="border-t border-border p-6 text-center text-xs text-muted-foreground">
-            No matches for &ldquo;{query}&rdquo;.
+            {query
+              ? `No matches for “${query}”.`
+              : "Every record is classified."}
           </p>
         )}
       </div>

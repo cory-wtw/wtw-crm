@@ -13,10 +13,12 @@
     "make-admin": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/make-admin.ts",
     "migrate-data-minimization": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/migrate-data-minimization.ts",
     "migrate-benefits-model": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/migrate-benefits-model.ts",
+    "import-va-facilities": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/import-va-facilities.ts",
     "purge-orgs": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/purge-orgs.ts",
     "deploy-rules": "firebase deploy --only firestore:rules,storage --project=wtw-crm-31aef"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@hookform/resolvers": "^5.2.2",
     "@react-pdf/renderer": "^4.5.1",
     "@tanstack/react-table": "^8.21.3",

@@ -58,6 +58,44 @@ export function canEditVeteran(
   return veteran.assigneeUid === session!.uid;
 }
 
+/**
+ * Running a concierge intake writes eligibility keys to the veteran record, so
+ * it needs the same authority as editing one. Deliberately a separate predicate
+ * from canEditVeteran even though the rule is identical today: the intake is
+ * its own capability, and if the two ever diverge this is where it happens.
+ */
+export function canRunIntake(
+  session: SessionLike | null,
+  veteran: VeteranLike,
+): boolean {
+  return canEditVeteran(session, veteran);
+}
+
+/**
+ * Approving a referral packet writes to the veteran's timeline and sets their
+ * concierge status, so it needs the same authority as editing the record.
+ *
+ * Nothing else in the system may write a referral. There is no auto-send and no
+ * background path — a person picks the resources and approves them, every time.
+ */
+export function canCreateReferral(
+  session: SessionLike | null,
+  veteran: VeteranLike,
+): boolean {
+  return canEditVeteran(session, veteran);
+}
+
+/**
+ * Recording a follow-up writes to the veteran's timeline and to the resource
+ * verification log, so it needs the same authority as editing the record.
+ */
+export function canRecordFollowUp(
+  session: SessionLike | null,
+  veteran: VeteranLike,
+): boolean {
+  return canEditVeteran(session, veteran);
+}
+
 /** Only admins can change the assignee of a veteran (reassign). */
 export function canReassignVeteran(session: SessionLike | null): boolean {
   return isAdmin(session);
@@ -81,6 +119,18 @@ export function canEditPhone(session: SessionLike | null): boolean {
 
 /** Only admins manage users + invites. */
 export function canManageUsers(session: SessionLike | null): boolean {
+  return isAdmin(session);
+}
+
+/**
+ * Approving an AI-proposed or imported record puts it in front of veterans, so
+ * it is admin-only. The proposal itself is a machine's guess about an
+ * organization it read a web page about; a person with authority over the
+ * directory decides whether it becomes something we hand someone.
+ */
+export function canApproveImportedResource(
+  session: SessionLike | null,
+): boolean {
   return isAdmin(session);
 }
 

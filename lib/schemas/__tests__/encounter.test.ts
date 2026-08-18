@@ -73,3 +73,63 @@ describe("encounterSchema", () => {
     expect(result.success).toBe(true);
   });
 });
+
+describe("referral encounters", () => {
+  it("defaults a hand-logged encounter to a plain note", () => {
+    const parsed = encounterSchema.parse({
+      id: "e1",
+      occurredAt: new Date(),
+      loggedBy: "uid-1",
+      summary: "Met at the shelter.",
+      createdAt: new Date(),
+    });
+    expect(parsed.type).toBe("note");
+    expect(parsed.referrals).toEqual([]);
+    expect(parsed.bucketsIdentified).toEqual([]);
+    expect(parsed.followUpDue).toBeNull();
+  });
+
+  it("accepts a referral packet", () => {
+    const result = encounterSchema.safeParse({
+      id: "e2",
+      type: "referral",
+      occurredAt: new Date(),
+      loggedBy: "uid-1",
+      summary: "Sent 2 resources: A, B",
+      bucketsIdentified: ["housing", "legal"],
+      referrals: [
+        { resourceId: "r1", resourceName: "A", rank: 0, score: 305 },
+        { resourceId: "r2", resourceName: "B", rank: 1, score: 210 },
+      ],
+      followUpDue: new Date(),
+      followUpCompleted: null,
+      createdAt: new Date(),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("requires a name on every referred resource", () => {
+    // The packet is a record of what the veteran was handed. A row without a
+    // name can't be read back as that.
+    const result = encounterSchema.safeParse({
+      id: "e3",
+      type: "referral",
+      occurredAt: new Date(),
+      loggedBy: "uid-1",
+      summary: "Sent 1 resource",
+      referrals: [{ resourceId: "r1", resourceName: "", rank: 0, score: 1 }],
+      createdAt: new Date(),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("keeps referral fields out of the hand-entry input schema", () => {
+    const parsed = encounterInputSchema.parse({
+      occurredAt: new Date(),
+      summary: "Talked on the phone.",
+    });
+    expect(parsed).not.toHaveProperty("type");
+    expect(parsed).not.toHaveProperty("referrals");
+    expect(parsed).not.toHaveProperty("followUpDue");
+  });
+});

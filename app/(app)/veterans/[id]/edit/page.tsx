@@ -7,7 +7,7 @@ import { getVeteran } from "@/lib/db/veterans";
 import { listVsos } from "@/lib/db/vsos";
 import { formatShortName } from "@/lib/name";
 import type { Veteran } from "@/lib/schemas";
-import { VeteranForm } from "../../veteran-form";
+import { VeteranForm, type VeteranFormInitial } from "../../veteran-form";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,9 @@ export default async function EditVeteranPage({
   );
 }
 
-function veteranToFormValues(v: Veteran) {
+// Annotated rather than inferred: without it the enum values widen to
+// string and stop matching the form schema.
+function veteranToFormValues(v: Veteran): VeteranFormInitial["values"] {
   return {
     firstName: v.firstName,
     lastInitial: v.lastInitial ?? "",
@@ -76,6 +78,10 @@ function veteranToFormValues(v: Veteran) {
     birthYear: v.birthYear?.toString() ?? "",
     city: v.city ?? "",
     state: v.state ?? "",
+    dischargeCharacter: v.dischargeCharacter ?? "",
+    serviceEra: v.serviceEra ?? "",
+    idStatus: v.idStatus ?? "",
+    hasDependents: v.hasDependents ?? "",
     assigneeUid: v.assigneeUid ?? "",
     pipelineStage: v.pipelineStage,
     monthlyBenefitBefore: v.monthlyBenefitBefore

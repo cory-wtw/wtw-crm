@@ -52,14 +52,18 @@ Add to `veteranSchema` in `lib/schemas/veteran.ts`:
 |---|---|---|
 | `dischargeCharacter` | enum, optional | `honorable` / `general` / `other` / `unsure` |
 | `serviceEra` | enum, optional | `post911` / `gulf` / `vietnam` / `pre911` / `other` / `unsure` |
-| `idStatus` | enum, optional | `valid` / `expired` / `none` |
-| `hasDependents` | bool, optional | |
+| `idStatus` | enum, optional | `valid` / `expired` / `none` / `unsure` |
+| `hasDependents` | enum, optional | `yes` / `no` / `unsure` |
 | `conciergeStatus` | enum, optional | `none` / `referred` / `followUpDue` / `closed` |
 | `followUpDue` | Date, optional | Set at referral, +14 days |
 
 All optional so no backfill is required. `lib/db/veterans.ts:deserialize` defaults every missing field, which is the existing convention.
 
 **Not stored, ever.** Diagnoses, conditions, medications, income figures, household composition, claim history detail, SSN, date of birth, VA file number, full street address, full surname. The line: facts needed to route someone, nothing about their health or their money.
+
+**On `unsure`.** Every eligibility field carries an `unsure` value, and it is not the same as a blank. Blank means nobody asked; `unsure` means somebody asked and the answer was "I don't know". Both fail closed at the gates, but only one of them is worth asking again — and only the blank one is safe for a later intake to overwrite. `runIntakeAction` treats a blank answer as "not asked this time" and leaves the stored value intact; clearing a stored answer is done from the veteran edit form, deliberately, by a person.
+
+**On clearing an answer.** `veteranInputSchema` accepts `null` on the four eligibility fields; the domain schema does not. That asymmetry is the clear path: the veteran edit form sends an explicit null to wipe an answer, and `dropUndefined` keeps it so it reaches Firestore. Intake never sends null — a blank there is silence, not an instruction. Edit clears; intake never does.
 
 **`safeTonight` is deliberately not a stored field.** A crisis answer is true at a moment, not about a person, and a stale `safeTonight: false` on a record read three months later is worse than no data. It is a transient form value that routes the call and is not persisted.
 
@@ -72,9 +76,9 @@ The resource directory becomes the matching corpus. Add to `lib/schemas/resource
 | Field | Type | Notes |
 |---|---|---|
 | `buckets` | array of enum | One or more, see §2.5 |
-| `geoScope` | enum | `national` / `state` / `metro` / `county` |
+| `geoScope` | enum | `national` / `state` / `local` |
 | `geoStates` | array of string | Two-letter codes. Empty when national |
-| `geoLocalities` | array of string | Cities or counties, for metro and county scope |
+| `geoLocalities` | array of string | Cities or counties, required for `local` scope |
 | `minDischarge` | enum | `any` / `general` / `honorable` |
 | `requiresVaEnrollment` | bool | |
 | `requiresValidId` | bool | |
@@ -102,6 +106,7 @@ The resource directory becomes the matching corpus. Add to `lib/schemas/resource
 | `contentHash` | string, optional | For diff checks |
 | `flagReason` | string, optional | |
 | `sourceName` | string, optional | Where the record came from |
+| `externalId` | string, optional | Source-namespaced id (e.g. `va-facilities:vc_0101V`). Importers key on it so a re-run updates rather than duplicates. Not on the input schema |
 
 **On `minDischarge`.** Values are inclusive upward. `any` accepts everything including other-than-honorable. `general` accepts general and honorable. Getting this wrong on Vet Center records silently hides the single most useful resource for this population, since Vet Centers accept any character of discharge and require no VA enrollment.
 
@@ -289,7 +294,7 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
   if (r.eraRestriction.length && !r.eraRestriction.includes(v.serviceEra ?? "unsure"))
     failures.push("era");
 
-  if (r.requiresDependents && v.hasDependents !== true) failures.push("dependents");
+  if (r.requiresDependents && v.hasDependents !== "yes") failures.push("dependents");
 
   if (!r.buckets.some(b => v.needs.includes(b))) failures.push("no bucket overlap");
 
@@ -383,9 +388,17 @@ Do not build a scraper farm. Almost all of this is already compiled by federal a
 
 No Cloud Functions. Import runs as a one-off tsx script in `scripts/`, matching the existing `scripts/migrate-*.ts` pattern run against `.env.local`.
 
-Per record: fetch page, AI proposes the ten gate values plus description, access method, and wait, write with `verificationStatus: "flagged"`, never `live`.
+**AI enrichment is a page, not part of the importer.** v2.0 described it inline in the import script; that shape suits a bulk feed and fights the actual first job, which is 75 hand-picked national organizations pasted in from a list. Enrichment therefore lives at `app/(app)/admin/resources/enrich`, `canApproveImportedResource` only: paste one URL or a list, one per line; per URL the server fetches the page, sends the text to the Anthropic API, and proposes a record; the proposal renders beside the fetched page text with every field editable, to approve or discard. Bulk imports (the VA Facilities script and anything after it) stay unenriched — they map gate values by record type and land flagged for the same review.
 
-An admin review queue at `app/(app)/admin/resources/review` lists flagged records for approval. On approval, store `contentHash` and set `live`.
+Rules the page holds to:
+
+- The API key is read server-side only and never reaches the client.
+- The prompt demands JSON only, and the parser strips fences and tolerates junk anyway. A model that ignores the instruction must not take the batch down with it.
+- **Any field the page doesn't support comes back `null`, never a guess.** A null prompts a human; a guess is a silent error nobody finds. Nulls are marked as unanswered in the review screen rather than quietly defaulted.
+- One URL at a time, so a fetch failure or an unparseable response costs that URL and not the batch.
+- Written `flagged`, `sourceName: "ai-enrich"`, `externalId: ai-enrich:<url-hash>` for idempotency.
+
+An admin review queue at `app/(app)/admin/resources/review` lists flagged records for approval in bulk. On approval, store `contentHash` and set `live`.
 
 **Never auto-publish an AI-enriched record.** A wrong gate value silently misroutes veterans and nobody finds out.
 
