@@ -2,6 +2,7 @@ import "server-only";
 import type { WriteBatch } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import type {
+  FollowUpOutcome,
   VerificationCheckType,
   VerificationResult,
 } from "@/lib/schemas";
@@ -15,6 +16,8 @@ export type VerificationEntry = {
   detail: string;
   /** uid of the person, or "system" for an automated check. */
   checkedBy: string;
+  /** For humanOutcome checks: what the veteran reported. */
+  outcome?: FollowUpOutcome;
 };
 
 /**
@@ -38,5 +41,6 @@ export function stageVerification(
     detail: entry.detail,
     checkedAt: at,
     checkedBy: entry.checkedBy,
+    ...(entry.outcome ? { outcome: entry.outcome } : {}),
   });
 }

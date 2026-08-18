@@ -20,8 +20,14 @@
  * neutral one, because it reads like it still means something specific.
  */
 
-/** Money in any shape a staff member is likely to type. */
-const MONEY = /\$\s*\d|\b\d[\d,]*(?:\.\d+)?\s*(?:dollars|usd|bucks)\b/i;
+/**
+ * Money in any shape a staff member is likely to type. The amount is captured
+ * whole, not just its first digit — the match goes into the resource's
+ * verification log, and "$1" instead of "$1,200" would send whoever reads it
+ * hunting for the wrong string.
+ */
+const MONEY =
+  /\$\s*\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s*(?:dollars|usd|bucks)\b/i;
 
 /**
  * Phrases that promise an outcome or edge into claim advice. Deliberately
@@ -32,10 +38,34 @@ const MONEY = /\$\s*\d|\b\d[\d,]*(?:\.\d+)?\s*(?:dollars|usd|bucks)\b/i;
 const RISKY =
   /\b(guarantee[sd]?|approv\w*|denied|back ?pay|rating|disability percentage|you (?:will|'ll) (?:get|receive|qualify)|file (?:a )?claim|should file|entitled to)\b/i;
 
+/** Which screen a sentence tripped, and on what. */
+export type ScreenTrip = {
+  pattern: "money" | "outcome-or-claim";
+  /** The text that matched, so a reviewer can find it in the record. */
+  match: string;
+};
+
+/**
+ * Screen a borrowed sentence. Null means it can go in front of a veteran
+ * as-is; anything else names what stopped it and the words that did it.
+ */
+export function screenForPacket(text: string): ScreenTrip | null {
+  const money = MONEY.exec(text);
+  if (money) return { pattern: "money", match: money[0].trim() };
+  const risky = RISKY.exec(text);
+  if (risky) return { pattern: "outcome-or-claim", match: risky[0].trim() };
+  return null;
+}
+
 /** True when a borrowed sentence can't go in front of a veteran as-is. */
 export function isUnsafeForPacket(text: string): boolean {
-  return MONEY.test(text) || RISKY.test(text);
+  return screenForPacket(text) !== null;
 }
+
+export const SCREEN_PATTERN_LABELS: Record<ScreenTrip["pattern"], string> = {
+  money: "a dollar figure",
+  "outcome-or-claim": "outcome or claim language",
+};
 
 /** First sentence, trimmed to something that reads on one line. */
 export function firstSentence(text: string, maxLength = 160): string {
@@ -53,17 +83,32 @@ const NEUTRAL_DESCRIPTION = "Ask them what they can help with.";
 /**
  * The "what they do" line for one resource: the record's own words when they
  * are safe to pass on, and a neutral prompt when they are not.
+ *
+ * Reports the trip when it substitutes. A description carrying money or
+ * outcome language is a bad record everywhere it appears, not just in this
+ * packet — the caller writes it to the resource's verification log, and the
+ * results screen tells the staff member reading the packet that a line was
+ * replaced. A silent substitution would defeat the human read that is the
+ * actual guarantee here.
  */
 export function describeResource(input: {
   description?: string | null;
   services?: string | null;
-}): string {
-  for (const candidate of [input.description, input.services]) {
+}): { line: string; trip: (ScreenTrip & { field: "description" | "services" }) | null } {
+  let firstTrip: (ScreenTrip & { field: "description" | "services" }) | null =
+    null;
+
+  for (const field of ["description", "services"] as const) {
+    const candidate = input[field];
     if (!candidate) continue;
     const sentence = firstSentence(candidate);
-    if (sentence && !isUnsafeForPacket(sentence)) return sentence;
+    if (!sentence) continue;
+    const trip = screenForPacket(sentence);
+    if (!trip) return { line: sentence, trip: firstTrip };
+    firstTrip ??= { ...trip, field };
   }
-  return NEUTRAL_DESCRIPTION;
+
+  return { line: NEUTRAL_DESCRIPTION, trip: firstTrip };
 }
 
 export type PacketResource = {
@@ -102,10 +147,24 @@ const CHECK_BACK =
  * compose window, and half of the people receiving it are reading on a
  * borrowed phone.
  */
-export function buildReferralText(input: {
+export type PacketSubstitution = {
+  resourceIndex: number;
+  organizationName: string;
+  field: "description" | "services" | "whatToBring";
+  pattern: ScreenTrip["pattern"];
+  match: string;
+};
+
+export type ReferralPacket = {
+  text: string;
+  /** Every place a record's own words were replaced, and why. */
+  substitutions: PacketSubstitution[];
+};
+
+export function buildReferralPacket(input: {
   firstName: string;
   resources: PacketResource[];
-}): string {
+}): ReferralPacket {
   const greeting = input.firstName.trim()
     ? `${input.firstName.trim()},`
     : "Hello,";
@@ -115,20 +174,48 @@ export function buildReferralText(input: {
       ? "Here's the organization we talked about."
       : `Here are the ${input.resources.length} organizations we talked about.`;
 
+  const substitutions: PacketSubstitution[] = [];
+
   const blocks = input.resources.map((resource, index) => {
+    const described = describeResource(resource);
+    if (described.trip) {
+      substitutions.push({
+        resourceIndex: index,
+        organizationName: resource.organizationName,
+        field: described.trip.field,
+        pattern: described.trip.pattern,
+        match: described.trip.match,
+      });
+    }
+
     const lines = [
       `${index + 1}. ${resource.organizationName}`,
-      `   What they do: ${describeResource(resource)}`,
+      `   What they do: ${described.line}`,
       `   How to start: ${startLine(resource)}`,
     ];
+
     const bring = resource.whatToBring?.trim();
-    if (bring && !isUnsafeForPacket(bring)) {
-      lines.push(`   Bring: ${firstSentence(bring)}`);
+    if (bring) {
+      const trip = screenForPacket(bring);
+      if (trip) {
+        // Dropped rather than replaced: there is no neutral stand-in for
+        // "what to bring" that says anything true.
+        substitutions.push({
+          resourceIndex: index,
+          organizationName: resource.organizationName,
+          field: "whatToBring",
+          pattern: trip.pattern,
+          match: trip.match,
+        });
+      } else {
+        lines.push(`   Bring: ${firstSentence(bring)}`);
+      }
     }
+
     return lines.join("\n");
   });
 
-  return [
+  const text = [
     greeting,
     "",
     intro,
@@ -140,4 +227,14 @@ export function buildReferralText(input: {
     "Worth Their Weight",
     "Worth Their Weight is not a law firm and does not provide legal representation before the U.S. Department of Veterans Affairs. All claims-related services are performed by VA-accredited attorneys, agents, or Veterans Service Organizations.",
   ].join("\n");
+
+  return { text, substitutions };
+}
+
+/** The text alone, for callers that don't care why a line was replaced. */
+export function buildReferralText(input: {
+  firstName: string;
+  resources: PacketResource[];
+}): string {
+  return buildReferralPacket(input).text;
 }

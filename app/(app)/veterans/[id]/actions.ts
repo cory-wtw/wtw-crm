@@ -15,7 +15,12 @@ import {
   type MatchFlag,
   type MatchInput,
 } from "@/lib/matching";
-import { buildReferralText } from "@/lib/referral-text";
+import {
+  buildReferralPacket,
+  SCREEN_PATTERN_LABELS,
+  type PacketSubstitution,
+} from "@/lib/referral-text";
+import { stageVerification } from "@/lib/verifications";
 import {
   canAccessCrm,
   canCreateReferral,
@@ -294,6 +299,10 @@ export type ReferralResult = {
   /** The block staff copies into an email and sends themselves. */
   referralText: string;
   followUpDue: string;
+  /** Lines the screen replaced or dropped, so the person about to send the
+   *  packet can see what isn't in it. A silent substitution would defeat the
+   *  human read that is the actual guarantee. */
+  substitutions: (PacketSubstitution & { resourceId: string })[];
 };
 
 /**
@@ -367,7 +376,7 @@ export async function createReferralAction(
     now.getTime() + FOLLOW_UP_DAYS * 24 * 60 * 60 * 1000,
   );
 
-  const referralText = buildReferralText({
+  const packet = buildReferralPacket({
     firstName: existing.firstName ?? "",
     resources: ordered.map((r) => {
       const resource = byId.get(r.resourceId)!;
@@ -381,6 +390,13 @@ export async function createReferralAction(
       };
     }),
   });
+
+  // Map each substitution back to the resource it came from, so both the
+  // verification log and the results screen can name it.
+  const substitutions = packet.substitutions.map((substitution) => ({
+    ...substitution,
+    resourceId: ordered[substitution.resourceIndex].resourceId,
+  }));
 
   const encounterRef = veteranRef.collection("encounters").doc();
 
@@ -407,6 +423,28 @@ export async function createReferralAction(
     updatedBy: session.uid,
     updatedAt: now,
   });
+
+  // A description carrying money or outcome language is a bad record
+  // everywhere it appears, not just in this packet. Log it against the
+  // resource so it surfaces in review — but leave verificationStatus alone:
+  // the record may be perfectly live and simply badly worded, and only a
+  // human or a Phase 7 check may flag it.
+  for (const substitution of substitutions) {
+    stageVerification(
+      batch,
+      {
+        resourceId: substitution.resourceId,
+        checkType: "manual",
+        result: "flag",
+        detail: `Referral text screen: ${substitution.field} matched ${SCREEN_PATTERN_LABELS[substitution.pattern]} ("${substitution.match}"). The line was ${
+          substitution.field === "whatToBring" ? "dropped from" : "replaced in"
+        } a packet; the record still says it.`,
+        checkedBy: session.uid,
+      },
+      now,
+    );
+  }
+
   await batch.commit();
 
   await logAudit({
@@ -428,8 +466,9 @@ export async function createReferralAction(
     ok: true,
     result: {
       encounterId: encounterRef.id,
-      referralText,
+      referralText: packet.text,
       followUpDue: followUpDue.toISOString(),
+      substitutions,
     },
   };
 }

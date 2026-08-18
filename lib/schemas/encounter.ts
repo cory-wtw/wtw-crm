@@ -37,6 +37,37 @@ export const referredResourceSchema = z.object({
 });
 export type ReferredResource = z.infer<typeof referredResourceSchema>;
 
+/**
+ * What came of one referred resource, two weeks on.
+ *
+ * This is the most valuable verification signal in the system: no crawler can
+ * tell you a phone number is dead, and a veteran who tried can.
+ */
+export const FOLLOW_UP_OUTCOMES = [
+  "reached",
+  "unreachable",
+  "ineligible",
+  "declined",
+  "helped",
+] as const;
+export const followUpOutcomeSchema = z.enum(FOLLOW_UP_OUTCOMES);
+export type FollowUpOutcome = z.infer<typeof followUpOutcomeSchema>;
+
+export const FOLLOW_UP_OUTCOME_LABELS: Record<FollowUpOutcome, string> = {
+  reached: "Got through",
+  unreachable: "Couldn't reach them",
+  ineligible: "Turned away — didn't qualify",
+  declined: "Veteran decided not to",
+  helped: "They helped",
+};
+
+export const followUpResultSchema = z.object({
+  resourceId: z.string().min(1),
+  outcome: followUpOutcomeSchema,
+  note: z.string().optional(),
+});
+export type FollowUpResult = z.infer<typeof followUpResultSchema>;
+
 export const encounterSchema = z.object({
   id: z.string(),
   type: encounterTypeSchema.default("note"),
@@ -53,6 +84,9 @@ export const encounterSchema = z.object({
   followUpDue: z.date().nullable().default(null),
   followUpCompleted: z.date().nullable().default(null),
 
+  // followUp encounters only.
+  outcomes: z.array(followUpResultSchema).default([]),
+
   createdAt: z.date(),
 });
 export type Encounter = z.infer<typeof encounterSchema>;
@@ -66,6 +100,7 @@ export const encounterInputSchema = encounterSchema.omit({
   referrals: true,
   followUpDue: true,
   followUpCompleted: true,
+  outcomes: true,
   createdAt: true,
 });
 export type EncounterInput = z.infer<typeof encounterInputSchema>;

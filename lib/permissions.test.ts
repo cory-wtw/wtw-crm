@@ -8,6 +8,7 @@ import {
   canEditPhone,
   canEditVeteran,
   canCreateReferral,
+  canRecordFollowUp,
   canRunIntake,
   canEditVso,
   canManageUsers,
@@ -250,5 +251,34 @@ describe("canCreateReferral", () => {
 
   it("keeps social-only users out entirely", () => {
     expect(canCreateReferral(SOCIAL, { assigneeUid: "u-a" })).toBe(false);
+  });
+});
+
+describe("canRecordFollowUp", () => {
+  it("tracks canEditVeteran exactly", () => {
+    for (const veteran of [
+      { assigneeUid: "u-a" },
+      { assigneeUid: "u-b" },
+      { assigneeUid: null },
+    ]) {
+      for (const session of [ADMIN, STANDARD_A, SOCIAL, null]) {
+        expect(canRecordFollowUp(session, veteran)).toBe(
+          canEditVeteran(session, veteran),
+        );
+      }
+    }
+  });
+
+  it("lets an admin close out anyone's follow-up", () => {
+    expect(canRecordFollowUp(ADMIN, { assigneeUid: "u-b" })).toBe(true);
+  });
+
+  it("keeps a standard user to their own caseload", () => {
+    expect(canRecordFollowUp(STANDARD_A, { assigneeUid: "u-a" })).toBe(true);
+    expect(canRecordFollowUp(STANDARD_A, { assigneeUid: "u-b" })).toBe(false);
+  });
+
+  it("keeps social-only users out entirely", () => {
+    expect(canRecordFollowUp(SOCIAL, { assigneeUid: "u-a" })).toBe(false);
   });
 });

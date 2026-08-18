@@ -28,6 +28,7 @@ function deserialize(
     referrals: data.referrals ?? [],
     followUpDue: tsToDate(data.followUpDue),
     followUpCompleted: tsToDate(data.followUpCompleted),
+    outcomes: data.outcomes ?? [],
     createdAt: tsToDate(data.createdAt) ?? new Date(),
   };
 }
@@ -42,4 +43,12 @@ export async function listEncounters(
     .orderBy("occurredAt", "desc")
     .get();
   return snap.docs.map((d) => deserialize(d.id, d.data()));
+}
+
+/** The most recent referral packet sent to a veteran, if there is one. */
+export async function getLatestReferral(
+  veteranId: string,
+): Promise<Encounter | null> {
+  const encounters = await listEncounters(veteranId);
+  return encounters.find((e) => e.type === "referral") ?? null;
 }

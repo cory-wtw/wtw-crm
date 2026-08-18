@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildReferralPacket,
   buildReferralText,
   describeResource,
+  screenForPacket,
   firstSentence,
   isUnsafeForPacket,
   startLine,
@@ -75,16 +77,36 @@ describe("firstSentence", () => {
   });
 });
 
+describe("screenForPacket", () => {
+  it("names the pattern and the words that tripped it", () => {
+    expect(screenForPacket("Grants of up to $1,200 for rent.")).toEqual({
+      pattern: "money",
+      match: "$1,200",
+    });
+    expect(screenForPacket("We guarantee you get seen")).toEqual({
+      pattern: "outcome-or-claim",
+      match: "guarantee",
+    });
+  });
+
+  it("returns null for text that can go in front of a veteran", () => {
+    expect(screenForPacket("Food pantry open Tuesdays.")).toBeNull();
+  });
+});
+
 describe("describeResource", () => {
   it("uses the record's own words when they're safe", () => {
-    expect(
-      describeResource({ description: "Runs a food pantry on Tuesdays." }),
-    ).toBe("Runs a food pantry on Tuesdays.");
+    const result = describeResource({
+      description: "Runs a food pantry on Tuesdays.",
+    });
+    expect(result.line).toBe("Runs a food pantry on Tuesdays.");
+    expect(result.trip).toBeNull();
   });
 
   it("falls back to services when there's no description", () => {
     expect(
-      describeResource({ description: null, services: "Rent help, utilities" }),
+      describeResource({ description: null, services: "Rent help, utilities" })
+        .line,
     ).toBe("Rent help, utilities");
   });
 
@@ -94,8 +116,21 @@ describe("describeResource", () => {
       description: "Grants of up to $1,200 for rent.",
       services: "Rent assistance",
     });
-    expect(result).toBe("Rent assistance");
-    expect(result).not.toContain("$");
+    expect(result.line).toBe("Rent assistance");
+    expect(result.line).not.toContain("$");
+  });
+
+  it("reports the bad description even when a safe fallback was found", () => {
+    // The description is a bad record wherever it appears, not just here.
+    const result = describeResource({
+      description: "Grants of up to $1,200 for rent.",
+      services: "Rent assistance",
+    });
+    expect(result.trip).toEqual({
+      pattern: "money",
+      match: "$1,200",
+      field: "description",
+    });
   });
 
   it("falls back to neutral when every candidate is unsafe", () => {
@@ -103,11 +138,73 @@ describe("describeResource", () => {
       description: "We guarantee approval.",
       services: "Gets you $2,000 back pay",
     });
-    expect(result).toBe("Ask them what they can help with.");
+    expect(result.line).toBe("Ask them what they can help with.");
+    expect(result.trip).not.toBeNull();
   });
 
   it("falls back to neutral when there's nothing on file", () => {
-    expect(describeResource({})).toBe("Ask them what they can help with.");
+    const result = describeResource({});
+    expect(result.line).toBe("Ask them what they can help with.");
+    expect(result.trip).toBeNull();
+  });
+});
+
+describe("buildReferralPacket substitutions", () => {
+  it("reports nothing when every record is clean", () => {
+    const packet = buildReferralPacket({
+      firstName: "John",
+      resources: [aPacketResource()],
+    });
+    expect(packet.substitutions).toEqual([]);
+  });
+
+  it("names the resource, field, pattern, and matched words", () => {
+    const packet = buildReferralPacket({
+      firstName: "John",
+      resources: [
+        aPacketResource({
+          organizationName: "Rent Fund",
+          description: "Grants of up to $1,200 for rent.",
+          services: null,
+        }),
+      ],
+    });
+    expect(packet.substitutions).toEqual([
+      {
+        resourceIndex: 0,
+        organizationName: "Rent Fund",
+        field: "description",
+        pattern: "money",
+        match: "$1,200",
+      },
+    ]);
+  });
+
+  it("reports a dropped what-to-bring line separately", () => {
+    const packet = buildReferralPacket({
+      firstName: "John",
+      resources: [
+        aPacketResource({ whatToBring: "Bring $25 for the application fee" }),
+      ],
+    });
+    expect(packet.text).not.toContain("Bring:");
+    expect(packet.substitutions).toHaveLength(1);
+    expect(packet.substitutions[0].field).toBe("whatToBring");
+  });
+
+  it("keeps the index so staff can find the entry in the packet", () => {
+    const packet = buildReferralPacket({
+      firstName: "John",
+      resources: [
+        aPacketResource(),
+        aPacketResource({
+          organizationName: "Second",
+          description: "We guarantee approval.",
+          services: null,
+        }),
+      ],
+    });
+    expect(packet.substitutions[0].resourceIndex).toBe(1);
   });
 });
 

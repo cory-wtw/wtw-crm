@@ -23,6 +23,7 @@ function deserialize(
     detail: data.detail ?? "",
     checkedAt: tsToDate(data.checkedAt) ?? new Date(0),
     checkedBy: data.checkedBy ?? "system",
+    outcome: data.outcome ?? undefined,
   };
 }
 

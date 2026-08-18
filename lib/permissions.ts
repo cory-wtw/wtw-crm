@@ -85,6 +85,17 @@ export function canCreateReferral(
   return canEditVeteran(session, veteran);
 }
 
+/**
+ * Recording a follow-up writes to the veteran's timeline and to the resource
+ * verification log, so it needs the same authority as editing the record.
+ */
+export function canRecordFollowUp(
+  session: SessionLike | null,
+  veteran: VeteranLike,
+): boolean {
+  return canEditVeteran(session, veteran);
+}
+
 /** Only admins can change the assignee of a veteran (reassign). */
 export function canReassignVeteran(session: SessionLike | null): boolean {
   return isAdmin(session);

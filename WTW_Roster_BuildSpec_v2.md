@@ -63,6 +63,8 @@ All optional so no backfill is required. `lib/db/veterans.ts:deserialize` defaul
 
 **On `unsure`.** Every eligibility field carries an `unsure` value, and it is not the same as a blank. Blank means nobody asked; `unsure` means somebody asked and the answer was "I don't know". Both fail closed at the gates, but only one of them is worth asking again — and only the blank one is safe for a later intake to overwrite. `runIntakeAction` treats a blank answer as "not asked this time" and leaves the stored value intact; clearing a stored answer is done from the veteran edit form, deliberately, by a person.
 
+**On clearing an answer.** `veteranInputSchema` accepts `null` on the four eligibility fields; the domain schema does not. That asymmetry is the clear path: the veteran edit form sends an explicit null to wipe an answer, and `dropUndefined` keeps it so it reaches Firestore. Intake never sends null — a blank there is silence, not an instruction. Edit clears; intake never does.
+
 **`safeTonight` is deliberately not a stored field.** A crisis answer is true at a moment, not about a person, and a stale `safeTonight: false` on a record read three months later is worse than no data. It is a transient form value that routes the call and is not persisted.
 
 ## 2.2 `resources` — fields added

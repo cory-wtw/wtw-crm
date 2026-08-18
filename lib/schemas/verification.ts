@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { followUpOutcomeSchema } from "./encounter";
 import type { VerificationStatus } from "./resource";
 
 /**
@@ -65,6 +66,12 @@ export const verificationSchema = z.object({
   checkedAt: z.date(),
   /** uid of the person, or "system" for an automated check. */
   checkedBy: z.string(),
+  /**
+   * For humanOutcome checks: what the veteran reported. Stored as its own
+   * field rather than left inside `detail`, because the "two unreachables in
+   * 60 days" rule counts these and must not do it by parsing prose.
+   */
+  outcome: followUpOutcomeSchema.optional(),
 });
 export type Verification = z.infer<typeof verificationSchema>;
 

@@ -20,6 +20,23 @@ import { CrisisLine } from "./intake-form";
 /** How many resources go in one referral packet. */
 const PACKET_SIZE = 5;
 
+const FIELD_LABELS: Record<
+  ReferralResult["substitutions"][number]["field"],
+  string
+> = {
+  description: "description",
+  services: "services line",
+  whatToBring: "what-to-bring line",
+};
+
+const PATTERN_LABELS: Record<
+  ReferralResult["substitutions"][number]["pattern"],
+  string
+> = {
+  money: "a dollar figure",
+  "outcome-or-claim": "an outcome or a claim",
+};
+
 export function IntakeResults({
   result,
   veteranId,
@@ -132,6 +149,40 @@ export function IntakeResults({
             the text below into your own email and send it yourself.
           </p>
         </div>
+
+        {referral.substitutions.length > 0 && (
+          <div className="rounded-lg border border-[color:var(--wtw-deep-gold)]/40 bg-[color:var(--wtw-deep-gold)]/10 p-4 text-sm">
+            <p className="font-bold">
+              {referral.substitutions.length === 1
+                ? "One line was replaced before this packet was written"
+                : `${referral.substitutions.length} lines were replaced before this packet was written`}
+            </p>
+            <ul className="mt-2 space-y-1">
+              {referral.substitutions.map((substitution, index) => (
+                <li key={`${substitution.resourceId}-${index}`}>
+                  <Link
+                    href={`/resources/${substitution.resourceId}`}
+                    className="font-bold underline-offset-4 hover:underline"
+                  >
+                    {substitution.organizationName}
+                  </Link>{" "}
+                  <span className="text-muted-foreground">
+                    — its {FIELD_LABELS[substitution.field]} mentioned{" "}
+                    {PATTERN_LABELS[substitution.pattern]} (
+                    {substitution.match}), so that line is{" "}
+                    {substitution.field === "whatToBring"
+                      ? "not in the packet"
+                      : "replaced with a neutral one"}
+                    . Fix the record so the next packet reads better.
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Read the text below before you send it.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
