@@ -375,8 +375,15 @@ export function ProposalReview({
             {result.pageText}
           </pre>
           <p className="text-xs text-muted-foreground">
-            This is the page text as extracted, not the live page. If a field
-            looks wrong, it&rsquo;s here or it was invented.
+            {result.pagesFetched.length === 1
+              ? "One page — no internal links scored high enough to follow."
+              : `${result.pagesFetched.length} pages, entry first${
+                  result.followedUp.length > 0
+                    ? `, ${result.followedUp.length} asked for after the first read`
+                    : ""
+                }.`}{" "}
+            This is the text as extracted, not the live pages. If a field looks
+            wrong, it&rsquo;s in here or it was invented.
           </p>
         </div>
       </div>

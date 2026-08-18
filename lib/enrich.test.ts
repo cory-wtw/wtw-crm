@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  combinePages,
   extractJsonObject,
+  extractLinks,
+  rankLinks,
+  scoreLink,
   htmlToText,
   isBlockedHost,
   MAX_PAGE_CHARS,
@@ -245,5 +249,182 @@ describe("parseUrlList", () => {
     const { urls, invalid } = parseUrlList("https://a.org\nnot-a-url\n");
     expect(urls).toEqual(["https://a.org"]);
     expect(invalid).toEqual(["not-a-url"]);
+  });
+});
+
+describe("extractLinks", () => {
+  const base = "https://example.org/veterans";
+
+  it("resolves relative links against the page", () => {
+    const links = extractLinks(
+      '<a href="/eligibility">Eligibility</a><a href="faq">FAQ</a>',
+      base,
+    );
+    expect(links.map((l) => l.url)).toEqual([
+      "https://example.org/eligibility",
+      "https://example.org/faq",
+    ]);
+  });
+
+  it("keeps the anchor text, stripped of markup", () => {
+    const links = extractLinks(
+      '<a href="/who"><span>Who</span> we <b>serve</b></a>',
+      base,
+    );
+    expect(links[0].text).toBe("Who we serve");
+  });
+
+  it("refuses other hosts", () => {
+    // An external link is somebody else's claim, and following one would let a
+    // page point our fetcher wherever it liked.
+    const links = extractLinks(
+      '<a href="https://elsewhere.org/x">Elsewhere</a><a href="/ours">Ours</a>',
+      base,
+    );
+    expect(links.map((l) => l.url)).toEqual(["https://example.org/ours"]);
+  });
+
+  it("skips fragments, mail, phone, and script links", () => {
+    const links = extractLinks(
+      '<a href="#top">Top</a><a href="mailto:a@b.c">Mail</a><a href="tel:555">Call</a><a href="javascript:x()">X</a>',
+      base,
+    );
+    expect(links).toEqual([]);
+  });
+
+  it("skips documents and media it can't read", () => {
+    const links = extractLinks(
+      '<a href="/form.pdf">Form</a><a href="/logo.png">Logo</a><a href="/help">Help</a>',
+      base,
+    );
+    expect(links.map((l) => l.url)).toEqual(["https://example.org/help"]);
+  });
+
+  it("de-duplicates and drops a self-link", () => {
+    const links = extractLinks(
+      '<a href="/a">A</a><a href="/a">A again</a><a href="/veterans">Self</a>',
+      base,
+    );
+    expect(links.map((l) => l.url)).toEqual(["https://example.org/a"]);
+  });
+});
+
+describe("scoreLink", () => {
+  it("ranks eligibility above everything else", () => {
+    // minDischarge and requiresVaEnrollment decide whether a veteran gets
+    // through the door, and they're never on a landing page.
+    const eligibility = scoreLink({
+      url: "https://x.org/eligibility",
+      text: "Eligibility",
+    });
+    for (const other of [
+      { url: "https://x.org/services", text: "Our services" },
+      { url: "https://x.org/contact", text: "Contact us" },
+      { url: "https://x.org/about", text: "About" },
+    ]) {
+      expect(eligibility).toBeGreaterThan(scoreLink(other));
+    }
+  });
+
+  it("scores the phrasings organizations actually use", () => {
+    for (const text of [
+      "Who we serve",
+      "Am I eligible?",
+      "How to get started",
+      "Apply now",
+      "Frequently asked questions",
+    ]) {
+      expect(scoreLink({ url: "https://x.org/p", text })).toBeGreaterThan(0);
+    }
+  });
+
+  it("zeroes out boilerplate", () => {
+    for (const text of [
+      "Privacy policy",
+      "Terms of use",
+      "Donate",
+      "Careers",
+      "Newsroom",
+    ]) {
+      expect(scoreLink({ url: "https://x.org/p", text })).toBe(0);
+    }
+  });
+
+  it("reads the href when the anchor text says nothing", () => {
+    expect(
+      scoreLink({ url: "https://x.org/eligibility-requirements", text: "" }),
+    ).toBeGreaterThan(0);
+  });
+});
+
+describe("rankLinks", () => {
+  it("returns the best links first and drops the scoreless", () => {
+    const ranked = rankLinks(
+      [
+        { url: "https://x.org/privacy", text: "Privacy" },
+        { url: "https://x.org/contact", text: "Contact" },
+        { url: "https://x.org/eligibility", text: "Eligibility" },
+      ],
+      5,
+    );
+    expect(ranked.map((l) => l.url)).toEqual([
+      "https://x.org/eligibility",
+      "https://x.org/contact",
+    ]);
+  });
+
+  it("respects the limit", () => {
+    const links = Array.from({ length: 20 }, (_, i) => ({
+      url: `https://x.org/eligibility-${i}`,
+      text: "Eligibility",
+    }));
+    expect(rankLinks(links, 5)).toHaveLength(5);
+  });
+
+  it("is deterministic when scores tie", () => {
+    const links = [
+      { url: "https://x.org/b", text: "Eligibility" },
+      { url: "https://x.org/a", text: "Eligibility" },
+    ];
+    expect(rankLinks(links, 5).map((l) => l.url)).toEqual([
+      "https://x.org/a",
+      "https://x.org/b",
+    ]);
+  });
+});
+
+describe("combinePages", () => {
+  it("labels each page with its URL", () => {
+    const combined = combinePages([
+      { url: "https://x.org/", text: "Landing text" },
+      { url: "https://x.org/eligibility", text: "Any discharge accepted." },
+    ]);
+    expect(combined).toContain("===== PAGE: https://x.org/");
+    expect(combined).toContain("===== PAGE: https://x.org/eligibility");
+    expect(combined).toContain("Any discharge accepted.");
+  });
+
+  it("spends the budget in order, so the entry page is never crowded out", () => {
+    const combined = combinePages(
+      [
+        { url: "https://x.org/", text: "E".repeat(500) },
+        { url: "https://x.org/faq", text: "F".repeat(500) },
+      ],
+      600,
+    );
+    expect(combined).toContain("E".repeat(400));
+    expect(combined.length).toBeLessThanOrEqual(700);
+  });
+
+  it("truncates rather than dropping a page mid-budget", () => {
+    const combined = combinePages(
+      [{ url: "https://x.org/", text: "E".repeat(5000) }],
+      1000,
+    );
+    expect(combined).toContain("[truncated]");
+  });
+
+  it("handles an empty list", () => {
+    expect(combinePages([])).toBe("");
   });
 });

@@ -283,3 +283,160 @@ export function proposalToInput(proposal: Proposal, url: string) {
     fragility: "fragile" as const,
   };
 }
+
+// --- One-hop crawl -------------------------------------------------------
+//
+// A landing page says what an organization is; it rarely says who it turns
+// away. Eligibility, discharge floors, and enrollment requirements live a click
+// down, under "who we serve" or "eligibility" or a FAQ. Reading only the entry
+// page therefore nulls exactly the fields that decide whether a referral works.
+
+export type PageLink = {
+  url: string;
+  /** The anchor text, normalized — the strongest signal about what's behind it. */
+  text: string;
+};
+
+/**
+ * Internal links from a page, same host only.
+ *
+ * Same-host is a hard rule, not a heuristic: an external link is somebody
+ * else's claim about this organization, and following one would let any page
+ * point our fetcher wherever it liked.
+ */
+export function extractLinks(html: string, baseUrl: string): PageLink[] {
+  let base: URL;
+  try {
+    base = new URL(baseUrl);
+  } catch {
+    return [];
+  }
+
+  const anchors = html.matchAll(
+    /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+  );
+
+  const seen = new Set<string>();
+  const links: PageLink[] = [];
+
+  for (const match of anchors) {
+    const href = match[1].trim();
+    if (
+      !href ||
+      href.startsWith("#") ||
+      /^(mailto:|tel:|javascript:|data:)/i.test(href)
+    ) {
+      continue;
+    }
+
+    let resolved: URL;
+    try {
+      resolved = new URL(href, base);
+    } catch {
+      continue;
+    }
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") continue;
+    if (resolved.hostname.toLowerCase() !== base.hostname.toLowerCase()) continue;
+    // Documents and media: the extractor can't read them and the model
+    // shouldn't be handed bytes it will hallucinate over.
+    if (/\.(pdf|docx?|xlsx?|pptx?|zip|jpe?g|png|gif|svg|mp4|mp3)$/i.test(resolved.pathname)) {
+      continue;
+    }
+
+    const url = normalizeUrl(resolved.toString());
+    if (!url || url === normalizeUrl(baseUrl)) continue;
+    if (seen.has(url)) continue;
+    seen.add(url);
+
+    const text = match[2]
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120);
+
+    links.push({ url, text });
+  }
+
+  return links;
+}
+
+/**
+ * What we're hunting for, and what it's worth.
+ *
+ * Weighted by which gate the page behind the link is likely to answer.
+ * Eligibility outranks everything because `minDischarge` and
+ * `requiresVaEnrollment` are the two fields that decide whether a veteran gets
+ * through the door, and they are almost never on a landing page.
+ */
+const LINK_SIGNALS: { pattern: RegExp; weight: number }[] = [
+  { pattern: /eligib|who (we serve|is eligible|qualifies)|qualif|requirements/i, weight: 100 },
+  { pattern: /\bapply\b|how (to|do i) (get|start|apply)|getting started|get help|intake/i, weight: 70 },
+  { pattern: /services|programs|what we (do|offer)|support/i, weight: 55 },
+  { pattern: /\bfaq\b|frequently asked|questions/i, weight: 45 },
+  { pattern: /locations?|find (a|us)|near you|directory|centers?/i, weight: 35 },
+  { pattern: /contact|reach us|phone/i, weight: 25 },
+  { pattern: /about/i, weight: 15 },
+];
+
+/** Noise that reliably answers none of the gates. */
+const LINK_PENALTIES =
+  /privacy|terms|cookie|accessibility|sitemap|donate|volunteer|news|blog|press|events|careers|jobs|shop|store|login|sign ?in|search|espanol|español/i;
+
+/** How likely this link leads to a page that answers a gate. 0 means skip it. */
+export function scoreLink(link: PageLink): number {
+  const haystack = `${link.text} ${decodeURIComponent(link.url)}`;
+  if (LINK_PENALTIES.test(haystack)) return 0;
+
+  let score = 0;
+  for (const signal of LINK_SIGNALS) {
+    if (signal.pattern.test(haystack)) score += signal.weight;
+  }
+  // A link whose anchor text says nothing ("click here", "") is a coin flip;
+  // keep it only if the href itself matched something.
+  if (score > 0 && link.text.length < 3) score -= 10;
+  return Math.max(0, score);
+}
+
+export type ScoredLink = PageLink & { score: number };
+
+/** The most promising links, highest first. */
+export function rankLinks(links: PageLink[], limit: number): ScoredLink[] {
+  return links
+    .map((link) => ({ ...link, score: scoreLink(link) }))
+    .filter((link) => link.score > 0)
+    .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url))
+    .slice(0, limit);
+}
+
+/** Total characters of page text handed to the model in one pass. */
+export const MAX_COMBINED_CHARS = 60_000;
+
+export type FetchedPage = { url: string; text: string };
+
+/**
+ * One labelled block of text from several pages, entry page first.
+ *
+ * Labelling by URL matters for more than provenance: it lets the model say
+ * which page a fact came from, and lets a reviewer check it. The cap is spent
+ * in order, so a long entry page never gets truncated in favour of a FAQ.
+ */
+export function combinePages(
+  pages: FetchedPage[],
+  maxChars = MAX_COMBINED_CHARS,
+): string {
+  const blocks: string[] = [];
+  let budget = maxChars;
+
+  for (const page of pages) {
+    if (budget <= 0) break;
+    const header = `\n===== PAGE: ${page.url}\n`;
+    const room = budget - header.length;
+    if (room <= 200) break;
+    const body =
+      page.text.length > room ? `${page.text.slice(0, room)}\n…[truncated]` : page.text;
+    blocks.push(`${header}${body}`);
+    budget -= header.length + body.length;
+  }
+
+  return blocks.join("\n").trim();
+}

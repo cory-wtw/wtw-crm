@@ -7,9 +7,9 @@
 //   npm run enrich-urls -- --file=urls.txt --concurrency=5
 //
 // The batch twin of /admin/resources/enrich. It shares the pipeline with the
-// page — same fetch, same host blocking, same prompt, same parser, same
-// externalId hashing — from lib/enrich-runner.ts, so a record drafted here and
-// one drafted on the page can't disagree about what a page said.
+// page — same crawl, same fetch, same host blocking, same prompt, same parser,
+// same externalId hashing — from lib/enrich-runner.ts, so a record drafted here
+// and one drafted on the page can't disagree about what a site said.
 //
 // The difference is who reviews. The page puts a proposal in front of a person
 // before anything is written; this writes unattended. That is only tolerable
@@ -113,10 +113,28 @@ async function main(): Promise<void> {
       return;
     }
 
-    const { proposal, unanswered, externalId, existingResourceId } =
-      outcome.result;
+    const {
+      proposal,
+      unanswered,
+      externalId,
+      existingResourceId,
+      pagesFetched,
+      followedUp,
+    } = outcome.result;
     drafted++;
     printProposal(url, proposal, unanswered);
+
+    // A thin crawl shows up here before it shows up as a record full of nulls.
+    console.log(`    pages read: ${pagesFetched.length}`);
+    for (const page of pagesFetched) {
+      const marker = page === url ? "entry" : followedUp.includes(page) ? "asked for" : "crawled";
+      console.log(`      [${marker}] ${page}`);
+    }
+    if (pagesFetched.length === 1) {
+      console.log(
+        "      only the entry page — no internal links scored high enough.",
+      );
+    }
     if (existingResourceId) {
       console.log("    (already in the directory — this updates that record)");
     }
