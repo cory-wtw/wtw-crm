@@ -51,7 +51,7 @@ describe("resourceInputSchema", () => {
       eligibility: "Low-income households in Hamilton County.",
       services: "Rent assistance, utility help, food pantry",
       buckets: ["housing", "essentials"],
-      geoScope: "county",
+      geoScope: "local",
       geoStates: ["TN"],
       geoLocalities: ["Hamilton County"],
       minDischarge: "any",
@@ -91,6 +91,61 @@ describe("resourceInputSchema", () => {
     expect(result).not.toHaveProperty("lastVerifiedBy");
     expect(result).not.toHaveProperty("contentHash");
     expect(result).not.toHaveProperty("flagReason");
+  });
+
+  it("rejects a local resource with no localities", () => {
+    // A geography gate with nothing to match against excludes everybody,
+    // silently. Better to refuse the save than to ship a record that answers
+    // "no" to every veteran.
+    const result = resourceInputSchema.safeParse({
+      organizationName: "MASH",
+      geoScope: "local",
+      geoStates: ["TN"],
+      geoLocalities: [],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((i) => i.path[0] === "geoLocalities"),
+      ).toBe(true);
+    }
+  });
+
+  it("rejects any scoped resource with no states", () => {
+    for (const geoScope of ["state", "local"] as const) {
+      const result = resourceInputSchema.safeParse({
+        organizationName: "MASH",
+        geoScope,
+        geoStates: [],
+        geoLocalities: ["Chattanooga"],
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(
+          result.error.issues.some((i) => i.path[0] === "geoStates"),
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("asks nothing of a national resource", () => {
+    const result = resourceInputSchema.safeParse({
+      organizationName: "MASH",
+      geoScope: "national",
+      geoStates: [],
+      geoLocalities: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects the retired metro and county scopes", () => {
+    for (const geoScope of ["metro", "county"] as const) {
+      const result = resourceInputSchema.safeParse({
+        organizationName: "MASH",
+        geoScope,
+      });
+      expect(result.success).toBe(false);
+    }
   });
 
   it("accepts a blank email", () => {

@@ -1,6 +1,10 @@
 import "server-only";
 import { adminDb } from "@/lib/firebase/admin";
-import { derivedVerificationStatus, type Resource } from "@/lib/schemas";
+import {
+  derivedVerificationStatus,
+  type GeoScope,
+  type Resource,
+} from "@/lib/schemas";
 
 const COLLECTION = "resources";
 
@@ -9,6 +13,19 @@ function tsToDate(value: unknown): Date | null {
   if (asTimestamp?.toDate) return asTimestamp.toDate();
   if (value instanceof Date) return value;
   return null;
+}
+
+/**
+ * Read a stored scope forward. `metro` and `county` were merged into `local`
+ * once it was clear they were one gate under two names; records written before
+ * that read as `local`, which is what they always meant.
+ */
+function readGeoScope(stored: unknown): GeoScope {
+  if (stored === "metro" || stored === "county") return "local";
+  if (stored === "state" || stored === "local" || stored === "national") {
+    return stored;
+  }
+  return "national";
 }
 
 function deserialize(
@@ -34,7 +51,7 @@ function deserialize(
     // the record matches nothing until somebody classifies it, which is the
     // correct behaviour — we don't know what it serves.
     buckets: data.buckets ?? [],
-    geoScope: data.geoScope ?? "national",
+    geoScope: readGeoScope(data.geoScope),
     geoStates: data.geoStates ?? [],
     geoLocalities: data.geoLocalities ?? [],
     minDischarge: data.minDischarge ?? "any",

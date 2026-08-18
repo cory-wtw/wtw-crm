@@ -33,6 +33,12 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     birthYear: data.birthYear ?? undefined,
     city: data.city ?? undefined,
     state: data.state ?? undefined,
+    // Eligibility keys, written by the intake. Absent on every record that
+    // predates it, which is why they're optional.
+    dischargeCharacter: data.dischargeCharacter ?? undefined,
+    serviceEra: data.serviceEra ?? undefined,
+    idStatus: data.idStatus ?? undefined,
+    hasDependents: data.hasDependents ?? undefined,
     assigneeUid: data.assigneeUid ?? null,
     pipelineStage: data.pipelineStage ?? "found",
     pipelineHistory: history.map(

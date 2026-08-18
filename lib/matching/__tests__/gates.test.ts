@@ -89,9 +89,9 @@ describe("geography", () => {
     expect(result.passes).toBe(true);
   });
 
-  it("checks locality for metro and county scope", () => {
+  it("checks locality for a local-scoped resource", () => {
     const resource = aResource({
-      geoScope: "county",
+      geoScope: "local",
       geoStates: ["TN"],
       geoLocalities: ["Chattanooga"],
     });
@@ -107,7 +107,7 @@ describe("geography", () => {
     const result = passesGates(
       aVeteran({ city: undefined }),
       aResource({
-        geoScope: "metro",
+        geoScope: "local",
         geoStates: ["TN"],
         geoLocalities: ["Chattanooga"],
       }),
@@ -119,7 +119,7 @@ describe("geography", () => {
     const result = passesGates(
       aVeteran({ state: "GA", city: "Chattanooga" }),
       aResource({
-        geoScope: "county",
+        geoScope: "local",
         geoStates: ["TN"],
         geoLocalities: ["Chattanooga"],
       }),
@@ -162,7 +162,7 @@ describe("matchesLocality", () => {
   });
 
   it("does not resolve a city to its county", () => {
-    // Known limitation: no city-to-county lookup exists, so a county-scoped
+    // Known limitation: no city-to-county lookup exists, so a local-scoped
     // record has to list the cities it covers. Phase 0 surfaces these.
     expect(matchesLocality("Hamilton County", "Chattanooga")).toBe(false);
   });

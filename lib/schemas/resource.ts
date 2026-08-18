@@ -43,17 +43,29 @@ export const TYPICAL_WAIT_LABELS: Record<TypicalWait, string> = {
   unknown: "Unknown",
 };
 
-/** How wide this resource's service area is. */
-export const GEO_SCOPES = ["national", "state", "metro", "county"] as const;
+/**
+ * How wide this resource's service area is.
+ *
+ * Three scopes, not four: `metro` and `county` were the same gate wearing two
+ * names — both mean "these particular places", both check `geoLocalities`, and
+ * asking staff to pick between them invited a wrong answer with no upside. The
+ * merged value is `local`, and legacy `metro` / `county` records read forward
+ * to it in lib/db/resources.ts.
+ */
+export const GEO_SCOPES = ["national", "state", "local"] as const;
 export const geoScopeSchema = z.enum(GEO_SCOPES);
 export type GeoScope = z.infer<typeof geoScopeSchema>;
 
 export const GEO_SCOPE_LABELS: Record<GeoScope, string> = {
   national: "National",
   state: "Statewide",
-  metro: "Metro area",
-  county: "County",
+  local: "Specific cities or counties",
 };
+
+/** Scopes that only serve named places, and so need `geoLocalities` filled in. */
+export function isSubStateScope(scope: GeoScope): boolean {
+  return scope === "local";
+}
 
 /**
  * Verification state. Only `live` and `aging` appear in matches; `aging` ranks
@@ -176,17 +188,50 @@ export type Resource = z.infer<typeof resourceSchema>;
  * marks a record live, and `contentHash` / `flagReason` are written by the
  * batch verifier — none of them are typed into the form.
  */
-export const resourceInputSchema = resourceSchema.omit({
-  id: true,
-  lastVerified: true,
-  lastVerifiedBy: true,
-  contentHash: true,
-  flagReason: true,
-  createdBy: true,
-  createdAt: true,
-  updatedBy: true,
-  updatedAt: true,
-});
+/**
+ * A geography gate with nothing to match against excludes everybody, silently.
+ * A `local` record with no localities, or any scoped record with no states,
+ * looks configured and answers "no" to every veteran — the worst kind of bug in
+ * this system, because nothing surfaces and nobody finds out.
+ */
+function refineGeography(
+  data: { geoScope: GeoScope; geoStates: string[]; geoLocalities: string[] },
+  ctx: z.RefinementCtx,
+): void {
+  if (data.geoScope === "national") return;
+
+  if (data.geoStates.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["geoStates"],
+      message:
+        "Add at least one state, or switch the service area to National.",
+    });
+  }
+
+  if (isSubStateScope(data.geoScope) && data.geoLocalities.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["geoLocalities"],
+      message:
+        "List the cities or counties served, or widen the service area to Statewide.",
+    });
+  }
+}
+
+export const resourceInputSchema = resourceSchema
+  .omit({
+    id: true,
+    lastVerified: true,
+    lastVerifiedBy: true,
+    contentHash: true,
+    flagReason: true,
+    createdBy: true,
+    createdAt: true,
+    updatedBy: true,
+    updatedAt: true,
+  })
+  .superRefine(refineGeography);
 export type ResourceInput = z.infer<typeof resourceInputSchema>;
 
 /**

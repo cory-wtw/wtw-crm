@@ -115,13 +115,12 @@ describe("scoreResource", () => {
   });
 
   it("scores geography by how local the resource is", () => {
-    const at = (geoScope: "national" | "state" | "metro" | "county") =>
+    const at = (geoScope: "national" | "state" | "local") =>
       scoreResource(aVeteran(), aResource({ geoScope }), NOW).geography;
-    expect(at("county")).toBe(RANKING_WEIGHTS.geography.locality);
-    expect(at("metro")).toBe(RANKING_WEIGHTS.geography.locality);
+    expect(at("local")).toBe(RANKING_WEIGHTS.geography.locality);
     expect(at("state")).toBe(RANKING_WEIGHTS.geography.state);
     expect(at("national")).toBe(RANKING_WEIGHTS.geography.national);
-    expect(at("county")).toBeGreaterThan(at("state"));
+    expect(at("local")).toBeGreaterThan(at("state"));
     expect(at("state")).toBeGreaterThan(at("national"));
   });
 
@@ -172,7 +171,7 @@ describe("rankResources", () => {
       organizationName: "Comfortable",
       buckets: ["crisis"],
       crisisCapable: false,
-      geoScope: "county",
+      geoScope: "local",
       geoStates: ["TN"],
       geoLocalities: ["Chattanooga"],
       accessMethod: "walkin",

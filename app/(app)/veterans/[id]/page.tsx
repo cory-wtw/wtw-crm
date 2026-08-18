@@ -4,6 +4,7 @@ import { getSession } from "@/lib/firebase/session";
 import {
   canDeleteVeteran,
   canEditVeteran,
+  canRunIntake,
 } from "@/lib/permissions";
 import { listEncounters } from "@/lib/db/encounters";
 import { getPhone } from "@/lib/db/phones";
@@ -14,10 +15,13 @@ import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
+  DISCHARGE_CHARACTER_LABELS,
+  ID_STATUS_LABELS,
   monthlyBenefitLift,
   PIPELINE_LABELS,
   PREFERRED_CONTACT_LABELS,
   type PipelineStage,
+  SERVICE_ERA_LABELS,
 } from "@/lib/schemas";
 import { EncounterForm } from "./encounter-form";
 import { StageChanger } from "./stage-changer";
@@ -58,6 +62,7 @@ export default async function VeteranDetailPage({
 
   const canEdit = canEditVeteran(session, veteran);
   const canDelete = canDeleteVeteran(session);
+  const canIntake = canRunIntake(session, veteran);
 
   const usersByUid = new Map(allUsers.map((u) => [u.uid, u]));
   function nameForUid(uid: string): string {
@@ -88,6 +93,14 @@ export default async function VeteranDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {canIntake && (
+            <Link
+              href={`/veterans/${veteran.id}/intake`}
+              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            >
+              Run intake
+            </Link>
+          )}
           {canEdit && (
             <Link
               href={`/veterans/${veteran.id}/edit`}
@@ -132,6 +145,37 @@ export default async function VeteranDetailPage({
           label="Assignee"
           value={
             assignee ? (assignee.displayName ?? assignee.email) : "Unassigned"
+          }
+        />
+      </Card>
+
+      <Card title="Eligibility keys">
+        <Row
+          label="Discharge"
+          value={
+            veteran.dischargeCharacter
+              ? DISCHARGE_CHARACTER_LABELS[veteran.dischargeCharacter]
+              : null
+          }
+        />
+        <Row
+          label="Service era"
+          value={
+            veteran.serviceEra ? SERVICE_ERA_LABELS[veteran.serviceEra] : null
+          }
+        />
+        <Row
+          label="ID"
+          value={veteran.idStatus ? ID_STATUS_LABELS[veteran.idStatus] : null}
+        />
+        <Row
+          label="Dependents"
+          value={
+            veteran.hasDependents === undefined
+              ? null
+              : veteran.hasDependents
+                ? "Yes"
+                : "No"
           }
         />
       </Card>

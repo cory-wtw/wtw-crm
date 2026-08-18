@@ -7,6 +7,7 @@ import {
   canEditMedia,
   canEditPhone,
   canEditVeteran,
+  canRunIntake,
   canEditVso,
   canManageUsers,
   canMarkMediaUsed,
@@ -195,5 +196,34 @@ describe("media permissions", () => {
 
   it("not-signed-in cannot delete media", () => {
     expect(canDeleteMedia(null, { createdBy: "u-a" })).toBe(false);
+  });
+});
+
+describe("canRunIntake", () => {
+  it("tracks canEditVeteran exactly", () => {
+    const mine = { assigneeUid: "u-a" };
+    const theirs = { assigneeUid: "u-b" };
+    const unassigned = { assigneeUid: null };
+
+    for (const veteran of [mine, theirs, unassigned]) {
+      for (const session of [ADMIN, STANDARD_A, SOCIAL, null]) {
+        expect(canRunIntake(session, veteran)).toBe(
+          canEditVeteran(session, veteran),
+        );
+      }
+    }
+  });
+
+  it("lets an admin run intake on anyone", () => {
+    expect(canRunIntake(ADMIN, { assigneeUid: "u-b" })).toBe(true);
+  });
+
+  it("lets a standard user run intake only on their own", () => {
+    expect(canRunIntake(STANDARD_A, { assigneeUid: "u-a" })).toBe(true);
+    expect(canRunIntake(STANDARD_A, { assigneeUid: "u-b" })).toBe(false);
+  });
+
+  it("keeps social-only users out", () => {
+    expect(canRunIntake(SOCIAL, { assigneeUid: "u-a" })).toBe(false);
   });
 });

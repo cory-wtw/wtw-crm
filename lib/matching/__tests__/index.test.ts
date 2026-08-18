@@ -13,7 +13,7 @@ describe("findCandidates", () => {
     const local = aResource({
       id: "local",
       organizationName: "Local Housing",
-      geoScope: "county",
+      geoScope: "local",
       geoStates: ["TN"],
       geoLocalities: ["Chattanooga"],
       accessMethod: "walkin",

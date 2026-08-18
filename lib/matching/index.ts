@@ -10,6 +10,7 @@
 export * from "./types";
 export * from "./gates";
 export * from "./ranking";
+export * from "./flags";
 
 import type { Resource } from "@/lib/schemas";
 import { passesGates } from "./gates";

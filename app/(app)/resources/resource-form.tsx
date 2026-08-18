@@ -133,7 +133,7 @@ export function ResourceForm({ initial }: Props) {
   const geoScope = watch("geoScope");
   const accessMethod = watch("accessMethod");
   const needsStates = geoScope !== "national";
-  const needsLocalities = geoScope === "metro" || geoScope === "county";
+  const needsLocalities = geoScope === "local";
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
@@ -151,8 +151,8 @@ export function ResourceForm({ initial }: Props) {
 
       geoScope: values.geoScope,
       // Scope decides which geography fields mean anything. Clear the ones it
-      // doesn't cover so a record switched from county to national doesn't
-      // keep a stale locality list that the gate would still read.
+      // doesn't cover so a record switched from local to national doesn't keep
+      // a stale locality list that the gate would still read.
       geoStates: needsStates ? splitList(values.geoStates, true) : [],
       geoLocalities: needsLocalities ? splitList(values.geoLocalities) : [],
 
@@ -286,7 +286,8 @@ export function ResourceForm({ initial }: Props) {
         {needsStates ? (
           <Field
             label="States served"
-            hint="Two-letter codes, comma separated — e.g. TN, GA, AL."
+            required
+            hint="Two-letter codes, comma separated — e.g. TN, GA, AL. Required once the area is narrower than national."
           >
             <Input {...register("geoStates")} placeholder="TN, GA" />
           </Field>
@@ -300,7 +301,8 @@ export function ResourceForm({ initial }: Props) {
         {needsLocalities && (
           <Field
             label="Cities or counties served"
-            hint="Comma separated — e.g. Chattanooga, Hamilton County."
+            required
+            hint="Comma separated — e.g. Chattanooga, East Ridge. A veteran's city is matched against this list, so name the cities, not just the county."
             full
           >
             <Input

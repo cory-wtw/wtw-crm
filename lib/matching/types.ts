@@ -1,18 +1,15 @@
-import type { Bucket, DischargeCharacter, ServiceEra } from "@/lib/schemas";
+import type {
+  Bucket,
+  DischargeCharacter,
+  IdStatus,
+  ReceivingVaBenefits,
+  ServiceEra,
+} from "@/lib/schemas";
 
-/**
- * Whether the veteran has ever filed with the VA. `no` and `unsure` both flag
- * the claims lane; only `no` closes the door on a resource that requires VA
- * enrollment, because an unsure answer might still be enrolled.
- *
- * Defined here rather than on the veteran schema because Phase 2 changes no
- * schemas. Phase 3 adds the intake fields to `veteranSchema`; when it does,
- * this and `IdStatus` should narrow to those enums rather than sit beside them.
- */
-export type ReceivingVaBenefits = "yes" | "no" | "unsure";
-
-/** Whether they have a current state ID or licence on them. */
-export type IdStatus = "valid" | "expired" | "none";
+// IdStatus and ReceivingVaBenefits come from the veteran schema rather than
+// being redeclared here: the intake form writes the first to the veteran record
+// and asks the second without storing it, and both must mean exactly the same
+// thing to the form and to the gates.
 
 /**
  * Everything the matcher knows about a veteran. Assembled by the intake form,

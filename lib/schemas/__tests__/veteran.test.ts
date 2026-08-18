@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { monthlyBenefitLift, veteranInputSchema } from "..";
+import {
+  ID_STATUSES,
+  ID_STATUS_LABELS,
+  RECEIVING_VA_BENEFITS,
+  RECEIVING_VA_BENEFITS_LABELS,
+  monthlyBenefitLift,
+  veteranInputSchema,
+} from "..";
 
 const base = {
   firstName: "Test",
@@ -200,5 +207,51 @@ describe("monthlyBenefitLift", () => {
   it("treats missing values as 0", () => {
     expect(monthlyBenefitLift(null, 1000)).toBe(1000);
     expect(monthlyBenefitLift(undefined, undefined)).toBe(0);
+  });
+});
+
+describe("eligibility keys", () => {
+  it("accepts a record with none of them — a call can end early", () => {
+    const result = veteranInputSchema.safeParse(base);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.dischargeCharacter).toBeUndefined();
+      expect(result.data.serviceEra).toBeUndefined();
+      expect(result.data.idStatus).toBeUndefined();
+      expect(result.data.hasDependents).toBeUndefined();
+    }
+  });
+
+  it("accepts all four", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      dischargeCharacter: "general",
+      serviceEra: "vietnam",
+      idStatus: "expired",
+      hasDependents: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a value outside the enum", () => {
+    const result = veteranInputSchema.safeParse({
+      ...base,
+      idStatus: "maybe",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("never accepts safeTonight — it is form state, not a stored fact", () => {
+    const result = veteranInputSchema.parse({ ...base, safeTonight: false });
+    expect(result).not.toHaveProperty("safeTonight");
+  });
+
+  it("labels every id status and VA-benefits answer", () => {
+    for (const status of ID_STATUSES) {
+      expect(ID_STATUS_LABELS[status]).toBeTruthy();
+    }
+    for (const answer of RECEIVING_VA_BENEFITS) {
+      expect(RECEIVING_VA_BENEFITS_LABELS[answer]).toBeTruthy();
+    }
   });
 });

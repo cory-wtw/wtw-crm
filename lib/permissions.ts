@@ -58,6 +58,19 @@ export function canEditVeteran(
   return veteran.assigneeUid === session!.uid;
 }
 
+/**
+ * Running a concierge intake writes eligibility keys to the veteran record, so
+ * it needs the same authority as editing one. Deliberately a separate predicate
+ * from canEditVeteran even though the rule is identical today: the intake is
+ * its own capability, and if the two ever diverge this is where it happens.
+ */
+export function canRunIntake(
+  session: SessionLike | null,
+  veteran: VeteranLike,
+): boolean {
+  return canEditVeteran(session, veteran);
+}
+
 /** Only admins can change the assignee of a veteran (reassign). */
 export function canReassignVeteran(session: SessionLike | null): boolean {
   return isAdmin(session);
