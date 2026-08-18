@@ -2,6 +2,7 @@ export * from "./pipeline";
 export * from "./user";
 export * from "./invite";
 export * from "./vso";
+export * from "./bucket";
 export * from "./resource";
 export * from "./phone";
 export * from "./veteran";

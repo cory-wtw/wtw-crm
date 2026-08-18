@@ -36,6 +36,27 @@ export default async function EditResourcePage({
             description: resource.description ?? "",
             eligibility: resource.eligibility ?? "",
             services: resource.services ?? "",
+
+            buckets: resource.buckets,
+            geoScope: resource.geoScope,
+            geoStates: resource.geoStates.join(", "),
+            geoLocalities: resource.geoLocalities.join(", "),
+
+            minDischarge: resource.minDischarge,
+            requiresVaEnrollment: resource.requiresVaEnrollment,
+            requiresValidId: resource.requiresValidId,
+            eraRestriction: resource.eraRestriction,
+            requiresDependents: resource.requiresDependents,
+            crisisCapable: resource.crisisCapable,
+
+            accessMethod: resource.accessMethod,
+            accessValue: resource.accessValue ?? "",
+            whatToBring: resource.whatToBring ?? "",
+            typicalWait: resource.typicalWait,
+
+            verificationStatus: resource.verificationStatus,
+            fragility: resource.fragility,
+            sourceName: resource.sourceName ?? "",
           },
         }}
       />

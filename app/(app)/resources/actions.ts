@@ -6,7 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import { canAccessCrm } from "@/lib/permissions";
-import { resourceInputSchema } from "@/lib/schemas";
+import { derivedVerificationStatus, resourceInputSchema } from "@/lib/schemas";
 
 function dropUndefined<T extends Record<string, unknown>>(
   obj: T,
@@ -47,6 +47,11 @@ export async function createResourceAction(
   const doc = dropUndefined({
     ...input,
     contactEmail: input.contactEmail || undefined,
+    // Entering a record by hand IS the verification — the person typing it
+    // just confirmed it exists. Imported records are stamped separately and
+    // land as "flagged" for review; they never come through this path.
+    lastVerified: now,
+    lastVerifiedBy: session.uid,
     createdBy: session.uid,
     createdAt: now,
     updatedBy: session.uid,
@@ -84,9 +89,32 @@ export async function editResourceAction(
   const existing = snap.data()!;
 
   const now = new Date();
+
+  // Re-stamp verification only on a transition INTO live — that's a human
+  // confirming a flagged or aging record is good. Editing a phone number on an
+  // already-live record must not reset the freshness clock, or nothing ever
+  // ages and the whole verification tier goes quiet.
+  //
+  // Compare against the DERIVED status, not the stored one: a record stored as
+  // "live" but 90 days stale reads as "aging" everywhere, including in the form
+  // the user just submitted. Comparing against the raw stored value would treat
+  // "aging -> live" as a no-op and quietly refuse to refresh the very records
+  // that need refreshing.
+  const existingLastVerified =
+    existing.lastVerified?.toDate?.() ?? existing.lastVerified ?? null;
+  const existingStatus = derivedVerificationStatus(
+    existing.verificationStatus ?? "live",
+    existingLastVerified,
+  );
+  const becameLive =
+    input.verificationStatus === "live" && existingStatus !== "live";
+
   const updates = dropUndefined({
     ...input,
     contactEmail: input.contactEmail || undefined,
+    ...(becameLive
+      ? { lastVerified: now, lastVerifiedBy: session.uid, flagReason: null }
+      : {}),
     updatedBy: session.uid,
     updatedAt: now,
   });
