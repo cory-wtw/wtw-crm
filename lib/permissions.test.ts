@@ -7,6 +7,7 @@ import {
   canEditMedia,
   canEditPhone,
   canEditVeteran,
+  canApproveImportedResource,
   canCreateReferral,
   canRecordFollowUp,
   canRunIntake,
@@ -280,5 +281,14 @@ describe("canRecordFollowUp", () => {
 
   it("keeps social-only users out entirely", () => {
     expect(canRecordFollowUp(SOCIAL, { assigneeUid: "u-a" })).toBe(false);
+  });
+});
+
+describe("canApproveImportedResource", () => {
+  it("is admin only", () => {
+    expect(canApproveImportedResource(ADMIN)).toBe(true);
+    expect(canApproveImportedResource(STANDARD_A)).toBe(false);
+    expect(canApproveImportedResource(SOCIAL)).toBe(false);
+    expect(canApproveImportedResource(null)).toBe(false);
   });
 });

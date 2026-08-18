@@ -18,6 +18,7 @@
     "deploy-rules": "firebase deploy --only firestore:rules,storage --project=wtw-crm-31aef"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@hookform/resolvers": "^5.2.2",
     "@react-pdf/renderer": "^4.5.1",
     "@tanstack/react-table": "^8.21.3",

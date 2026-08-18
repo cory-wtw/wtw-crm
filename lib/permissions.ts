@@ -122,6 +122,18 @@ export function canManageUsers(session: SessionLike | null): boolean {
   return isAdmin(session);
 }
 
+/**
+ * Approving an AI-proposed or imported record puts it in front of veterans, so
+ * it is admin-only. The proposal itself is a machine's guess about an
+ * organization it read a web page about; a person with authority over the
+ * directory decides whether it becomes something we hand someone.
+ */
+export function canApproveImportedResource(
+  session: SessionLike | null,
+): boolean {
+  return isAdmin(session);
+}
+
 /** Only admins view the audit log. */
 export function canViewAuditLog(session: SessionLike | null): boolean {
   return isAdmin(session);

@@ -388,9 +388,17 @@ Do not build a scraper farm. Almost all of this is already compiled by federal a
 
 No Cloud Functions. Import runs as a one-off tsx script in `scripts/`, matching the existing `scripts/migrate-*.ts` pattern run against `.env.local`.
 
-Per record: fetch page, AI proposes the ten gate values plus description, access method, and wait, write with `verificationStatus: "flagged"`, never `live`.
+**AI enrichment is a page, not part of the importer.** v2.0 described it inline in the import script; that shape suits a bulk feed and fights the actual first job, which is 75 hand-picked national organizations pasted in from a list. Enrichment therefore lives at `app/(app)/admin/resources/enrich`, `canApproveImportedResource` only: paste one URL or a list, one per line; per URL the server fetches the page, sends the text to the Anthropic API, and proposes a record; the proposal renders beside the fetched page text with every field editable, to approve or discard. Bulk imports (the VA Facilities script and anything after it) stay unenriched — they map gate values by record type and land flagged for the same review.
 
-An admin review queue at `app/(app)/admin/resources/review` lists flagged records for approval. On approval, store `contentHash` and set `live`.
+Rules the page holds to:
+
+- The API key is read server-side only and never reaches the client.
+- The prompt demands JSON only, and the parser strips fences and tolerates junk anyway. A model that ignores the instruction must not take the batch down with it.
+- **Any field the page doesn't support comes back `null`, never a guess.** A null prompts a human; a guess is a silent error nobody finds. Nulls are marked as unanswered in the review screen rather than quietly defaulted.
+- One URL at a time, so a fetch failure or an unparseable response costs that URL and not the batch.
+- Written `flagged`, `sourceName: "ai-enrich"`, `externalId: ai-enrich:<url-hash>` for idempotency.
+
+An admin review queue at `app/(app)/admin/resources/review` lists flagged records for approval in bulk. On approval, store `contentHash` and set `live`.
 
 **Never auto-publish an AI-enriched record.** A wrong gate value silently misroutes veterans and nobody finds out.
 
