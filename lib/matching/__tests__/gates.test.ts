@@ -14,6 +14,20 @@ describe("passesGates", () => {
     expect(result).toEqual({ passes: true, failures: [] });
   });
 
+  it("ignores eligibility notes, however restrictive they read", () => {
+    // The field is descriptive: it exists so eligibility that fits no checkbox
+    // reaches the person choosing. A gate that read it would be guessing at
+    // prose, and would turn a note meant to help into a silent exclusion.
+    const result = passesGates(
+      aVeteran(),
+      aResource({
+        eligibilityNotes:
+          "Combat theater service or military sexual trauma only.",
+      }),
+    );
+    expect(result).toEqual({ passes: true, failures: [] });
+  });
+
   it("labels every failure code", () => {
     for (const failure of GATE_FAILURES) {
       expect(GATE_FAILURE_LABELS[failure]).toBeTruthy();

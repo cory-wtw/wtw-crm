@@ -172,6 +172,18 @@ export default async function ResourceDetailPage({
         </div>
       </Card>
 
+      {resource.eligibilityNotes && (
+        <Card title="Eligibility notes">
+          <p className="whitespace-pre-wrap text-sm md:col-span-2">
+            {resource.eligibilityNotes}
+          </p>
+          <p className="text-xs text-muted-foreground md:col-span-2">
+            Read by staff, not by the matcher — this never filters anybody in
+            or out.
+          </p>
+        </Card>
+      )}
+
       <Card title="Who they'll take">
         <Row label="Service area" value={serviceArea(resource)} />
         <Row

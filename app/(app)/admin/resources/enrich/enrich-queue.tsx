@@ -181,15 +181,7 @@ function RowStatus({ row }: { row: Row }) {
     case "failed":
       return <span className="text-destructive">{row.error}</span>;
     case "ready":
-      return (
-        <span className="text-muted-foreground">
-          Draft ready
-          {row.result.unanswered.length > 0 &&
-            ` · ${row.result.unanswered.length} field${
-              row.result.unanswered.length === 1 ? "" : "s"
-            } the page didn't answer`}
-        </span>
-      );
+      return <span className="text-muted-foreground">Draft ready</span>;
     case "approved":
       return <span className="font-bold">Kept as a flagged record</span>;
     case "discarded":

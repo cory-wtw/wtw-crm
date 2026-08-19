@@ -192,6 +192,37 @@ describe("buildReferralPacket substitutions", () => {
     expect(packet.substitutions[0].field).toBe("whatToBring");
   });
 
+  it("passes eligibility notes through as a who-they-take line", () => {
+    const packet = buildReferralPacket({
+      firstName: "John",
+      resources: [
+        aPacketResource({
+          eligibilityNotes:
+            "Anyone who served in a combat theater, or experienced military sexual trauma.",
+        }),
+      ],
+    });
+    expect(packet.text).toContain(
+      "Who they take: Anyone who served in a combat theater, or experienced military sexual trauma.",
+    );
+    expect(packet.substitutions).toEqual([]);
+  });
+
+  it("drops eligibility notes that trip the screen rather than rewriting them", () => {
+    const packet = buildReferralPacket({
+      firstName: "John",
+      resources: [
+        aPacketResource({
+          organizationName: "Rent Fund",
+          eligibilityNotes: "We'll get you approved for back pay.",
+        }),
+      ],
+    });
+    expect(packet.text).not.toContain("Who they take:");
+    expect(packet.substitutions).toHaveLength(1);
+    expect(packet.substitutions[0].field).toBe("eligibilityNotes");
+  });
+
   it("keeps the index so staff can find the entry in the packet", () => {
     const packet = buildReferralPacket({
       firstName: "John",

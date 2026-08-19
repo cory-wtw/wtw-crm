@@ -33,6 +33,7 @@ type Draft = {
   geoStates: string;
   geoLocalities: string;
   minDischarge: MinDischarge;
+  eligibilityNotes: string;
   requiresVaEnrollment: boolean;
   requiresValidId: boolean;
   requiresDependents: boolean;
@@ -73,6 +74,7 @@ function toDraft(result: EnrichResult): Draft {
     geoStates: input.geoStates.join(", "),
     geoLocalities: input.geoLocalities.join(", "),
     minDischarge: input.minDischarge,
+    eligibilityNotes: input.eligibilityNotes ?? "",
     requiresVaEnrollment: input.requiresVaEnrollment,
     requiresValidId: input.requiresValidId,
     requiresDependents: input.requiresDependents,
@@ -131,6 +133,7 @@ export function ProposalReview({
             ? splitList(draft.geoLocalities)
             : [],
           minDischarge: draft.minDischarge,
+          eligibilityNotes: draft.eligibilityNotes || undefined,
           requiresVaEnrollment: draft.requiresVaEnrollment,
           requiresValidId: draft.requiresValidId,
           eraRestriction: [],
@@ -183,17 +186,13 @@ export function ProposalReview({
       )}
 
       {result.unanswered.length > 0 && (
-        <div className="rounded-lg border border-[color:var(--wtw-deep-gold)]/40 bg-[color:var(--wtw-deep-gold)]/10 p-4 text-sm">
-          <p className="font-bold">
-            The page didn&rsquo;t answer {result.unanswered.length} field
-            {result.unanswered.length === 1 ? "" : "s"}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            Marked below. They&rsquo;re sitting at the permissive default, which
-            is a placeholder and not a finding — set them yourself, or leave
-            them open rather than guessing.
-          </p>
-        </div>
+        <p className="rounded-lg border border-border bg-secondary/30 p-3 text-sm text-muted-foreground">
+          Fields marked <em>page didn&rsquo;t say</em> are sitting at the
+          permissive default, which is a placeholder and not a finding. A page
+          that says nothing about discharge isn&rsquo;t an incomplete record —
+          it&rsquo;s a page about something else. Set what you know and leave
+          the rest open rather than guessing.
+        </p>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -292,6 +291,24 @@ export function ProposalReview({
                 label: MIN_DISCHARGE_LABELS[m],
               }))}
             />
+          </Field>
+
+          <Field
+            label="Eligibility notes"
+            unanswered={unanswered.has("eligibilityNotes")}
+          >
+            <textarea
+              value={draft.eligibilityNotes}
+              onChange={(e) => update({ eligibilityNotes: e.target.value })}
+              rows={3}
+              maxLength={500}
+              className={inputClasses}
+            />
+            <p className="text-xs text-muted-foreground">
+              Eligibility the checkboxes above can&rsquo;t hold — combat theater
+              service, military sexual trauma, and the like. Staff reads it when
+              choosing; the matcher never does, so it filters nobody in or out.
+            </p>
           </Field>
 
           <div className="grid gap-2 rounded-md border border-input bg-background p-3 sm:grid-cols-2">

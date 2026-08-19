@@ -143,6 +143,26 @@ describe("parseProposal", () => {
     expect(parsed!.buckets).toBeNull();
   });
 
+  it("keeps eligibility notes, and drops an overlong one to unanswered", () => {
+    const kept = parseProposal(
+      JSON.stringify({
+        ...full,
+        eligibilityNotes: "Combat theater service or military sexual trauma.",
+      }),
+    );
+    expect(kept!.eligibilityNotes).toBe(
+      "Combat theater service or military sexual trauma.",
+    );
+
+    // Past the cap it can't be stored, and a truncated eligibility sentence
+    // would say something the page didn't. Null sends it to a person.
+    const overlong = parseProposal(
+      JSON.stringify({ ...full, eligibilityNotes: "x".repeat(501) }),
+    );
+    expect(overlong!.eligibilityNotes).toBeNull();
+    expect(overlong!.name).toBe("MASH");
+  });
+
   it("returns null when there's no JSON at all", () => {
     expect(parseProposal("I could not read that page.")).toBeNull();
   });

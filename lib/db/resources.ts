@@ -56,6 +56,7 @@ function deserialize(
     geoStates: data.geoStates ?? [],
     geoLocalities: data.geoLocalities ?? [],
     minDischarge: data.minDischarge ?? "any",
+    eligibilityNotes: data.eligibilityNotes ?? undefined,
     requiresVaEnrollment: data.requiresVaEnrollment ?? false,
     requiresValidId: data.requiresValidId ?? false,
     eraRestriction: data.eraRestriction ?? [],

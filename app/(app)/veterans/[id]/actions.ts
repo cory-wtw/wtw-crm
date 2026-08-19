@@ -75,6 +75,9 @@ export type Candidate = {
   accessMethod: AccessMethod;
   accessValue: string | null;
   whatToBring: string | null;
+  /** Eligibility the gates can't express. Descriptive: it never gated anything
+   *  on the way here, and staff reads it before choosing. */
+  eligibilityNotes: string | null;
   typicalWait: TypicalWait;
   verificationStatus: VerificationStatus;
   lastVerified: string | null;
@@ -237,6 +240,7 @@ export async function runIntakeAction(
       accessMethod: resource.accessMethod,
       accessValue: resource.accessValue ?? null,
       whatToBring: resource.whatToBring ?? null,
+      eligibilityNotes: resource.eligibilityNotes ?? null,
       typicalWait: resource.typicalWait,
       verificationStatus: resource.verificationStatus,
       lastVerified: resource.lastVerified?.toISOString() ?? null,
@@ -384,6 +388,7 @@ export async function createReferralAction(
         organizationName: resource.organizationName,
         description: resource.description ?? null,
         services: resource.services ?? null,
+        eligibilityNotes: resource.eligibilityNotes ?? null,
         accessMethod: resource.accessMethod,
         accessValue: resource.accessValue ?? null,
         whatToBring: resource.whatToBring ?? null,
@@ -437,7 +442,10 @@ export async function createReferralAction(
         checkType: "manual",
         result: "flag",
         detail: `Referral text screen: ${substitution.field} matched ${SCREEN_PATTERN_LABELS[substitution.pattern]} ("${substitution.match}"). The line was ${
-          substitution.field === "whatToBring" ? "dropped from" : "replaced in"
+          substitution.field === "whatToBring" ||
+          substitution.field === "eligibilityNotes"
+            ? "dropped from"
+            : "replaced in"
         } a packet; the record still says it.`,
         checkedBy: session.uid,
       },

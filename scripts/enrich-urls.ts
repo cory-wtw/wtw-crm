@@ -69,8 +69,11 @@ function printProposal(url: string, proposal: Proposal, unanswered: string[]) {
     console.log(`    ${field.padEnd(21)} ${rendered}`);
   }
   if (unanswered.length > 0) {
+    // Not "N fields missing": a page that never mentions discharge is a page
+    // about something else, not an incomplete record. The nulls are marked
+    // field by field above; this only says what the write does with them.
     console.log(
-      `    ${unanswered.length} field${unanswered.length === 1 ? "" : "s"} unanswered — a person should fill these in.`,
+      `    Fields the page didn't address are written at the permissive default.`,
     );
   }
 }

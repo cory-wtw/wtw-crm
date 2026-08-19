@@ -38,6 +38,7 @@ const formSchema = z.object({
   contactEmail: z.string().optional(),
   description: z.string().optional(),
   eligibility: z.string().optional(),
+  eligibilityNotes: z.string().optional(),
   services: z.string().optional(),
 
   buckets: z.array(z.string()),
@@ -110,6 +111,7 @@ export function ResourceForm({ initial }: Props) {
       contactEmail: "",
       description: "",
       eligibility: "",
+      eligibilityNotes: "",
       services: "",
       buckets: [],
       geoScope: "national",
@@ -148,6 +150,7 @@ export function ResourceForm({ initial }: Props) {
       contactEmail: values.contactEmail || undefined,
       description: values.description || undefined,
       eligibility: values.eligibility || undefined,
+      eligibilityNotes: values.eligibilityNotes || undefined,
       services: values.services || undefined,
 
       buckets: values.buckets,
@@ -321,6 +324,14 @@ export function ResourceForm({ initial }: Props) {
           </Field>
         )}
 
+        <Field
+          label="Eligibility notes"
+          hint="Eligibility the checkboxes can't hold — combat theater service, military sexual trauma, and the like. Shown to staff and included in the referral; it never filters anything."
+          full
+          error={errors.eligibilityNotes?.message}
+        >
+          <Textarea {...register("eligibilityNotes")} rows={3} />
+        </Field>
         <Field
           label="Minimum discharge accepted"
           hint="Inclusive upward. Vet Centers and most crisis services accept any discharge — check before restricting this."

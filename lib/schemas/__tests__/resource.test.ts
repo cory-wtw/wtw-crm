@@ -44,6 +44,24 @@ describe("resourceInputSchema", () => {
     expect(result.buckets).toEqual([]);
   });
 
+  it("takes eligibility notes up to 500 characters and no further", () => {
+    expect(
+      resourceInputSchema.safeParse({
+        organizationName: "Vet Center",
+        eligibilityNotes:
+          "Combat theater service, military sexual trauma, mortuary duty, " +
+          "or drone crew supporting combat operations.",
+      }).success,
+    ).toBe(true);
+
+    expect(
+      resourceInputSchema.safeParse({
+        organizationName: "Vet Center",
+        eligibilityNotes: "x".repeat(501),
+      }).success,
+    ).toBe(false);
+  });
+
   it("accepts a fully populated resource", () => {
     const result = resourceInputSchema.safeParse({
       organizationName: "MASH",

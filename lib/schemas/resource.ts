@@ -168,6 +168,19 @@ export const resourceSchema = z.object({
 
   // --- Access. How a veteran starts. Ranking signal, not a gate. ---
 
+  /**
+   * Eligibility the eight gates cannot express, in the organization's own
+   * terms — combat theater service, military sexual trauma, mortuary duty or
+   * emergency medical care for war casualties, drone crew in combat support.
+   *
+   * DESCRIPTIVE ONLY. Nothing in lib/matching reads this, and nothing should:
+   * gates are boolean and decidable, and a free-text field a matcher tried to
+   * interpret would fail in ways nobody could predict or test. It exists so
+   * that eligibility which doesn't fit a checkbox reaches the person choosing,
+   * instead of vanishing between the gates.
+   */
+  eligibilityNotes: z.string().max(500, "Keep it under 500 characters").optional(),
+
   accessMethod: accessMethodSchema.default("phone"),
   /** Number, URL, or address, matching accessMethod. */
   accessValue: z.string().optional(),

@@ -86,6 +86,16 @@ The resource directory becomes the matching corpus. Add to `lib/schemas/resource
 | `requiresDependents` | bool | |
 | `crisisCapable` | bool | Same-day intake available |
 
+**Eligibility that isn't a gate**
+
+| Field | Type | Notes |
+|---|---|---|
+| `eligibilityNotes` | string, optional, max 500 | Free text. Descriptive only — nothing in `lib/matching` reads it |
+
+**On `eligibilityNotes`.** The eight gates above are boolean and decidable, which is why they can be trusted to exclude. Plenty of real eligibility isn't: combat theater service, military sexual trauma, mortuary duty or emergency medical care for casualties of war, drone crew supporting combat operations. Vet Centers turn on exactly that language. Without somewhere to put it, it vanishes between the gates and staff never sees the sentence that would have got the veteran through the door.
+
+It never gates. A matcher interpreting prose would exclude people in ways nobody could predict or test, and a note written to help would become a silent no. It is read by a person: it shows on the resource detail page, beside each candidate on the intake results screen so staff sees it before selecting, and under the resource in the referral packet — screened like any other borrowed text (§5.1), and dropped rather than reworded when it trips, since there is no neutral stand-in for "who they take" that says anything true.
+
 **Access**
 
 | Field | Type | Notes |
@@ -394,7 +404,8 @@ Rules the page holds to:
 
 - The API key is read server-side only and never reaches the client.
 - The prompt demands JSON only, and the parser strips fences and tolerates junk anyway. A model that ignores the instruction must not take the batch down with it.
-- **Any field the page doesn't support comes back `null`, never a guess.** A null prompts a human; a guess is a silent error nobody finds. Nulls are marked as unanswered in the review screen rather than quietly defaulted.
+- **Any field the page doesn't support comes back `null`, never a guess.** A null prompts a human; a guess is a silent error nobody finds. Each null is marked "page didn't say" beside its field, and the value under it is the schema's permissive default — a placeholder, not a finding. It is not counted or reported as a hole in the record: a page that says nothing about discharge is a page about something else, not an incomplete one.
+- **Eligibility written in prose goes to `eligibilityNotes`** (§2.2), in the organization's own terms. The boolean fields hold what reduces to a checkbox; this holds the rest, and is the difference between a Vet Center record that reads "any discharge" and one that also says who else it takes.
 - One URL at a time, so a fetch failure or an unparseable response costs that URL and not the batch.
 - Written `flagged`, `sourceName: "ai-enrich"`, `externalId: ai-enrich:<url-hash>` for idempotency.
 

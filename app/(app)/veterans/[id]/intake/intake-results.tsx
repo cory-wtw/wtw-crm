@@ -26,8 +26,19 @@ const FIELD_LABELS: Record<
 > = {
   description: "description",
   services: "services line",
+  eligibilityNotes: "eligibility notes",
   whatToBring: "what-to-bring line",
 };
+
+/**
+ * Fields with no neutral stand-in. A replaced description still says something
+ * true ("ask them what they can help with"); an invented eligibility line or
+ * bring-list would not, so those are dropped instead.
+ */
+const DROPPED_FIELDS: ReferralResult["substitutions"][number]["field"][] = [
+  "eligibilityNotes",
+  "whatToBring",
+];
 
 const PATTERN_LABELS: Record<
   ReferralResult["substitutions"][number]["pattern"],
@@ -170,7 +181,7 @@ export function IntakeResults({
                     — its {FIELD_LABELS[substitution.field]} mentioned{" "}
                     {PATTERN_LABELS[substitution.pattern]} (
                     {substitution.match}), so that line is{" "}
-                    {substitution.field === "whatToBring"
+                    {DROPPED_FIELDS.includes(substitution.field)
                       ? "not in the packet"
                       : "replaced with a neutral one"}
                     . Fix the record so the next packet reads better.
@@ -474,6 +485,13 @@ function CandidateCard({
             </span>{" "}
             {candidate.accessValue ?? "—"}
           </p>
+
+          {candidate.eligibilityNotes && (
+            <p className="rounded-md border border-border bg-secondary/30 px-2.5 py-1.5 text-xs">
+              <span className="font-bold">Who they take: </span>
+              {candidate.eligibilityNotes}
+            </p>
+          )}
 
           {candidate.whatToBring && (
             <p className="text-xs text-muted-foreground">

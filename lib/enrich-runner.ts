@@ -69,6 +69,8 @@ Organizations almost never write "minimum discharge: any". They write it in pros
 - "you must be enrolled", "requires VA health care enrollment", "eligible for VA health care" as a stated condition → requiresVaEnrollment: true
 - "honorable discharge required", "must have an honorable or general discharge" → minDischarge: "honorable" or "general" as stated
 
+Plenty of real eligibility fits none of the boolean fields — combat theater service, military sexual trauma, mortuary duty or emergency medical care for casualties of war, drone crew supporting combat operations. Put that in "eligibilityNotes", in the organization's own terms, under 500 characters. It is read by a person, never by the matcher, so it does not have to reduce to a category. Without it, the eligibility that actually gets a veteran through the door disappears between the gates.
+
 Absence of the topic is still null. A page that never mentions discharge answers nothing. But a page saying eligibility is broad HAS answered — recording that as null throws away the fact that makes the organization worth referring to, and null on this field silently hides them from every veteran with a bad paper discharge.
 
 BUCKETS ARE WHAT THE ORGANIZATION PRIMARILY DOES.
@@ -109,6 +111,7 @@ Return a JSON object with exactly these keys:
   "geoStates": string[]|null,     // two-letter state codes served
   "geoLocalities": string[]|null, // cities or counties served
   "minDischarge": string|null,    // "any" | "general" | "honorable" — read the prose, see the system prompt
+  "eligibilityNotes": string|null,// eligibility the booleans can't hold, in their words, max 500 chars
   "requiresVaEnrollment": boolean|null,
   "requiresValidId": boolean|null,
   "eraRestriction": string[]|null,// any of: post911, gulf, vietnam, pre911, other

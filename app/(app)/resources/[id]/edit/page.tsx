@@ -36,6 +36,7 @@ export default async function EditResourcePage({
             contactEmail: resource.contactEmail ?? "",
             description: resource.description ?? "",
             eligibility: resource.eligibility ?? "",
+            eligibilityNotes: resource.eligibilityNotes ?? "",
             services: resource.services ?? "",
 
             buckets: resource.buckets,

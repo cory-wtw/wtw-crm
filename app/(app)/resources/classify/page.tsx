@@ -35,6 +35,7 @@ export default async function ClassifyResourcesPage() {
         contactEmail: r.contactEmail,
         description: r.description,
         eligibility: r.eligibility,
+        eligibilityNotes: r.eligibilityNotes,
         services: r.services,
         buckets: r.buckets,
         geoScope: r.geoScope,

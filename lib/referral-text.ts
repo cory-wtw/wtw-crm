@@ -115,6 +115,8 @@ export type PacketResource = {
   organizationName: string;
   description?: string | null;
   services?: string | null;
+  /** Eligibility the gates can't express, in the organization's own words. */
+  eligibilityNotes?: string | null;
   accessMethod: "phone" | "web" | "walkin" | "referral";
   accessValue?: string | null;
   whatToBring?: string | null;
@@ -150,7 +152,7 @@ const CHECK_BACK =
 export type PacketSubstitution = {
   resourceIndex: number;
   organizationName: string;
-  field: "description" | "services" | "whatToBring";
+  field: "description" | "services" | "eligibilityNotes" | "whatToBring";
   pattern: ScreenTrip["pattern"];
   match: string;
 };
@@ -191,8 +193,34 @@ export function buildReferralPacket(input: {
     const lines = [
       `${index + 1}. ${resource.organizationName}`,
       `   What they do: ${described.line}`,
-      `   How to start: ${startLine(resource)}`,
     ];
+
+    // Eligibility the eight gates couldn't hold — combat theater service,
+    // military sexual trauma, and the rest. It reaches the veteran here or
+    // nowhere, so it goes above "how to start": it's what decides whether
+    // the call is worth making. Screened like any other borrowed sentence,
+    // and dropped rather than replaced when it trips — there is no neutral
+    // stand-in for "who they take" that says anything true.
+    const notes = resource.eligibilityNotes?.trim();
+    if (notes) {
+      const trip = screenForPacket(notes);
+      if (trip) {
+        substitutions.push({
+          resourceIndex: index,
+          organizationName: resource.organizationName,
+          field: "eligibilityNotes",
+          pattern: trip.pattern,
+          match: trip.match,
+        });
+      } else {
+        // Longer than the other borrowed lines on purpose: eligibility is
+        // usually a list, and a list cut at 160 characters reads as though
+        // it ended.
+        lines.push(`   Who they take: ${firstSentence(notes, 240)}`);
+      }
+    }
+
+    lines.push(`   How to start: ${startLine(resource)}`);
 
     const bring = resource.whatToBring?.trim();
     if (bring) {
