@@ -304,8 +304,17 @@ async function main(): Promise<void> {
     );
   }
 
-  const states = [...byState.keys()].sort();
+  // Named, with counts, not just tallied. "States covered: 10" doesn't answer
+  // the only question that matters before committing — is the state we work in
+  // actually in here? A subset that skips Tennessee is worse than no import,
+  // because the directory then looks stocked and still has nothing local.
+  const states = [...byState.entries()].sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+  );
   console.log(`\n  States covered: ${states.length}`);
+  console.log(
+    `    ${states.map(([code, count]) => `${code} ${count}`).join(" · ")}`,
+  );
   console.log(`  Total records:  ${writes.length}`);
 
   console.log("\nEverything lands verificationStatus=flagged and is invisible");
