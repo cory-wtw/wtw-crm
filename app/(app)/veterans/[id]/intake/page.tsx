@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { getLatestIntake } from "@/lib/db/encounters";
 import { getVeteran } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
+import { formatDate } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { canRunIntake } from "@/lib/permissions";
 import { IntakeForm } from "./intake-form";
@@ -19,6 +21,10 @@ export default async function IntakePage({
 
   const session = await getSession();
   if (!canRunIntake(session, veteran)) redirect(`/veterans/${id}`);
+
+  // What the last run recorded. Read after the permission check — an intake is
+  // case history, not something to hand to somebody who can't open the record.
+  const lastIntake = await getLatestIntake(id);
 
   const shortName = formatShortName(veteran.firstName, veteran.lastInitial);
 
@@ -53,6 +59,14 @@ export default async function IntakePage({
           idStatus: veteran.idStatus ?? "",
           hasDependents: veteran.hasDependents ?? "",
         }}
+        lastIntake={
+          lastIntake
+            ? {
+                needs: lastIntake.bucketsIdentified,
+                on: formatDate(lastIntake.occurredAt),
+              }
+            : null
+        }
       />
     </div>
   );

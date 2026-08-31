@@ -45,6 +45,9 @@ type Props = {
   knownCity: string | null;
   knownState: string | null;
   initial: Partial<FormValues>;
+  /** What the last intake recorded, and when. Seeds the needs boxes so a call
+   *  that matched nobody doesn't cost staff the assessment. */
+  lastIntake: { needs: Bucket[]; on: string } | null;
 };
 
 const NEEDS_LEAD_IN =
@@ -56,6 +59,7 @@ export function IntakeForm({
   knownCity,
   knownState,
   initial,
+  lastIntake,
 }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [result, setResult] = useState<IntakeResult | null>(null);
@@ -70,7 +74,7 @@ export function IntakeForm({
     defaultValues: {
       safeTonight: "",
       receivingVaBenefits: "",
-      needs: [],
+      needs: lastIntake?.needs ?? [],
       idStatus: "",
       dischargeCharacter: "",
       serviceEra: "",
@@ -102,11 +106,10 @@ export function IntakeForm({
       safeTonight:
         values.safeTonight === "" ? undefined : values.safeTonight === "yes",
       receivingVaBenefits: values.receivingVaBenefits || undefined,
-      // A crisis call surfaces same-day help regardless of what else got
-      // checked before the answer came out.
-      needs: (inCrisis
-        ? Array.from(new Set([...values.needs, "crisis"]))
-        : values.needs) as Bucket[],
+      // What was ticked, and only that. A crisis answer still surfaces same-day
+      // help, but the server folds that in — see matchNeeds. The record should
+      // say what the veteran told us, not what we inferred from it.
+      needs: values.needs as Bucket[],
       idStatus: values.idStatus || undefined,
       dischargeCharacter: values.dischargeCharacter || undefined,
       serviceEra: values.serviceEra || undefined,
@@ -139,6 +142,14 @@ export function IntakeForm({
   const prefilledCount = ELIGIBILITY_FIELDS.filter(
     (field) => initial[field],
   ).length;
+
+  /** A box ticked on the last call, still ticked now. */
+  function carriedOver(code: Bucket): boolean {
+    return (
+      (lastIntake?.needs.includes(code) ?? false) &&
+      current.needs.includes(code)
+    );
+  }
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
@@ -201,6 +212,14 @@ export function IntakeForm({
       ) : (
         <>
           <Section title="Needs" blurb={NEEDS_LEAD_IN}>
+            {lastIntake && (
+              <p className="rounded-md border border-border bg-secondary/30 p-3 text-sm text-muted-foreground md:col-span-2">
+                Ticked from the intake on{" "}
+                <span className="font-bold">{lastIntake.on}</span>. Change
+                whatever this call changes — the boxes here are this call&rsquo;s
+                answers, and the earlier run stays on the record as it was.
+              </p>
+            )}
             <div className="space-y-2 md:col-span-2">
               {BUCKET_CODES.map((code) => (
                 <label
@@ -217,6 +236,11 @@ export function IntakeForm({
                     <span className="block">{BUCKET_PROMPTS[code]}</span>
                     <span className="mt-0.5 block text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                       {BUCKET_LABELS[code]}
+                      {carriedOver(code) && (
+                        <span className="ml-2 text-[color:var(--wtw-deep-gold)]">
+                          · from last call
+                        </span>
+                      )}
                     </span>
                   </span>
                 </label>

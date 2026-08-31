@@ -74,6 +74,58 @@ describe("encounterSchema", () => {
   });
 });
 
+describe("intake encounters", () => {
+  it("accepts an intake that matched nobody", () => {
+    const result = encounterSchema.safeParse({
+      id: "e3",
+      type: "intake",
+      occurredAt: new Date(),
+      loggedBy: "uid-1",
+      summary: "Checked: Housing. None of 1 resource matched.",
+      bucketsIdentified: ["housing"],
+      intakeAnswers: { dischargeCharacter: "honorable", idStatus: "none" },
+      candidatesFound: 0,
+      createdAt: new Date(),
+    });
+    expect(result.success).toBe(true);
+    expect(result.data!.candidatesFound).toBe(0);
+  });
+
+  it("defaults the intake fields off on every other encounter", () => {
+    // A plain note read back must not look like an intake that found nothing:
+    // zero candidates is a claim about the directory, and null is silence.
+    const parsed = encounterSchema.parse({
+      id: "e4",
+      occurredAt: new Date(),
+      loggedBy: "uid-1",
+      summary: "Met at the shelter.",
+      createdAt: new Date(),
+    });
+    expect(parsed.intakeAnswers).toEqual({});
+    expect(parsed.candidatesFound).toBeNull();
+  });
+
+  it("keeps the four eligibility answers and nothing else", () => {
+    const parsed = encounterSchema.parse({
+      id: "e5",
+      type: "intake",
+      occurredAt: new Date(),
+      loggedBy: "uid-1",
+      summary: "Checked: Housing. 2 of 9 resources matched.",
+      // safeTonight and receivingVaBenefits are never stored. If either ever
+      // reaches this schema, it gets dropped here rather than written.
+      intakeAnswers: {
+        serviceEra: "post911",
+        safeTonight: false,
+        receivingVaBenefits: "no",
+      },
+      candidatesFound: 2,
+      createdAt: new Date(),
+    });
+    expect(parsed.intakeAnswers).toEqual({ serviceEra: "post911" });
+  });
+});
+
 describe("referral encounters", () => {
   it("defaults a hand-logged encounter to a plain note", () => {
     const parsed = encounterSchema.parse({

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ELIGIBILITY_FIELDS, mergeEligibility } from "./intake";
+import {
+  ELIGIBILITY_FIELDS,
+  intakeSummary,
+  matchNeeds,
+  mergeEligibility,
+} from "./intake";
+import type { Bucket } from "@/lib/schemas";
 
 describe("mergeEligibility", () => {
   it("writes an answer to an empty record", () => {
@@ -80,5 +86,60 @@ describe("mergeEligibility", () => {
 
   it("returns an empty merge for an empty record and an empty submit", () => {
     expect(mergeEligibility({}, {})).toEqual({ updates: {}, effective: {} });
+  });
+});
+
+describe("matchNeeds", () => {
+  it("adds crisis when there's nowhere safe tonight", () => {
+    expect(matchNeeds(["housing"], false)).toEqual(["housing", "crisis"]);
+  });
+
+  it("doesn't duplicate a crisis box staff already ticked", () => {
+    expect(matchNeeds(["crisis", "housing"], false)).toEqual([
+      "crisis",
+      "housing",
+    ]);
+  });
+
+  it("leaves the list alone when they're safe, or weren't asked", () => {
+    expect(matchNeeds(["housing"], true)).toEqual(["housing"]);
+    expect(matchNeeds(["housing"], undefined)).toEqual(["housing"]);
+  });
+
+  it("returns what was checked untouched, so the record can use it", () => {
+    // The augmented list is a routing decision. Recording it would put
+    // safeTonight into history under another name, which is the one thing
+    // this field is never allowed to do.
+    const checked: Bucket[] = ["housing"];
+    matchNeeds(checked, false);
+    expect(checked).toEqual(["housing"]);
+  });
+});
+
+describe("intakeSummary", () => {
+  it("names what was checked and how thin the directory was", () => {
+    expect(
+      intakeSummary({
+        needs: ["housing", "health"],
+        candidatesFound: 3,
+        consideredCount: 12,
+      }),
+    ).toBe("Checked: Housing, Health Care. 3 of 12 resources matched.");
+  });
+
+  it("says plainly when nothing matched", () => {
+    expect(
+      intakeSummary({
+        needs: ["housing"],
+        candidatesFound: 0,
+        consideredCount: 1,
+      }),
+    ).toBe("Checked: Housing. None of 1 resource matched.");
+  });
+
+  it("still reads as a record when no box was ticked", () => {
+    expect(
+      intakeSummary({ needs: [], candidatesFound: 0, consideredCount: 4 }),
+    ).toBe("Nothing checked. None of 4 resources matched.");
   });
 });

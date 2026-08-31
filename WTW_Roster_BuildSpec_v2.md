@@ -120,9 +120,24 @@ It never gates. A matcher interpreting prose would exclude people in ways nobody
 
 **On `minDischarge`.** Values are inclusive upward. `any` accepts everything including other-than-honorable. `general` accepts general and honorable. Getting this wrong on Vet Center records silently hides the single most useful resource for this population, since Vet Centers accept any character of discharge and require no VA enrollment.
 
-## 2.3 Referrals as encounters
+## 2.3 Intakes and referrals as encounters
 
-No new collection. A referral set is written to `veterans/{id}/encounters/{id}` with an encounter type of `referral` and:
+No new collection. Both are written to `veterans/{id}/encounters/{id}`.
+
+**Every intake run writes an encounter of type `intake`**, whether or not it ends in a referral:
+
+| Field | Type |
+|---|---|
+| `type` | `"intake"` |
+| `bucketsIdentified` | array of bucket codes — what staff checked |
+| `intakeAnswers` | the four eligibility values the gates ran against |
+| `candidatesFound` | number that cleared the gates |
+
+The run that matches nobody is the one most worth keeping. It is the only record that the call happened, and the only place a hole in the directory is visible after the tab closes — for the first months, when the directory is nearly empty, that is most of them. It carries no `followUpDue` and does not touch `conciergeStatus`, so it stays invisible to the follow-up queue: approving a packet is still the only thing that puts a veteran in the loop.
+
+`bucketsIdentified` is what staff **checked**, not what the matcher was handed. A veteran with nowhere safe tonight gets `crisis` folded into the needs the gates see (`matchNeeds`), and that derivation stops at the matcher: writing it to the encounter would put `safeTonight` into history under another name. `intakeAnswers` holds only the four eligibility keys — `safeTonight` and `receivingVaBenefits` are absent by design, and the schema drops them if they ever arrive.
+
+A referral set is written with an encounter type of `referral` and:
 
 | Field | Type |
 |---|---|

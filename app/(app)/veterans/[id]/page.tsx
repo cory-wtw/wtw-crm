@@ -15,6 +15,7 @@ import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
+  BUCKET_LABELS,
   CONCIERGE_STATUS_LABELS,
   DEPENDENTS_ANSWER_LABELS,
   DISCHARGE_CHARACTER_LABELS,
@@ -23,6 +24,7 @@ import {
   monthlyBenefitLift,
   PIPELINE_LABELS,
   PREFERRED_CONTACT_LABELS,
+  type IntakeAnswers as IntakeAnswersType,
   type PipelineStage,
   SERVICE_ERA_LABELS,
 } from "@/lib/schemas";
@@ -320,6 +322,19 @@ export default async function VeteranDetailPage({
                   </p>
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-sm">{e.summary}</p>
+                {e.bucketsIdentified.length > 0 && (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {e.bucketsIdentified.map((bucket) => (
+                      <li
+                        key={bucket}
+                        className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]"
+                      >
+                        {BUCKET_LABELS[bucket]}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {e.type === "intake" && <IntakeAnswers answers={e.intakeAnswers} />}
                 {e.referrals.length > 0 && (
                   <ol className="mt-2 space-y-0.5 text-xs">
                     {e.referrals.map((referral) => (
@@ -364,6 +379,46 @@ export default async function VeteranDetailPage({
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * The eligibility picture an intake ran against.
+ *
+ * Worth showing beside the needs: an intake that matched nobody is either a
+ * thin directory or an answer that closed every door, and these are the four
+ * values that decide which. An answer nobody has given is left out rather than
+ * shown as a blank — the gates treat unknown and "no" differently, and so
+ * should the record of them.
+ */
+function IntakeAnswers({ answers }: { answers: IntakeAnswersType }) {
+  const rows: [string, string | undefined][] = [
+    [
+      "Discharge",
+      answers.dischargeCharacter
+        ? DISCHARGE_CHARACTER_LABELS[answers.dischargeCharacter]
+        : undefined,
+    ],
+    [
+      "Era",
+      answers.serviceEra ? SERVICE_ERA_LABELS[answers.serviceEra] : undefined,
+    ],
+    ["ID", answers.idStatus ? ID_STATUS_LABELS[answers.idStatus] : undefined],
+    [
+      "Dependents",
+      answers.hasDependents
+        ? DEPENDENTS_ANSWER_LABELS[answers.hasDependents]
+        : undefined,
+    ],
+  ];
+  const known = rows.filter(([, value]) => value);
+  if (known.length === 0) return null;
+
+  return (
+    <p className="mt-2 text-xs text-muted-foreground">
+      Matched on:{" "}
+      {known.map(([label, value]) => `${label} ${value}`).join(" · ")}
+    </p>
   );
 }
 

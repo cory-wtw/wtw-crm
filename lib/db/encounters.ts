@@ -25,6 +25,9 @@ function deserialize(
     nextStep: data.nextStep ?? undefined,
     nextStepDueAt: tsToDate(data.nextStepDueAt),
     bucketsIdentified: data.bucketsIdentified ?? [],
+    intakeAnswers: data.intakeAnswers ?? {},
+    candidatesFound:
+      typeof data.candidatesFound === "number" ? data.candidatesFound : null,
     referrals: data.referrals ?? [],
     followUpDue: tsToDate(data.followUpDue),
     followUpCompleted: tsToDate(data.followUpCompleted),
@@ -43,6 +46,19 @@ export async function listEncounters(
     .orderBy("occurredAt", "desc")
     .get();
   return snap.docs.map((d) => deserialize(d.id, d.data()));
+}
+
+/**
+ * The most recent intake run, if there is one.
+ *
+ * Seeds the needs checkboxes when staff opens intake again — a call that ended
+ * with nothing to refer to shouldn't cost them the assessment.
+ */
+export async function getLatestIntake(
+  veteranId: string,
+): Promise<Encounter | null> {
+  const encounters = await listEncounters(veteranId);
+  return encounters.find((e) => e.type === "intake") ?? null;
 }
 
 /** The most recent referral packet sent to a veteran, if there is one. */

@@ -13,7 +13,9 @@
  * the two is worth asking about again.
  */
 
+import { BUCKET_LABELS } from "@/lib/schemas";
 import type {
+  Bucket,
   DependentsAnswer,
   DischargeCharacter,
   IdStatus,
@@ -76,4 +78,52 @@ export function mergeEligibility(
   }
 
   return { updates, effective };
+}
+
+/**
+ * The needs the matcher runs against: what staff checked, plus `crisis` when
+ * the veteran has nowhere safe tonight.
+ *
+ * The augmentation lives here, and on the server, for one reason: what gets
+ * recorded on the intake encounter is what staff checked, and this is what the
+ * gates see. Those are different things. Somebody who says at question three
+ * that they have nowhere to sleep needs same-day help whether or not the box
+ * above it was ticked — but the record should say what they told us, not what
+ * we inferred. Folding the two together would write `safeTonight` into history
+ * under another name.
+ */
+export function matchNeeds(
+  checked: Bucket[],
+  safeTonight: boolean | undefined,
+): Bucket[] {
+  if (safeTonight !== false) return checked;
+  return Array.from(new Set<Bucket>([...checked, "crisis"]));
+}
+
+/**
+ * The one-line summary on an intake encounter.
+ *
+ * Written to be readable on a timeline six months later, when the question is
+ * "what did we ask this man, and what did we have for him?" — so it names what
+ * was checked and how thin the directory was, in that order.
+ */
+export function intakeSummary(input: {
+  needs: Bucket[];
+  candidatesFound: number;
+  consideredCount: number;
+}): string {
+  const checked =
+    input.needs.length > 0
+      ? `Checked: ${input.needs.map((b) => BUCKET_LABELS[b]).join(", ")}.`
+      : "Nothing checked.";
+
+  const pool = `${input.consideredCount} ${
+    input.consideredCount === 1 ? "resource" : "resources"
+  }`;
+  const matched =
+    input.candidatesFound === 0
+      ? `None of ${pool} matched.`
+      : `${input.candidatesFound} of ${pool} matched.`;
+
+  return `${checked} ${matched}`;
 }

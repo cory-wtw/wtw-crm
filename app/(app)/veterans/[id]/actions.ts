@@ -26,7 +26,12 @@ import {
   canCreateReferral,
   canRunIntake,
 } from "@/lib/permissions";
-import { mergeEligibility, type EligibilityAnswers } from "@/lib/intake";
+import {
+  intakeSummary,
+  matchNeeds,
+  mergeEligibility,
+  type EligibilityAnswers,
+} from "@/lib/intake";
 import {
   dependentsAnswerSchema,
   dischargeCharacterSchema,
@@ -123,11 +128,19 @@ function formatIssues(
 }
 
 /**
- * Run a concierge intake: save the eligibility keys, then gate and rank the
- * directory in memory and hand back a short list.
+ * Run a concierge intake: save the eligibility keys and the assessment, then
+ * gate and rank the directory in memory and hand back a short list.
  *
- * Writes nothing but the veteran's four eligibility fields. No encounter, no
- * referral, no message to anybody — a person decides what happens next.
+ * Writes the four eligibility fields and an `intake` encounter — what staff
+ * checked, the answers the gates ran against, and how many resources cleared
+ * them. An intake that matched nobody is the one most worth keeping: it is the
+ * only record that the call happened, and the only place a hole in the
+ * directory is visible after the tab closes.
+ *
+ * It writes no referral and sends nothing. The encounter carries no
+ * `followUpDue` and doesn't touch `conciergeStatus`, so it stays invisible to
+ * the follow-up queue: a person deciding to send a packet is still the only
+ * thing that puts a veteran in the loop.
  */
 export async function runIntakeAction(
   veteranId: string,
@@ -185,26 +198,14 @@ export async function runIntakeAction(
     hasDependents: input.hasDependents,
   });
 
-  if (Object.keys(updates).length > 0) {
-    const diff = computeDiff(
-      stored as Record<string, unknown>,
-      updates as Record<string, unknown>,
-      Object.keys(updates),
-    );
-
-    await docRef.update({
-      ...updates,
-      updatedBy: session.uid,
-      updatedAt: now,
-    });
-
-    await logAudit({
-      action: "update",
-      resourceType: "veteran",
-      resourceId: veteranId,
-      diff,
-    });
-  }
+  const eligibilityChanged = Object.keys(updates).length > 0;
+  const eligibilityDiff = eligibilityChanged
+    ? computeDiff(
+        stored as Record<string, unknown>,
+        updates as Record<string, unknown>,
+        Object.keys(updates),
+      )
+    : null;
 
   // The veteran's own city and state come from their record — intake doesn't
   // re-ask what we already know.
@@ -219,7 +220,10 @@ export async function runIntakeAction(
     idStatus: effective.idStatus,
     hasDependents: effective.hasDependents,
     receivingVaBenefits: input.receivingVaBenefits,
-    needs: input.needs,
+    // Nowhere safe tonight surfaces same-day help whatever else got checked.
+    // The derivation stops here: `input.needs` is what staff ticked, and that
+    // is what goes on the record.
+    needs: matchNeeds(input.needs, input.safeTonight),
   };
 
   const resources = await listResources();
@@ -260,6 +264,64 @@ export async function runIntakeAction(
       failures: passesGates(matchInput, r).failures,
     }))
     .sort((a, b) => a.organizationName.localeCompare(b.organizationName));
+
+  // The assessment and the answers commit together. Splitting them would let a
+  // call save four eligibility fields and lose every needs box that was ticked
+  // to establish them — which is the failure this encounter exists to prevent.
+  //
+  // No followUpDue, no conciergeStatus: the follow-up queue reads those off the
+  // veteran, so an intake stays out of it until a person approves a packet.
+  const encounterRef = docRef.collection("encounters").doc();
+  const batch = adminDb.batch();
+  batch.set(encounterRef, {
+    type: "intake",
+    occurredAt: now,
+    loggedBy: session.uid,
+    summary: intakeSummary({
+      needs: input.needs,
+      candidatesFound: candidates.length,
+      consideredCount: resources.length,
+    }),
+    // What staff checked, not what the matcher was handed.
+    bucketsIdentified: input.needs,
+    // What the gates ran against — stored answers plus this call's. Absent by
+    // design: safeTonight and receivingVaBenefits.
+    // mergeEligibility only ever sets keys it has values for, so there is no
+    // undefined in here for Firestore to reject.
+    intakeAnswers: effective,
+    candidatesFound: candidates.length,
+    referrals: [],
+    followUpDue: null,
+    followUpCompleted: null,
+    outcomes: [],
+    createdAt: now,
+  });
+  if (eligibilityChanged) {
+    batch.update(docRef, {
+      ...updates,
+      updatedBy: session.uid,
+      updatedAt: now,
+    });
+  }
+  await batch.commit();
+
+  if (eligibilityDiff) {
+    await logAudit({
+      action: "update",
+      resourceType: "veteran",
+      resourceId: veteranId,
+      diff: eligibilityDiff,
+    });
+  }
+  await logAudit({
+    action: "create",
+    resourceType: "encounter",
+    resourceId: `${veteranId}/${encounterRef.id}`,
+    diff: {
+      type: { before: null, after: "intake" },
+      bucketsIdentified: { before: null, after: input.needs },
+    },
+  });
 
   revalidatePath(`/veterans/${veteranId}`);
 
