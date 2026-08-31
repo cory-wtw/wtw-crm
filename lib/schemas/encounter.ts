@@ -119,6 +119,15 @@ export const encounterSchema = z.object({
 
   // Intake encounters only.
   intakeAnswers: intakeAnswersSchema.default({}),
+  /**
+   * Which of the checked buckets had at least one resource clear the gates.
+   *
+   * Null means the run predates this field, not that nothing matched — the
+   * difference decides whether a bucket counts as a gap, so silence has to
+   * stay distinguishable from a "no". `candidatesFound: 0` is the one case
+   * where a null still tells you everything: nothing matched at all.
+   */
+  bucketsMatched: z.array(bucketSchema).nullable().default(null),
   /** How many resources cleared the gates. Zero is the interesting number:
    *  it's a hole in the directory, and it only shows up here. */
   candidatesFound: z.number().int().nonnegative().nullable().default(null),
@@ -142,6 +151,7 @@ export const encounterInputSchema = encounterSchema.omit({
   loggedBy: true,
   bucketsIdentified: true,
   intakeAnswers: true,
+  bucketsMatched: true,
   candidatesFound: true,
   referrals: true,
   followUpDue: true,

@@ -26,6 +26,7 @@ function deserialize(
     nextStepDueAt: tsToDate(data.nextStepDueAt),
     bucketsIdentified: data.bucketsIdentified ?? [],
     intakeAnswers: data.intakeAnswers ?? {},
+    bucketsMatched: data.bucketsMatched ?? null,
     candidatesFound:
       typeof data.candidatesFound === "number" ? data.candidatesFound : null,
     referrals: data.referrals ?? [],

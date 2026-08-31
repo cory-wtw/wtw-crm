@@ -284,6 +284,12 @@ export async function runIntakeAction(
     }),
     // What staff checked, not what the matcher was handed.
     bucketsIdentified: input.needs,
+    // Which of those needs the gates could actually answer. Recorded so the
+    // roster gaps page can tell "asked for and nothing to offer" apart from
+    // "asked for and served" — the difference is the whole list.
+    bucketsMatched: [
+      ...new Set(candidates.flatMap((candidate) => candidate.matchedBuckets)),
+    ],
     // What the gates ran against — stored answers plus this call's. Absent by
     // design: safeTonight and receivingVaBenefits.
     // mergeEligibility only ever sets keys it has values for, so there is no

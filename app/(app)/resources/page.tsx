@@ -45,12 +45,20 @@ export default async function ResourcesPage() {
           </p>
         </div>
         {canEdit && (
-          <Link
-            href="/resources/new"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
-          >
-            Add Resource
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/resources/gaps"
+              className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            >
+              Roster gaps
+            </Link>
+            <Link
+              href="/resources/new"
+              className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            >
+              Add Resource
+            </Link>
+          </div>
         )}
       </div>
 
