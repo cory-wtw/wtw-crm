@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
-import { findByExternalId } from "@/lib/enrich-runner";
+import { findByExternalId } from "@/lib/external-id";
 import { getSession } from "@/lib/firebase/session";
 import { canApproveImportedResource } from "@/lib/permissions";
 import { parseSeedResource, type SeedResource } from "@/lib/resource-import";

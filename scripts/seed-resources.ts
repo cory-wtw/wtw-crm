@@ -31,7 +31,7 @@ import {
   type SeedResource,
 } from "@/lib/resource-import";
 import { resourceInputSchema, type ResourceInput } from "@/lib/schemas";
-import { findByExternalId } from "@/lib/enrich-runner";
+import { findByExternalId } from "@/lib/external-id";
 
 const COMMIT = process.argv.includes("--commit");
 

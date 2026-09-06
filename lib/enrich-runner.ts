@@ -33,6 +33,7 @@ import {
   type ScoredLink,
 } from "@/lib/enrich";
 import { adminDb } from "@/lib/firebase/admin";
+import { findByExternalId } from "@/lib/external-id";
 import { resourceInputSchema, type ResourceInput } from "@/lib/schemas";
 
 /** Named in the build request, not chosen here. */
@@ -405,16 +406,8 @@ export async function enrichUrl(rawUrl: string): Promise<EnrichOutcome> {
   };
 }
 
-export async function findByExternalId(
-  externalId: string,
-): Promise<string | null> {
-  const snap = await adminDb
-    .collection("resources")
-    .where("externalId", "==", externalId)
-    .limit(1)
-    .get();
-  return snap.empty ? null : snap.docs[0].id;
-}
+
+export { findByExternalId };
 
 const FLAG_REASON =
   "Drafted by AI from the organization's own page. Needs verifying.";

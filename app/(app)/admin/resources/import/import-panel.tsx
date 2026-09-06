@@ -90,8 +90,16 @@ export function ImportPanel() {
       }
       setSummary(response.summary);
       setPreviews(null);
-    } catch {
-      setServerError("The request failed before it reached the server.");
+    } catch (error) {
+      // Say what actually happened. "The request failed" told a person on an
+      // iPad nothing they could act on, and there is no console to open on a
+      // tablet — so the message on screen has to carry the diagnosis.
+      const detail = error instanceof Error ? error.message : String(error);
+      setServerError(
+        `The request didn't reach the server: ${detail}. If the app was ` +
+          `deployed a moment ago, reload the page fully and try again — the ` +
+          `page in front of you may be from the previous version.`,
+      );
     } finally {
       setSaving(false);
     }
