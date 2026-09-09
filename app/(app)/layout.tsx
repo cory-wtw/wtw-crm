@@ -14,7 +14,10 @@ export default async function AuthenticatedLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  if (!session) redirect("/login");
+  // Not /login directly: a stale-but-present cookie would make proxy.ts
+  // bounce that request straight back here. /logout clears the cookie
+  // first, then sends the browser on to /login for real.
+  if (!session) redirect("/logout");
 
   // Social-only users are penned into /social. This is the authoritative
   // check — it runs on every authenticated page render and reads the real
@@ -60,7 +63,7 @@ export default async function AuthenticatedLayout({
               </span>
             </span>
           </Link>
-          <nav className="hidden flex-1 items-center gap-1 md:flex">
+          <nav className="hidden flex-1 items-center gap-1 lg:flex">
             {navItems.map((item) => (
               <NavLink key={item.href} href={item.href}>
                 {item.label}
@@ -71,7 +74,7 @@ export default async function AuthenticatedLayout({
             <span className="hidden text-muted-foreground lg:inline">
               {session.email}
             </span>
-            <form action={signOutAction} className="hidden md:block">
+            <form action={signOutAction} className="hidden lg:block">
               <button
                 type="submit"
                 className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 font-bold transition-colors hover:bg-secondary"

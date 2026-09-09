@@ -9,9 +9,10 @@ export type NavItem = { href: string; label: string };
 
 /**
  * The small-screen navigation. The desktop nav lives inline in the layout and
- * is hidden below `md`; this hamburger takes over there. It collapses to a
- * single button in the header and expands to a full-width panel of links plus
- * the account row.
+ * is hidden below `lg` — phones and tablets alike land here, not just
+ * phones. This hamburger takes over there: it collapses to a single button
+ * in the header and expands to a full-width panel of links plus the account
+ * row.
  */
 export function MobileNav({
   items,
@@ -34,7 +35,7 @@ export function MobileNav({
   }, [open]);
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
       <button
         type="button"
         aria-label={open ? "Close menu" : "Open menu"}
