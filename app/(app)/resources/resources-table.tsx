@@ -209,7 +209,7 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
         </span>
       </div>
       {/* Cards on phones/tablets, sortable table on desktop. */}
-      <ul className="space-y-2 lg:hidden">
+      <ul className="space-y-2 lg:pointer-fine:hidden">
         {table.getRowModel().rows.map((row) => {
           const r = row.original;
           return (
@@ -248,7 +248,7 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
         })}
       </ul>
 
-      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:pointer-fine:block">
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (

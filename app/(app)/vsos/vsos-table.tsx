@@ -125,7 +125,7 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
         </span>
       </div>
       {/* Cards on phones/tablets, sortable table on desktop. */}
-      <ul className="space-y-2 lg:hidden">
+      <ul className="space-y-2 lg:pointer-fine:hidden">
         {table.getRowModel().rows.map((row) => {
           const v = row.original;
           const location = [v.city, v.state].filter(Boolean).join(", ");
@@ -153,7 +153,7 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
         })}
       </ul>
 
-      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:pointer-fine:block">
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (
