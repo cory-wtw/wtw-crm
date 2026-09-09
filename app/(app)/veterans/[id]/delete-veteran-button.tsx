@@ -38,7 +38,7 @@ export function DeleteVeteranButton({
         type="button"
         onClick={onClick}
         disabled={isPending}
-        className="inline-flex h-9 items-center justify-center rounded-md border border-destructive/40 bg-card px-3 text-sm font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+        className="inline-flex h-11 items-center justify-center rounded-md border border-destructive/40 bg-card px-3 text-sm font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
       >
         {isPending ? "Deleting…" : "Delete"}
       </button>

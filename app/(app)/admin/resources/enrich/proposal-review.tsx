@@ -414,7 +414,7 @@ export function ProposalReview({
           disabled={
             saving || gaps.length > 0 || draft.organizationName.trim() === ""
           }
-          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
           {saving ? "Saving…" : "Keep as a flagged record"}
         </button>
@@ -441,7 +441,7 @@ export function ProposalReview({
 }
 
 const inputClasses =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+  "w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 function Field({
   label,

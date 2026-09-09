@@ -101,7 +101,7 @@ export default async function VeteranDetailPage({
           {canIntake && (
             <Link
               href={`/veterans/${veteran.id}/intake`}
-              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Run intake
             </Link>
@@ -109,7 +109,7 @@ export default async function VeteranDetailPage({
           {canEdit && (
             <Link
               href={`/veterans/${veteran.id}/edit`}
-              className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
             >
               Edit
             </Link>
@@ -154,7 +154,7 @@ export default async function VeteranDetailPage({
         />
       </Card>
 
-      <Card title="Eligibility keys">
+      <Details title="Eligibility keys">
         <Row
           label="Discharge"
           value={
@@ -181,7 +181,7 @@ export default async function VeteranDetailPage({
               : null
           }
         />
-      </Card>
+      </Details>
 
       <Card title="Concierge">
         <Row
@@ -215,7 +215,7 @@ export default async function VeteranDetailPage({
         )}
       </Card>
 
-      <Card title="Monthly benefit">
+      <Details title="Monthly benefit">
         <Row
           label="Before WTW"
           value={formatUsd(veteran.monthlyBenefitBefore)}
@@ -228,9 +228,9 @@ export default async function VeteranDetailPage({
           label="WTW monthly impact"
           value={monthlyLift ? formatUsd(monthlyLift) : "—"}
         />
-      </Card>
+      </Details>
 
-      <Card title="VSO partners">
+      <Details title="VSO partners">
         {vsos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No VSO partners linked yet.
@@ -252,14 +252,14 @@ export default async function VeteranDetailPage({
             ))}
           </ul>
         )}
-      </Card>
+      </Details>
 
-      <Card title="Phone">
+      <Details title="Phone">
         <Row label="Assigned phone" value={phone?.name ?? null} />
         <Row label="IMEI / Serial" value={phone?.imeiSerial ?? null} />
-      </Card>
+      </Details>
 
-      <Card title="Pipeline history">
+      <Details title="Pipeline history">
         {veteran.pipelineHistory.length === 0 ? (
           <p className="text-sm text-muted-foreground">No history yet.</p>
         ) : (
@@ -282,7 +282,7 @@ export default async function VeteranDetailPage({
               ))}
           </ol>
         )}
-      </Card>
+      </Details>
 
       <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="mb-4 flex items-baseline justify-between gap-3">
@@ -436,6 +436,28 @@ function Card({
       </h2>
       <div className="grid gap-3 md:grid-cols-2">{children}</div>
     </section>
+  );
+}
+
+/** Reference info someone opens on demand, tucked away by default so the
+ *  things a person acts on daily aren't buried under it. */
+function Details({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-lg border border-border bg-card shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-6 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)] [&::-webkit-details-marker]:hidden">
+        {title}
+        <span aria-hidden className="text-sm transition-transform group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+      <div className="grid gap-3 px-6 pb-6 md:grid-cols-2">{children}</div>
+    </details>
   );
 }
 

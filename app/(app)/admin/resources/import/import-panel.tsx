@@ -178,7 +178,7 @@ export function ImportPanel() {
           type="button"
           onClick={check}
           disabled={text.trim().length === 0}
-          className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary disabled:opacity-50"
         >
           Check it
         </button>
@@ -225,7 +225,7 @@ export function ImportPanel() {
             type="button"
             onClick={load}
             disabled={saving || ready.length === 0}
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
           >
             {saving
               ? "Loading…"

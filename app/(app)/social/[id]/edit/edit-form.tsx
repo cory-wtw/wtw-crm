@@ -162,14 +162,14 @@ export function EditMediaForm({
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
           {isPending ? "Saving…" : "Save changes"}
         </button>
         <button
           type="button"
           onClick={() => router.push("/social")}
-          className="inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-sm font-bold transition-colors hover:bg-secondary"
+          className="inline-flex h-11 items-center justify-center rounded-md border border-border px-4 text-sm font-bold transition-colors hover:bg-secondary"
         >
           Cancel
         </button>

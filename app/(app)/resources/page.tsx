@@ -48,13 +48,13 @@ export default async function ResourcesPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/resources/gaps"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
             >
               Roster gaps
             </Link>
             <Link
               href="/resources/new"
-              className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Add Resource
             </Link>
@@ -77,7 +77,7 @@ export default async function ResourcesPage() {
           </div>
           <Link
             href="/resources/classify"
-            className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
           >
             Work through them
           </Link>
@@ -90,7 +90,7 @@ export default async function ResourcesPage() {
           {canEdit && (
             <Link
               href="/resources/new"
-              className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Add the first resource
             </Link>
