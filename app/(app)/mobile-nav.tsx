@@ -8,11 +8,12 @@ import { signOutAction } from "@/app/login/actions";
 export type NavItem = { href: string; label: string };
 
 /**
- * The small-screen navigation. The desktop nav lives inline in the layout and
- * is hidden below `lg` — phones and tablets alike land here, not just
- * phones. This hamburger takes over there: it collapses to a single button
- * in the header and expands to a full-width panel of links plus the account
- * row.
+ * The small-screen navigation. The desktop nav lives inline in the layout
+ * and only shows on a wide screen WITH a fine pointer (`lg:pointer-fine`) —
+ * a raw width breakpoint can't tell a desktop window from an iPad in
+ * landscape, since their widths overlap, but pointer type can: touch stays
+ * "coarse" even at 1300px, so tablets land on this hamburger regardless of
+ * orientation and only an actual mouse/trackpad gets the desktop nav.
  */
 export function MobileNav({
   items,
@@ -35,7 +36,7 @@ export function MobileNav({
   }, [open]);
 
   return (
-    <div className="lg:hidden">
+    <div className="lg:pointer-fine:hidden">
       <button
         type="button"
         aria-label={open ? "Close menu" : "Open menu"}
