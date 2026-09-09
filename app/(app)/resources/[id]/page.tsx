@@ -108,7 +108,7 @@ export default async function ResourceDetailPage({
         {canEdit && (
           <Link
             href={`/resources/${resource.id}/edit`}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
           >
             Edit
           </Link>
@@ -135,19 +135,19 @@ export default async function ResourceDetailPage({
       )}
 
       {resource.description && (
-        <Card title="Description">
+        <Details title="Description">
           <p className="whitespace-pre-wrap text-sm md:col-span-2">
             {resource.description}
           </p>
-        </Card>
+        </Details>
       )}
 
       {resource.eligibility && (
-        <Card title="Eligibility requirements">
+        <Details title="Eligibility requirements">
           <p className="whitespace-pre-wrap text-sm md:col-span-2">
             {resource.eligibility}
           </p>
-        </Card>
+        </Details>
       )}
 
       <Card title="Needs served">
@@ -173,7 +173,7 @@ export default async function ResourceDetailPage({
       </Card>
 
       {resource.eligibilityNotes && (
-        <Card title="Eligibility notes">
+        <Details title="Eligibility notes">
           <p className="whitespace-pre-wrap text-sm md:col-span-2">
             {resource.eligibilityNotes}
           </p>
@@ -181,7 +181,7 @@ export default async function ResourceDetailPage({
             Read by staff, not by the matcher — this never filters anybody in
             or out.
           </p>
-        </Card>
+        </Details>
       )}
 
       <Card title="Who they'll take">
@@ -215,7 +215,7 @@ export default async function ResourceDetailPage({
         <Row label="What to bring" value={resource.whatToBring} />
       </Card>
 
-      <Card title="Verification">
+      <Details title="Verification">
         <Row
           label="Status"
           value={VERIFICATION_STATUS_LABELS[resource.verificationStatus]}
@@ -258,7 +258,7 @@ export default async function ResourceDetailPage({
             </div>
           )}
         </div>
-      </Card>
+      </Details>
 
       <p className="text-xs text-muted-foreground">
         Last updated {formatDate(resource.updatedAt)}
@@ -281,6 +281,28 @@ function Card({
       </h2>
       <div className="grid gap-3 md:grid-cols-2">{children}</div>
     </section>
+  );
+}
+
+/** Reference info someone opens on demand, tucked away by default so the
+ *  things a person acts on daily aren't buried under it. */
+function Details({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-lg border border-border bg-card shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-6 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)] [&::-webkit-details-marker]:hidden">
+        {title}
+        <span aria-hidden className="text-sm transition-transform group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+      <div className="grid gap-3 px-6 pb-6 md:grid-cols-2">{children}</div>
+    </details>
   );
 }
 

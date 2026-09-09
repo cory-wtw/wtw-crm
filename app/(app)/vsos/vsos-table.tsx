@@ -118,13 +118,42 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
           placeholder="Search by name, affiliation, or location…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="h-11 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
         <span className="shrink-0 text-xs text-muted-foreground">
           {filtered.length} of {rows.length}
         </span>
       </div>
-      <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
+      {/* Cards on phones, sortable table from sm up. */}
+      <ul className="space-y-2 sm:hidden">
+        {table.getRowModel().rows.map((row) => {
+          const v = row.original;
+          const location = [v.city, v.state].filter(Boolean).join(", ");
+          return (
+            <li key={row.id}>
+              <Link
+                href={`/vsos/${v.id}`}
+                className="block rounded-lg border border-border bg-card p-4 active:bg-secondary/40"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-bold text-foreground">{v.fullName}</p>
+                  <span
+                    className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STATUS_TINT[v.partnershipStatus]}`}
+                  >
+                    {PARTNERSHIP_STATUS_LABELS[v.partnershipStatus]}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {[v.affiliation, location].filter(Boolean).join(" · ") ||
+                    "No details on file"}
+                </p>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card sm:block">
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -175,12 +204,12 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && (
-          <p className="border-t border-border p-6 text-center text-xs text-muted-foreground">
-            No matches for &ldquo;{query}&rdquo;.
-          </p>
-        )}
       </div>
+      {filtered.length === 0 && (
+        <p className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+          No matches for &ldquo;{query}&rdquo;.
+        </p>
+      )}
     </div>
   );
 }

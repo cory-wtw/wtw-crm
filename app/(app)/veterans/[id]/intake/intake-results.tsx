@@ -203,7 +203,7 @@ export function IntakeResults({
             <button
               type="button"
               onClick={copyText}
-              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               {copied ? "Copied" : "Copy to clipboard"}
             </button>
@@ -216,7 +216,7 @@ export function IntakeResults({
         <div className="flex items-center gap-3 border-t border-border pt-6">
           <Link
             href={`/veterans/${veteranId}`}
-            className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary"
+            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary"
           >
             Back to the record
           </Link>
@@ -353,7 +353,7 @@ export function IntakeResults({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search the directory…"
-              className="h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-11 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             {filteredExcluded.length === 0 ? (
               <p className="text-xs text-muted-foreground">
@@ -418,7 +418,7 @@ export function IntakeResults({
               type="button"
               onClick={approve}
               disabled={selected.length === 0 || approving}
-              className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
             >
               {approving
                 ? "Recording…"

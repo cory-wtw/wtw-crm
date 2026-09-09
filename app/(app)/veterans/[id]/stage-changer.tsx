@@ -45,7 +45,7 @@ export function StageChanger({
           value={nextStage}
           onChange={(e) => setNextStage(e.target.value as PipelineStage)}
           disabled={isPending}
-          className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="h-11 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           {PIPELINE_STAGES.map((s) => (
             <option key={s} value={s}>
@@ -57,7 +57,7 @@ export function StageChanger({
         <button
           type="submit"
           disabled={disabled}
-          className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
           {isPending ? "Updating…" : "Change stage"}
         </button>

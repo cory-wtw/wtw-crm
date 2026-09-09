@@ -133,7 +133,7 @@ export function ClassifyQueue({ queue }: { queue: ClassifyItem[] }) {
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/resources"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
           >
             Back to the directory
           </Link>
@@ -318,7 +318,7 @@ export function ClassifyQueue({ queue }: { queue: ClassifyItem[] }) {
           type="button"
           onClick={save}
           disabled={saving || remainingGaps.length > 0}
-          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
           {saving
             ? "Saving…"

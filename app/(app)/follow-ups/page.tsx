@@ -89,7 +89,7 @@ export default async function FollowUpsPage() {
                   </div>
                   <Link
                     href={`/follow-ups/${veteran.id}`}
-                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
                   >
                     Record outcomes
                   </Link>

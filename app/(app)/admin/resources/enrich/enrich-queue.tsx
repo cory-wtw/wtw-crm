@@ -102,7 +102,7 @@ export function EnrichQueue() {
             type="button"
             onClick={run}
             disabled={running || input.trim().length === 0}
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
           >
             {running ? "Reading…" : "Read these pages"}
           </button>
@@ -150,7 +150,7 @@ export function EnrichQueue() {
                   <button
                     type="button"
                     onClick={() => setOpenUrl(row.url)}
-                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
                   >
                     Review
                   </button>
@@ -158,7 +158,7 @@ export function EnrichQueue() {
                 {row.state === "approved" && (
                   <Link
                     href={`/resources/${row.resourceId}`}
-                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
                   >
                     Open record
                   </Link>

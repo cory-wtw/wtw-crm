@@ -84,7 +84,7 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
       <button
         type="button"
         onClick={() => setExpanded(true)}
-        className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+        className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
       >
         Log encounter
       </button>
@@ -131,7 +131,7 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
         <button
           type="submit"
           disabled={isSubmitting || isPending}
-          className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
           {isSubmitting || isPending ? "Saving…" : "Save encounter"}
         </button>

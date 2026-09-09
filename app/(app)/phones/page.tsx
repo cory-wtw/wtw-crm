@@ -45,7 +45,7 @@ export default async function PhonesPage() {
         {canEdit && (
           <Link
             href="/phones/new"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
           >
             Add phone
           </Link>
@@ -58,7 +58,7 @@ export default async function PhonesPage() {
           {canEdit && (
             <Link
               href="/phones/new"
-              className="mt-4 inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Add the first phone
             </Link>

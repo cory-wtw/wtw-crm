@@ -187,14 +187,14 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
             placeholder="Search by need, service, org, or description…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-11 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
           {gapCount > 0 && (
             <button
               type="button"
               onClick={() => setOnlyGaps((v) => !v)}
               aria-pressed={onlyGaps}
-              className={`inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-3 text-xs font-bold transition-colors ${
+              className={`inline-flex h-11 shrink-0 items-center justify-center rounded-md border px-3 text-xs font-bold transition-colors ${
                 onlyGaps
                   ? "border-[color:var(--wtw-deep-gold)] bg-[color:var(--wtw-deep-gold)]/15 text-[color:var(--wtw-deep-gold)]"
                   : "border-border bg-card hover:bg-secondary"
@@ -208,7 +208,47 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
           {filtered.length} of {rows.length}
         </span>
       </div>
-      <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
+      {/* Cards on phones, sortable table from sm up. */}
+      <ul className="space-y-2 sm:hidden">
+        {table.getRowModel().rows.map((row) => {
+          const r = row.original;
+          return (
+            <li key={row.id}>
+              <Link
+                href={`/resources/${r.id}`}
+                className="block rounded-lg border border-border bg-card p-4 active:bg-secondary/40"
+              >
+                <p className="font-bold text-foreground">
+                  {r.organizationName}
+                </p>
+                {r.buckets.length === 0 ? (
+                  <p className="mt-1 text-xs font-bold text-[color:var(--wtw-deep-gold)]">
+                    {CLASSIFICATION_GAP_LABELS["no-buckets"]}
+                  </p>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {r.buckets.map((bucket) => (
+                      <span
+                        key={bucket}
+                        className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em]"
+                      >
+                        {BUCKET_LABELS[bucket]}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {r.contactName && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {r.contactName}
+                  </p>
+                )}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card sm:block">
         <table className="w-full min-w-[48rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -259,14 +299,12 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && (
-          <p className="border-t border-border p-6 text-center text-xs text-muted-foreground">
-            {query
-              ? `No matches for “${query}”.`
-              : "Every record is classified."}
-          </p>
-        )}
       </div>
+      {filtered.length === 0 && (
+        <p className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+          {query ? `No matches for “${query}”.` : "Every record is classified."}
+        </p>
+      )}
     </div>
   );
 }

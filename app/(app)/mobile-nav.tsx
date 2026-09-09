@@ -41,7 +41,7 @@ export function MobileNav({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card transition-colors hover:bg-secondary"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-border bg-card transition-colors hover:bg-secondary"
       >
         {open ? <CloseIcon /> : <MenuIcon />}
       </button>
@@ -78,7 +78,7 @@ export function MobileNav({
               <form action={signOutAction}>
                 <button
                   type="submit"
-                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
                 >
                   Sign out
                 </button>
