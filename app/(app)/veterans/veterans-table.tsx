@@ -119,8 +119,8 @@ export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
           {filtered.length} of {rows.length}
         </span>
       </div>
-      {/* Cards on phones, sortable table from sm up. */}
-      <ul className="space-y-2 sm:hidden">
+      {/* Cards on phones/tablets, sortable table on desktop. */}
+      <ul className="space-y-2 lg:hidden">
         {table.getRowModel().rows.map((row) => {
           const v = row.original;
           return (
@@ -151,7 +151,7 @@ export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
         })}
       </ul>
 
-      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card sm:block">
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
         <table className="w-full min-w-[36rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (
