@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
@@ -46,6 +47,18 @@ import {
   type VerificationStatus,
 } from "@/lib/schemas";
 import { z } from "zod";
+
+function tsToDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
+
+/** Later of the two, treating a null contact date as "never". */
+function maxDate(a: Date | null, b: Date): Date {
+  return a && a > b ? a : b;
+}
 
 /** How many candidates the review screen shows. */
 const SHORT_LIST = 8;
@@ -302,13 +315,15 @@ export async function runIntakeAction(
     outcomes: [],
     createdAt: now,
   });
-  if (eligibilityChanged) {
-    batch.update(docRef, {
-      ...updates,
-      updatedBy: session.uid,
-      updatedAt: now,
-    });
-  }
+  // An intake is a real contact whether or not it changed anything on file —
+  // it's a phone call that happened. Always move lastContactedAt forward, and
+  // fold in the eligibility updates when there are any.
+  batch.update(docRef, {
+    ...(eligibilityChanged ? updates : {}),
+    lastContactedAt: maxDate(tsToDate(existing.lastContactedAt), now),
+    updatedBy: session.uid,
+    updatedAt: now,
+  });
   await batch.commit();
 
   if (eligibilityDiff) {
@@ -493,6 +508,7 @@ export async function createReferralAction(
   batch.update(veteranRef, {
     conciergeStatus: "referred",
     followUpDue,
+    lastContactedAt: maxDate(tsToDate(existing.lastContactedAt), now),
     updatedBy: session.uid,
     updatedAt: now,
   });

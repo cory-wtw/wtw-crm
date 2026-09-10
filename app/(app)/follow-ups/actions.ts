@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { getResourcesByIds } from "@/lib/db/resources";
@@ -20,6 +21,18 @@ import {
   type FollowUpResult,
 } from "@/lib/schemas";
 import { stageVerification } from "@/lib/verifications";
+
+function tsToDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
+
+/** Later of the two, treating a null contact date as "never". */
+function maxDate(a: Date | null, b: Date): Date {
+  return a && a > b ? a : b;
+}
 
 const followUpInputSchema = z.object({
   /** The referral packet being closed out. */
@@ -222,6 +235,7 @@ export async function recordFollowUpAction(
   batch.update(veteranRef, {
     conciergeStatus: "closed",
     followUpDue: null,
+    lastContactedAt: maxDate(tsToDate(existing.lastContactedAt), now),
     updatedBy: session.uid,
     updatedAt: now,
   });

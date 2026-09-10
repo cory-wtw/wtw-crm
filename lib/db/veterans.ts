@@ -47,6 +47,7 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
         : (data.hasDependents ?? undefined),
     conciergeStatus: data.conciergeStatus ?? undefined,
     followUpDue: tsToDate(data.followUpDue),
+    lastContactedAt: tsToDate(data.lastContactedAt),
     assigneeUid: data.assigneeUid ?? null,
     pipelineStage: data.pipelineStage ?? "found",
     pipelineHistory: history.map(

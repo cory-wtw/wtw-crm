@@ -33,6 +33,7 @@ export default async function AuthenticatedLayout({
     ? [{ href: "/social", label: "Social" }]
     : [
         { href: "/veterans", label: "Veterans" },
+        { href: "/check-ins", label: "Check-ins" },
         { href: "/follow-ups", label: "Follow-ups" },
         { href: "/vsos", label: "VSOs" },
         { href: "/resources", label: "Resources" },

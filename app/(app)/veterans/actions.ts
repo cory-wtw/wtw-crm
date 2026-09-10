@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
@@ -19,6 +20,13 @@ import {
   pipelineStageSchema,
   veteranInputSchema,
 } from "@/lib/schemas";
+
+function tsToDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  return null;
+}
 
 function dropUndefined<T extends Record<string, unknown>>(
   obj: T,
@@ -101,6 +109,9 @@ export async function createVeteranAction(
     vsoIds: input.vsoIds ?? [],
     assigneeUid,
     assignedPhoneId: input.assignedPhoneId ?? null,
+    // Adding the record is itself the first contact — the check-in queue
+    // shouldn't come knocking the moment a veteran is found.
+    lastContactedAt: now,
     createdBy: session.uid,
     createdAt: now,
     updatedBy: session.uid,
@@ -300,14 +311,21 @@ export async function addEncounterAction(
     createdAt: now,
   });
 
-  const encounterRef = await adminDb
-    .collection("veterans")
-    .doc(veteranId)
-    .collection("encounters")
-    .add(data);
+  const veteranRef = adminDb.collection("veterans").doc(veteranId);
+  const veteranSnap = await veteranRef.get();
+  if (!veteranSnap.exists) return { ok: false, error: "Veteran not found." };
+  const existingLastContacted = tsToDate(veteranSnap.data()!.lastContactedAt);
 
-  // Touch the veteran's updatedAt so the list view bumps it to the top.
-  await adminDb.collection("veterans").doc(veteranId).update({
+  const encounterRef = await veteranRef.collection("encounters").add(data);
+
+  // Touch the veteran's updatedAt so the list view bumps it to the top, and
+  // move lastContactedAt forward — but never backward: a note backfilled
+  // about an older contact must not erase a more recent one just logged.
+  await veteranRef.update({
+    lastContactedAt:
+      existingLastContacted && existingLastContacted > input.occurredAt
+        ? existingLastContacted
+        : input.occurredAt,
     updatedAt: now,
     updatedBy: session.uid,
   });

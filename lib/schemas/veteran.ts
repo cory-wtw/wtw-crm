@@ -148,6 +148,13 @@ export const veteranSchema = z.object({
   conciergeStatus: conciergeStatusSchema.optional(),
   followUpDue: z.date().nullable().default(null),
 
+  // The standing check-in cadence, not the two-week referral follow-up above:
+  // this is when *any* contact — a call, a voicemail, an intake, a referral —
+  // was last logged, and it's what keeps a veteran from going quiet between
+  // referrals. Written by createVeteranAction and every action that logs an
+  // encounter; never typed into a form.
+  lastContactedAt: z.date().nullable().default(null),
+
   // Ownership
   assigneeUid: z.string().nullable().default(null),
 
@@ -227,6 +234,7 @@ export const veteranInputSchema = veteranSchema
     id: true,
     conciergeStatus: true,
     followUpDue: true,
+    lastContactedAt: true,
     pipelineHistory: true,
     dateFound: true,
     dateConnected: true,
