@@ -20,7 +20,7 @@ export default async function FollowUpPage({
   if (!veteran) notFound();
 
   const session = await getSession();
-  if (!canRecordFollowUp(session, veteran)) redirect("/follow-ups");
+  if (!canRecordFollowUp(session, veteran)) redirect("/outreach");
 
   const referral = await getLatestReferral(id);
   const shortName = formatShortName(veteran.firstName, veteran.lastInitial);
@@ -39,7 +39,7 @@ export default async function FollowUpPage({
           </p>
         </div>
         <Link
-          href="/follow-ups"
+          href="/outreach"
           className="text-sm font-bold text-muted-foreground hover:text-foreground"
         >
           Back to the queue

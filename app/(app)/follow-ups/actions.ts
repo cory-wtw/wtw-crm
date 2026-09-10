@@ -254,7 +254,7 @@ export async function recordFollowUpAction(
     },
   });
 
-  revalidatePath("/follow-ups");
+  revalidatePath("/outreach");
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath("/veterans");
 
