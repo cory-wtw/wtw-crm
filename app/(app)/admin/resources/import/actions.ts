@@ -9,6 +9,16 @@ import { canApproveImportedResource } from "@/lib/permissions";
 import { parseSeedResource, type SeedResource } from "@/lib/resource-import";
 import { resourceInputSchema } from "@/lib/schemas";
 
+function dropUndefined<T extends Record<string, unknown>>(
+  obj: T,
+): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
+}
+
 /**
  * The browser twin of scripts/seed-resources.ts.
  *
@@ -93,7 +103,7 @@ export async function importResourcesAction(
     }
 
     const existingId = await findByExternalId(mapped.externalId);
-    const shared = {
+    const shared = dropUndefined({
       ...validated.data,
       externalId: mapped.externalId,
       updatedBy: guard.session.uid,
@@ -104,7 +114,7 @@ export async function importResourcesAction(
       ...(validated.data.verificationStatus === "live"
         ? { lastVerified: now, lastVerifiedBy: guard.session.uid }
         : {}),
-    };
+    });
 
     if (existingId) {
       await adminDb.collection("resources").doc(existingId).update(shared);
