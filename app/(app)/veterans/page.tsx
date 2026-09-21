@@ -4,7 +4,13 @@ import {
   listVeterans,
   type VeteranListItem,
 } from "@/lib/db/veterans";
-import { PIPELINE_LABELS, type PipelineStage } from "@/lib/schemas";
+import { formatUsd } from "@/lib/format";
+import {
+  lifetimeBenefitsUnlocked,
+  monthlyBenefitLift,
+  PIPELINE_LABELS,
+  type PipelineStage,
+} from "@/lib/schemas";
 import { VeteransTable } from "./veterans-table";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +29,22 @@ export default async function VeteransPage() {
     countVeteransByStage(),
   ]);
   const total = STAGE_ORDER.reduce((sum, s) => sum + counts[s], 0);
+
+  const totalMonthlyLift = veterans.reduce(
+    (sum, v) =>
+      sum + monthlyBenefitLift(v.monthlyBenefitBefore, v.monthlyBenefitAfter),
+    0,
+  );
+  const totalLifetimeLift = veterans.reduce(
+    (sum, v) =>
+      sum +
+      (lifetimeBenefitsUnlocked(
+        v.monthlyBenefitBefore,
+        v.monthlyBenefitAfter,
+        v.birthYear,
+      ) ?? 0),
+    0,
+  );
 
   const rows: VeteranListItem[] = veterans.map((v) => ({
     id: v.id,
@@ -51,6 +73,30 @@ export default async function VeteransPage() {
           Add veteran
         </Link>
       </div>
+
+      <section>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
+          Impact
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Monthly benefits unlocked
+            </p>
+            <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+              {formatUsd(totalMonthlyLift)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              Est. lifetime benefits unlocked
+            </p>
+            <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+              {formatUsd(totalLifetimeLift)}
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section>
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
