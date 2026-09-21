@@ -66,6 +66,7 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     monthlyBenefitAfter: data.monthlyBenefitAfter ?? 0,
     vsoIds: data.vsoIds ?? [],
     assignedPhoneId: data.assignedPhoneId ?? null,
+    eight00ThreadId: data.eight00ThreadId ?? null,
     createdBy: data.createdBy ?? "",
     createdAt: tsToDate(data.createdAt) ?? new Date(),
     updatedBy: data.updatedBy ?? "",
