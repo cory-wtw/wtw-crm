@@ -6,6 +6,7 @@ import {
   ID_STATUS_LABELS,
   RECEIVING_VA_BENEFITS,
   RECEIVING_VA_BENEFITS_LABELS,
+  lifetimeBenefitsUnlocked,
   monthlyBenefitLift,
   veteranInputSchema,
 } from "..";
@@ -279,5 +280,30 @@ describe("eligibility keys", () => {
     for (const answer of DEPENDENTS_ANSWERS) {
       expect(DEPENDENTS_ANSWER_LABELS[answer]).toBeTruthy();
     }
+  });
+});
+
+describe("lifetimeBenefitsUnlocked", () => {
+  const thisYear = new Date().getFullYear();
+
+  it("returns null with no monthly lift", () => {
+    expect(lifetimeBenefitsUnlocked(1000, 1000, thisYear - 40)).toBeNull();
+  });
+
+  it("returns null with no birth year", () => {
+    expect(lifetimeBenefitsUnlocked(0, 1000, undefined)).toBeNull();
+  });
+
+  it("returns null once past the assumed life expectancy", () => {
+    expect(lifetimeBenefitsUnlocked(0, 1000, thisYear - 90)).toBeNull();
+  });
+
+  it("grows with a bigger lift and with more remaining years", () => {
+    const smallLift = lifetimeBenefitsUnlocked(0, 500, thisYear - 40);
+    const bigLift = lifetimeBenefitsUnlocked(0, 1500, thisYear - 40);
+    const youngerVet = lifetimeBenefitsUnlocked(0, 500, thisYear - 25);
+    expect(smallLift).toBeGreaterThan(0);
+    expect(bigLift).toBeGreaterThan(smallLift!);
+    expect(youngerVet).toBeGreaterThan(smallLift!);
   });
 });

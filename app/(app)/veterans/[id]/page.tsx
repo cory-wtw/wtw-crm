@@ -21,6 +21,7 @@ import {
   DISCHARGE_CHARACTER_LABELS,
   ENCOUNTER_TYPE_LABELS,
   ID_STATUS_LABELS,
+  lifetimeBenefitsUnlocked,
   monthlyBenefitLift,
   PIPELINE_LABELS,
   PREFERRED_CONTACT_LABELS,
@@ -80,6 +81,11 @@ export default async function VeteranDetailPage({
   const monthlyLift = monthlyBenefitLift(
     veteran.monthlyBenefitBefore,
     veteran.monthlyBenefitAfter,
+  );
+  const lifetimeLift = lifetimeBenefitsUnlocked(
+    veteran.monthlyBenefitBefore,
+    veteran.monthlyBenefitAfter,
+    veteran.birthYear,
   );
 
   return (
@@ -227,6 +233,10 @@ export default async function VeteranDetailPage({
         <Row
           label="WTW monthly impact"
           value={monthlyLift ? formatUsd(monthlyLift) : "—"}
+        />
+        <Row
+          label="Est. lifetime benefits unlocked"
+          value={lifetimeLift ? formatUsd(lifetimeLift) : "—"}
         />
       </Details>
 
