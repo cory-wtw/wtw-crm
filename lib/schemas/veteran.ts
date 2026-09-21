@@ -272,3 +272,32 @@ export function monthlyBenefitLift(
 ): number {
   return Math.max(0, (after ?? 0) - (before ?? 0));
 }
+
+/** Assumptions behind {@link lifetimeBenefitsUnlocked}. Planning estimates,
+ *  not VA figures — tune here if staff want a different assumption. */
+export const LIFE_EXPECTANCY_AGE = 78;
+export const ASSUMED_ANNUAL_COLA = 0.025;
+
+/**
+ * Rough lifetime-dollar estimate of WTW's monthly impact: the monthly lift
+ * projected out to an assumed life expectancy and grown by an assumed
+ * annual COLA. Deliberately built from just the before/after snapshot, not
+ * a rating history — it recomputes from whatever `monthlyBenefitAfter` is
+ * current, so it stays right as long as that field is kept up to date.
+ * Returns null when there's no birth year to project from or no lift yet.
+ */
+export function lifetimeBenefitsUnlocked(
+  before: number | undefined | null,
+  after: number | undefined | null,
+  birthYear: number | undefined | null,
+): number | null {
+  const lift = monthlyBenefitLift(before, after);
+  if (lift <= 0 || !birthYear) return null;
+
+  const remainingYears = LIFE_EXPECTANCY_AGE - (currentYear - birthYear);
+  if (remainingYears <= 0) return null;
+
+  const g = ASSUMED_ANNUAL_COLA;
+  const growthFactor = (Math.pow(1 + g, remainingYears) - 1) / g;
+  return Math.round(lift * 12 * growthFactor);
+}
