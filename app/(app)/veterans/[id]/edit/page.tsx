@@ -92,5 +92,6 @@ function veteranToFormValues(v: Veteran): VeteranFormInitial["values"] {
       : "",
     vsoIds: v.vsoIds,
     assignedPhoneId: v.assignedPhoneId ?? "",
+    eight00ThreadId: v.eight00ThreadId ?? "",
   };
 }

@@ -98,6 +98,16 @@ export default async function VeteranDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {veteran.eight00ThreadId && (
+            <a
+              href={`https://app.800.com/company/worth-their-weight/inbox/${veteran.eight00ThreadId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            >
+              Text on 800.com
+            </a>
+          )}
           {canIntake && (
             <Link
               href={`/veterans/${veteran.id}/intake`}

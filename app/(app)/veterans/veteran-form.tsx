@@ -69,6 +69,7 @@ const formSchema = z.object({
 
   vsoIds: z.array(z.string()),
   assignedPhoneId: z.string().optional(),
+  eight00ThreadId: z.string().optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -76,6 +77,15 @@ function toNumber(s: string | undefined): number | undefined {
   if (!s || !s.trim()) return undefined;
   const n = Number(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+// Accepts either a bare thread id or a full 800.com inbox URL pasted from the
+// browser bar, and stores just the id either way.
+function extractEight00ThreadId(s: string | undefined): string | null {
+  const trimmed = (s ?? "").trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/inbox\/(\d+)/);
+  return match ? match[1] : trimmed;
 }
 
 export function VeteranForm({
@@ -115,6 +125,7 @@ export function VeteranForm({
       monthlyBenefitAfter: "",
       vsoIds: [],
       assignedPhoneId: "",
+      eight00ThreadId: "",
       ...initial?.values,
     },
   });
@@ -148,6 +159,7 @@ export function VeteranForm({
       monthlyBenefitAfter: toNumber(values.monthlyBenefitAfter) ?? 0,
       vsoIds: values.vsoIds,
       assignedPhoneId: values.assignedPhoneId || null,
+      eight00ThreadId: extractEight00ThreadId(values.eight00ThreadId),
     };
 
     const result = initial
@@ -389,6 +401,11 @@ export function VeteranForm({
               ))}
             </Select>
           }
+        />
+        <Field
+          label="800.com text thread"
+          hint="Paste the thread's URL or just its id, e.g. https://app.800.com/company/worth-their-weight/inbox/82639336"
+          input={<Input {...register("eight00ThreadId")} />}
         />
       </Section>
 
