@@ -26,6 +26,21 @@ service firebase.storage {
       allow delete: if false;
     }
 
+    // Veteran attachments (DD-214s, VA letters, ID scans, etc). Files live
+    // under attachments/{veteranId}/{fileName}. Only CRM users (not the
+    // social-only role) can read/write, mirroring canAccessCrm in
+    // permissions.ts. Capped at 25 MB — mirrors ATTACHMENT_MAX_BYTES.
+    match /attachments/{veteranId}/{fileName=**} {
+      allow read: if signedIn() && request.auth.token.role != 'social';
+
+      allow write: if signedIn() &&
+                      request.auth.token.role != 'social' &&
+                      request.resource.size < 25 * 1024 * 1024;
+
+      // Deletes go through the Admin SDK. Block client-side deletes.
+      allow delete: if false;
+    }
+
     // Deny everything else.
     match /{allPaths=**} {
       allow read, write: if false;

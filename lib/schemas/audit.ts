@@ -28,6 +28,7 @@ export const RESOURCE_TYPES = [
   "media",
   "resource",
   "verification",
+  "attachment",
 ] as const;
 export const resourceTypeSchema = z.enum(RESOURCE_TYPES);
 export type ResourceType = z.infer<typeof resourceTypeSchema>;
@@ -42,6 +43,7 @@ export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
   media: "Media",
   resource: "Community Resource",
   verification: "Verification",
+  attachment: "Attachment",
 };
 
 export const auditDiffEntrySchema = z.object({

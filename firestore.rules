@@ -99,6 +99,15 @@ service cloud.firestore {
                         resource.data.createdBy == request.auth.uid);
     }
 
+    match /attachments/{id} {
+      // Files attached to a veteran's record. Same CRM-access gate as the
+      // veteran collection itself — social-only users can't reach these.
+      // In practice every write goes through the Admin SDK in Server
+      // Actions; this is belt-and-suspenders.
+      allow read, create, update: if canAccessCrm();
+      allow delete: if canAccessCrm();
+    }
+
     match /verifications/{id} {
       // Append-only log of resource verification checks. Written only by the
       // server (Admin SDK), in the same batch as the resource status change it
