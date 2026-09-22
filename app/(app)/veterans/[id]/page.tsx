@@ -6,6 +6,7 @@ import {
   canEditVeteran,
   canRunIntake,
 } from "@/lib/permissions";
+import { listAttachmentsForVeteran } from "@/lib/db/attachments";
 import { listEncounters } from "@/lib/db/encounters";
 import { getPhone } from "@/lib/db/phones";
 import { getUser, listUsers } from "@/lib/db/users";
@@ -13,6 +14,7 @@ import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
 import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
+import { Attachments } from "./attachments";
 import { DeleteVeteranButton } from "./delete-veteran-button";
 import {
   BUCKET_LABELS,
@@ -52,7 +54,7 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, vsos, phone, encounters, allUsers, session] =
+  const [assignee, vsos, phone, encounters, allUsers, session, attachments] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
       getVsosByIds(veteran.vsoIds),
@@ -62,6 +64,7 @@ export default async function VeteranDetailPage({
       listEncounters(veteran.id),
       listUsers(),
       getSession(),
+      listAttachmentsForVeteran(veteran.id),
     ]);
 
   const shortName = formatShortName(veteran.firstName, veteran.lastInitial);
@@ -400,6 +403,20 @@ export default async function VeteranDetailPage({
           </ol>
         )}
       </section>
+
+      <Attachments
+        veteranId={veteran.id}
+        canManage={canEdit}
+        items={attachments.map((a) => ({
+          id: a.id,
+          name: a.name,
+          fileName: a.fileName,
+          downloadUrl: a.downloadUrl,
+          contentType: a.contentType,
+          sizeBytes: a.sizeBytes,
+          createdAtIso: a.createdAt.toISOString(),
+        }))}
+      />
     </div>
   );
 }
