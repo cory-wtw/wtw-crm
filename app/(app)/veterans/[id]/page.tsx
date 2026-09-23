@@ -410,9 +410,7 @@ export default async function VeteranDetailPage({
         items={attachments.map((a) => ({
           id: a.id,
           name: a.name,
-          fileName: a.fileName,
           downloadUrl: a.downloadUrl,
-          contentType: a.contentType,
           sizeBytes: a.sizeBytes,
           createdAtIso: a.createdAt.toISOString(),
         }))}
