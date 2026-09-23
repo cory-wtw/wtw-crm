@@ -17,6 +17,7 @@
     "enrich-urls": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/enrich-urls.ts",
     "seed-resources": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/seed-resources.ts",
     "purge-orgs": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/purge-orgs.ts",
+    "backfill-attachment-pdfs": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/backfill-attachment-pdfs.ts",
     "deploy-rules": "firebase deploy --only firestore:rules,storage --project=wtw-crm-31aef"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "firebase-functions": "^7.2.5",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
+    "pdf-lib": "^1.17.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.75.0",
@@ -46,6 +48,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4",
     "tsx": "^4.22.0",
     "typescript": "^5",

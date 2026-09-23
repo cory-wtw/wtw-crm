@@ -9,6 +9,7 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase/client";
+import { convertToPdf, isConvertibleFile } from "@/lib/pdf-convert";
 import { ATTACHMENT_MAX_BYTES } from "@/lib/schemas";
 import {
   createAttachmentAction,
@@ -19,9 +20,7 @@ import {
 export type AttachmentRow = {
   id: string;
   name: string;
-  fileName: string;
   downloadUrl: string;
-  contentType: string;
   sizeBytes: number;
   createdAtIso: string;
 };
@@ -56,19 +55,29 @@ export function Attachments({
 
   return (
     <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-      <div className="mb-4 flex items-baseline justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
           Files ({items.length})
         </h2>
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => setUploading((v) => !v)}
-            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
-          >
-            {uploading ? "Cancel" : "Add file"}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {items.length > 1 && (
+            <a
+              href={`/api/veterans/${veteranId}/attachments/packet`}
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            >
+              Download all
+            </a>
+          )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setUploading((v) => !v)}
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            >
+              {uploading ? "Cancel" : "Add file"}
+            </button>
+          )}
+        </div>
       </div>
 
       {uploading && (
@@ -112,6 +121,7 @@ function UploadForm({
   const [uid, setUid] = useState<string | null>(auth.currentUser?.uid ?? null);
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
+  const [converting, setConverting] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -121,6 +131,12 @@ function UploadForm({
   }, []);
 
   function onFileChange(f: File | null) {
+    setError(null);
+    if (f && !isConvertibleFile(f)) {
+      setFile(null);
+      setError("Only images and PDFs are supported.");
+      return;
+    }
     setFile(f);
     if (f && !name.trim()) {
       setName(f.name.replace(/\.[^./\\]+$/, ""));
@@ -135,10 +151,6 @@ function UploadForm({
       setError("Choose a file first.");
       return;
     }
-    if (file.size > ATTACHMENT_MAX_BYTES) {
-      setError("That file is larger than the 25 MB limit.");
-      return;
-    }
     if (!name.trim()) {
       setError("Give the file a name.");
       return;
@@ -149,16 +161,33 @@ function UploadForm({
     }
 
     setBusy(true);
-    setProgress(0);
-
-    const path = `attachments/${veteranId}/${Date.now()}-${crypto.randomUUID()}-${sanitize(
-      file.name,
-    )}`;
+    setConverting(true);
 
     try {
-      const task = uploadBytesResumable(storageRef(storage, path), file, {
-        contentType: file.type || "application/octet-stream",
-      });
+      const pdfBytes = await convertToPdf(file);
+      setConverting(false);
+
+      if (pdfBytes.byteLength > ATTACHMENT_MAX_BYTES) {
+        setError("That file is larger than the 25 MB limit, even after conversion.");
+        setBusy(false);
+        return;
+      }
+
+      setProgress(0);
+
+      const path = `attachments/${veteranId}/${Date.now()}-${crypto.randomUUID()}-${sanitize(
+        name.trim(),
+      )}.pdf`;
+
+      const pdfArrayBuffer = pdfBytes.buffer.slice(
+        pdfBytes.byteOffset,
+        pdfBytes.byteOffset + pdfBytes.byteLength,
+      ) as ArrayBuffer;
+      const task = uploadBytesResumable(
+        storageRef(storage, path),
+        new Blob([pdfArrayBuffer], { type: "application/pdf" }),
+        { contentType: "application/pdf" },
+      );
 
       const downloadUrl = await new Promise<string>((resolve, reject) => {
         task.on(
@@ -176,9 +205,9 @@ function UploadForm({
         veteranId,
         storagePath: path,
         downloadUrl,
-        contentType: file.type || "application/octet-stream",
-        sizeBytes: file.size,
-        fileName: file.name,
+        contentType: "application/pdf",
+        sizeBytes: pdfBytes.byteLength,
+        fileName: `${sanitize(name.trim())}.pdf`,
         name: name.trim(),
       });
 
@@ -200,6 +229,7 @@ function UploadForm({
       setError(
         err instanceof Error ? err.message : "Upload failed. Try again.",
       );
+      setConverting(false);
       setBusy(false);
       setProgress(null);
     }
@@ -217,10 +247,13 @@ function UploadForm({
         <input
           ref={fileInput}
           type="file"
+          accept="image/*,application/pdf"
           onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
           className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:py-2 file:text-sm file:font-bold"
         />
-        <p className="text-[11px] text-muted-foreground">Up to 25 MB.</p>
+        <p className="text-[11px] text-muted-foreground">
+          Images and PDFs only, up to 25 MB. Images are saved as PDFs.
+        </p>
       </div>
 
       <div className="space-y-1">
@@ -235,6 +268,10 @@ function UploadForm({
           className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
         />
       </div>
+
+      {converting && (
+        <p className="text-[11px] text-muted-foreground">Converting…</p>
+      )}
 
       {progress != null && (
         <div className="space-y-1">
@@ -257,7 +294,7 @@ function UploadForm({
         disabled={busy}
         className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
       >
-        {busy ? "Uploading…" : "Upload"}
+        {converting ? "Converting…" : busy ? "Uploading…" : "Upload"}
       </button>
     </form>
   );
@@ -353,29 +390,38 @@ function AttachmentItem({
           </a>
         )}
 
-        {canManage && !editing && (
+        {!editing && (
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
+            <a
+              href={`/api/veterans/${veteranId}/attachments/${item.id}`}
               className="text-xs font-bold text-muted-foreground hover:text-foreground"
             >
-              Rename
-            </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={busy}
-              className="text-xs font-bold text-destructive hover:underline disabled:opacity-50"
-            >
-              Delete
-            </button>
+              Download
+            </a>
+            {canManage && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="text-xs font-bold text-muted-foreground hover:text-foreground"
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={busy}
+                  className="text-xs font-bold text-destructive hover:underline disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
       <p className="text-[11px] text-muted-foreground">
-        {item.fileName} · {formatSize(item.sizeBytes)} ·{" "}
-        {dateFmt.format(new Date(item.createdAtIso))}
+        {formatSize(item.sizeBytes)} · {dateFmt.format(new Date(item.createdAtIso))}
       </p>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </li>
