@@ -1,19 +1,33 @@
 /**
- * Builds the link behind the "Send claim guide" button: an `sms:` or
- * `mailto:` URL with the guide's link already written into the message.
+ * Works out what the "Send claim guide" button does for a veteran.
  *
- * Nothing here sends anything — the link opens the staff member's own
- * texting or mail app, prefilled, and they hit send. The guide itself is
- * hosted wherever CLAIM_GUIDE_URL points (a shared Drive link, a Storage
- * URL); it has to be publicly reachable because the veteran has no login.
+ * Nothing here sends anything. For texting, the button copies the message
+ * and opens the veteran's 800.com thread so staff paste and send from the
+ * company number, never a personal phone. For email-preferred veterans it
+ * opens a prefilled email. The guide itself is hosted wherever
+ * CLAIM_GUIDE_URL points (a shared Drive link, a Storage URL); it has to
+ * be publicly reachable because the veteran has no login.
  */
+
+const EIGHT00_INBOX = "https://app.800.com/company/worth-their-weight/inbox";
 
 export type ClaimGuideContact = {
   firstName: string;
   preferredContact: "phone" | "email";
   phone?: string;
   email?: string;
+  eight00ThreadId?: string | null;
 };
+
+export type ClaimGuideSend =
+  | { kind: "eight00"; message: string; url: string }
+  | { kind: "email"; href: string };
+
+/** The veteran's 800.com thread, or the inbox when no thread is linked. */
+export function eight00Url(threadId?: string | null): string {
+  const id = threadId?.trim();
+  return id ? `${EIGHT00_INBOX}/${id}` : EIGHT00_INBOX;
+}
 
 export function claimGuideMessage(firstName: string, guideUrl: string): string {
   const greeting = firstName.trim() ? `Hi ${firstName.trim()}, ` : "Hi, ";
@@ -24,27 +38,27 @@ export function claimGuideMessage(firstName: string, guideUrl: string): string {
 }
 
 /**
- * Returns null when there's no guide configured or no usable contact, so
- * the caller can simply not render the button.
+ * Returns null when there's no guide configured or no way to reach the
+ * veteran, so the caller can simply not render the button.
  */
-export function claimGuideHref(
+export function claimGuideSend(
   contact: ClaimGuideContact,
   guideUrl: string | undefined,
-): string | null {
+): ClaimGuideSend | null {
   const url = guideUrl?.trim();
   if (!url) return null;
-  const body = claimGuideMessage(contact.firstName, url);
+  const message = claimGuideMessage(contact.firstName, url);
 
   if (contact.preferredContact === "email") {
     const email = contact.email?.trim();
     if (!email) return null;
     const subject = "Your VA claim self-guide";
-    return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return {
+      kind: "email",
+      href: `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`,
+    };
   }
 
-  // Keep a leading + for international numbers; drop spaces, dashes, parens.
-  const phone = contact.phone?.trim().replace(/(?!^\+)[^\d]/g, "") ?? "";
-  if (!phone.replace("+", "")) return null;
-  // `?&body=` is the form both iOS and Android Messages accept.
-  return `sms:${phone}?&body=${encodeURIComponent(body)}`;
+  if (!contact.phone?.trim() && !contact.eight00ThreadId?.trim()) return null;
+  return { kind: "eight00", message, url: eight00Url(contact.eight00ThreadId) };
 }

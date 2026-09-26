@@ -1,45 +1,55 @@
 import { describe, expect, it } from "vitest";
-import { claimGuideHref, claimGuideMessage } from "./claim-guide";
+import { claimGuideMessage, claimGuideSend, eight00Url } from "./claim-guide";
 
 const GUIDE = "https://example.com/guide.pdf";
 
-describe("claimGuideHref", () => {
-  it("builds a prefilled sms link for phone contacts", () => {
-    const href = claimGuideHref(
-      { firstName: "Sam", preferredContact: "phone", phone: "(423) 555-0100" },
-      GUIDE,
-    );
-    expect(href).toBe(
-      `sms:4235550100?&body=${encodeURIComponent(claimGuideMessage("Sam", GUIDE))}`,
-    );
+describe("claimGuideSend", () => {
+  it("opens the veteran's 800.com thread for phone contacts", () => {
+    expect(
+      claimGuideSend(
+        {
+          firstName: "Sam",
+          preferredContact: "phone",
+          phone: "4235550100",
+          eight00ThreadId: "abc123",
+        },
+        GUIDE,
+      ),
+    ).toEqual({
+      kind: "eight00",
+      message: claimGuideMessage("Sam", GUIDE),
+      url: eight00Url("abc123"),
+    });
   });
 
-  it("keeps a leading + on the number", () => {
-    const href = claimGuideHref(
-      { firstName: "Sam", preferredContact: "phone", phone: "+1 423-555-0100" },
+  it("falls back to the 800.com inbox when no thread is linked", () => {
+    const send = claimGuideSend(
+      { firstName: "Sam", preferredContact: "phone", phone: "4235550100" },
       GUIDE,
     );
-    expect(href?.startsWith("sms:+14235550100?")).toBe(true);
+    expect(send).toMatchObject({ kind: "eight00", url: eight00Url() });
   });
 
   it("builds a mailto link for email contacts", () => {
-    const href = claimGuideHref(
+    const send = claimGuideSend(
       { firstName: "Sam", preferredContact: "email", email: "sam@example.com" },
       GUIDE,
     );
-    expect(href?.startsWith("mailto:sam@example.com?subject=")).toBe(true);
-    expect(href).toContain(encodeURIComponent(GUIDE));
+    expect(send?.kind).toBe("email");
+    if (send?.kind !== "email") return;
+    expect(send.href.startsWith("mailto:sam@example.com?subject=")).toBe(true);
+    expect(send.href).toContain(encodeURIComponent(GUIDE));
   });
 
   it("returns null without a guide url or contact", () => {
     expect(
-      claimGuideHref({ firstName: "Sam", preferredContact: "phone", phone: "4235550100" }, ""),
+      claimGuideSend({ firstName: "Sam", preferredContact: "phone", phone: "4235550100" }, ""),
     ).toBeNull();
     expect(
-      claimGuideHref({ firstName: "Sam", preferredContact: "phone", phone: "" }, GUIDE),
+      claimGuideSend({ firstName: "Sam", preferredContact: "phone", phone: "" }, GUIDE),
     ).toBeNull();
     expect(
-      claimGuideHref({ firstName: "Sam", preferredContact: "email" }, GUIDE),
+      claimGuideSend({ firstName: "Sam", preferredContact: "email" }, GUIDE),
     ).toBeNull();
   });
 });
