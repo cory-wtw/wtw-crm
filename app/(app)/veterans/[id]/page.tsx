@@ -12,6 +12,7 @@ import { getPhone } from "@/lib/db/phones";
 import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
+import { claimGuideHref } from "@/lib/claim-guide";
 import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { Attachments } from "./attachments";
@@ -68,6 +69,7 @@ export default async function VeteranDetailPage({
     ]);
 
   const shortName = formatShortName(veteran.firstName, veteran.lastInitial);
+  const claimGuideLink = claimGuideHref(veteran, process.env.CLAIM_GUIDE_URL);
 
   const canEdit = canEditVeteran(session, veteran);
   const canDelete = canDeleteVeteran(session);
@@ -302,7 +304,15 @@ export default async function VeteranDetailPage({
           <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
             Encounters ({encounters.length})
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {claimGuideLink && (
+              <a
+                href={claimGuideLink}
+                className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+              >
+                Send claim guide
+              </a>
+            )}
             {veteran.eight00ThreadId && (
               <a
                 href={`https://app.800.com/company/worth-their-weight/inbox/${veteran.eight00ThreadId}`}
