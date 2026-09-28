@@ -1,47 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatShortName, splitFullName } from "./name";
-
-describe("splitFullName", () => {
-  it("splits a simple first + last name", () => {
-    expect(splitFullName("John Doe")).toEqual({
-      firstName: "John",
-      lastInitial: "D",
-    });
-  });
-
-  it("upper-cases the last initial", () => {
-    expect(splitFullName("john doe")).toEqual({
-      firstName: "john",
-      lastInitial: "D",
-    });
-  });
-
-  it("uses the last token for the initial on multi-word names", () => {
-    expect(splitFullName("Mary Jo Van Halen")).toEqual({
-      firstName: "Mary",
-      lastInitial: "H",
-    });
-  });
-
-  it("handles a single-word name with no initial", () => {
-    expect(splitFullName("Cher")).toEqual({
-      firstName: "Cher",
-      lastInitial: "",
-    });
-  });
-
-  it("collapses extra whitespace", () => {
-    expect(splitFullName("  John   Doe  ")).toEqual({
-      firstName: "John",
-      lastInitial: "D",
-    });
-  });
-
-  it("returns empties for a blank string", () => {
-    expect(splitFullName("")).toEqual({ firstName: "", lastInitial: "" });
-    expect(splitFullName("   ")).toEqual({ firstName: "", lastInitial: "" });
-  });
-});
+import { formatShortName } from "./name";
 
 describe("formatShortName", () => {
   it("formats first name + initial", () => {

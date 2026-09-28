@@ -99,10 +99,9 @@ benefit, nothing more.
 > Note: income, household size, dependent status, branch, discharge status,
 > service dates, housing status, and free-text notes were removed in the
 > data-minimization pass, along with the separate life/service **intake**
-> feature (see `scripts/migrate-data-minimization.ts`). A later pass replaced
-> the rate-code/life-expectancy/lifetime projection with the two plain
-> `monthlyBenefit*` figures and deleted the VA `rateTable` subsystem (see
-> `scripts/migrate-benefits-model.ts`). Impact = after − before.
+> feature. A later pass replaced the rate-code/life-expectancy/lifetime
+> projection with the two plain `monthlyBenefit*` figures and deleted the VA
+> `rateTable` subsystem. Impact = after − before.
 
 ### `veterans/{id}/encounters` (subcollection)
 Every interaction with a veteran — replaces the AirTable encounter form.
