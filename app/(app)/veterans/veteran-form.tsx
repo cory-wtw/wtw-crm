@@ -134,15 +134,13 @@ export function VeteranForm({
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
-    // Store only the preferred contact channel — the other is left blank so
-    // we never keep both a phone and an email on the same record.
-    const usePhone = values.preferredContact === "phone";
     const input = {
       firstName: values.firstName,
       lastInitial: (values.lastInitial || "").toUpperCase(),
       preferredContact: values.preferredContact,
-      phone: usePhone ? values.phone || undefined : "",
-      email: !usePhone ? values.email || undefined : "",
+      // "" rather than undefined so clearing a field actually clears it.
+      phone: (values.phone ?? "").trim(),
+      email: (values.email ?? "").trim(),
       birthYear: toNumber(values.birthYear),
       city: values.city || undefined,
       state: values.state || undefined,
@@ -195,7 +193,7 @@ export function VeteranForm({
       <Section title="Contact">
         <Field
           label="Preferred contact method"
-          hint="We keep only this one channel on file."
+          hint="The one we reach them on first. The other is optional."
           input={
             <Select {...register("preferredContact")}>
               {PREFERRED_CONTACT_METHODS.map((m) => (
@@ -206,19 +204,16 @@ export function VeteranForm({
             </Select>
           }
         />
-        {preferredContact === "phone" ? (
-          <Field
-            label="Phone"
-            error={errors.phone?.message}
-            input={<Input type="tel" {...register("phone")} />}
-          />
-        ) : (
-          <Field
-            label="Email"
-            error={errors.email?.message}
-            input={<Input type="email" {...register("email")} />}
-          />
-        )}
+        <Field
+          label={preferredContact === "phone" ? "Phone" : "Phone (optional)"}
+          error={errors.phone?.message}
+          input={<Input type="tel" {...register("phone")} />}
+        />
+        <Field
+          label={preferredContact === "email" ? "Email" : "Email (optional)"}
+          error={errors.email?.message}
+          input={<Input type="email" {...register("email")} />}
+        />
       </Section>
 
       <Section title="Demographics">

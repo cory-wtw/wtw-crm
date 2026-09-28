@@ -100,7 +100,7 @@ describe("veteranInputSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects storing both a phone and an email", () => {
+  it("accepts a record with both a phone and an email", () => {
     const result = veteranInputSchema.safeParse({
       firstName: "Test",
       preferredContact: "phone",
@@ -108,12 +108,7 @@ describe("veteranInputSchema", () => {
       email: "vet@example.com",
       pipelineStage: "found",
     });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.some((i) => i.path[0] === "email")).toBe(
-        true,
-      );
-    }
+    expect(result.success).toBe(true);
   });
 
   it("rejects an invalid email", () => {

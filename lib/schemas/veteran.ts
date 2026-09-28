@@ -5,9 +5,8 @@ import {
   pipelineStageSchema,
 } from "./pipeline";
 
-// How a veteran prefers to be reached. We store exactly one channel per
-// veteran (data minimization): whichever they choose is the only contact
-// value kept on the record.
+// How a veteran prefers to be reached. The preferred channel is required;
+// the other is optional and kept only when the veteran gives it.
 export const PREFERRED_CONTACT_METHODS = ["phone", "email"] as const;
 export const preferredContactSchema = z.enum(PREFERRED_CONTACT_METHODS);
 export type PreferredContact = z.infer<typeof preferredContactSchema>;
@@ -112,8 +111,8 @@ export const veteranSchema = z.object({
     .optional()
     .or(z.literal("")),
 
-  // Contact — one channel only. `preferredContact` says which of phone/email
-  // is on file; the matching field below holds the value, the other is blank.
+  // Contact. `preferredContact` says which of phone/email to reach them on;
+  // that field must hold a value, the other is optional.
   preferredContact: preferredContactSchema.default("phone"),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
@@ -189,46 +188,26 @@ export const veteranSchema = z.object({
 export type Veteran = z.infer<typeof veteranSchema>;
 
 /**
- * Enforce the "one contact channel only" rule: the preferred channel must
- * carry a value and the other must be blank. Shared by the input schema so
- * both create and edit reject a record that stores both phone and email.
+ * The preferred channel must carry a value. The other channel is optional:
+ * some veterans give both, and we keep it when they do.
  */
-function refineSingleContact(
+function refinePreferredContact(
   data: { preferredContact: PreferredContact; phone?: string; email?: string },
   ctx: z.RefinementCtx,
 ): void {
-  const phone = data.phone?.trim() ?? "";
-  const email = data.email?.trim() ?? "";
-  if (data.preferredContact === "phone") {
-    if (!phone) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["phone"],
-        message: "Add a phone number, or switch the preferred method to email.",
-      });
-    }
-    if (email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["email"],
-        message: "Only the preferred contact is stored. Clear the email.",
-      });
-    }
-  } else {
-    if (!email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["email"],
-        message: "Add an email, or switch the preferred method to phone.",
-      });
-    }
-    if (phone) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["phone"],
-        message: "Only the preferred contact is stored. Clear the phone.",
-      });
-    }
+  if (data.preferredContact === "phone" && !data.phone?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["phone"],
+      message: "Add a phone number, or switch the preferred method to email.",
+    });
+  }
+  if (data.preferredContact === "email" && !data.email?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["email"],
+      message: "Add an email, or switch the preferred method to phone.",
+    });
   }
 }
 
@@ -261,7 +240,7 @@ export const veteranInputSchema = veteranSchema
     idStatus: idStatusSchema.nullish(),
     hasDependents: dependentsAnswerSchema.nullish(),
   })
-  .superRefine(refineSingleContact);
+  .superRefine(refinePreferredContact);
 export type VeteranInput = z.infer<typeof veteranInputSchema>;
 
 /** WTW's monthly impact for a veteran: what they get now minus what they got

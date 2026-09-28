@@ -70,7 +70,11 @@ export default async function VeteranDetailPage({
     ]);
 
   const shortName = formatShortName(veteran.firstName, veteran.lastInitial);
-  const claimGuide = claimGuideSend(veteran, process.env.CLAIM_GUIDE_URL);
+  const claimGuide = claimGuideSend(
+    veteran,
+    process.env.CLAIM_GUIDE_URL,
+    session?.email,
+  );
 
   const canEdit = canEditVeteran(session, veteran);
   const canDelete = canDeleteVeteran(session);
@@ -140,14 +144,8 @@ export default async function VeteranDetailPage({
           label="Preferred contact"
           value={PREFERRED_CONTACT_LABELS[veteran.preferredContact]}
         />
-        <Row
-          label={veteran.preferredContact === "email" ? "Email" : "Phone"}
-          value={
-            veteran.preferredContact === "email"
-              ? veteran.email
-              : veteran.phone
-          }
-        />
+        <Row label="Phone" value={veteran.phone || null} />
+        <Row label="Email" value={veteran.email || null} />
         <Row
           label="Birth year"
           value={veteran.birthYear?.toString() ?? null}

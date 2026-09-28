@@ -30,7 +30,12 @@ export function SendClaimGuideButton({ send }: { send: ClaimGuideSend }) {
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-1">
         {send.kind === "email" ? (
-          <a href={send.href} className={BUTTON}>
+          <a
+            href={send.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={BUTTON}
+          >
             Send claim guide
           </a>
         ) : (
@@ -103,8 +108,10 @@ function HelpPopover({ kind }: { kind: ClaimGuideSend["kind"] }) {
             </ol>
           ) : (
             <p className="text-muted-foreground">
-              This veteran prefers email. Tapping the button opens a new email
-              with the guide link already written in. Review it and hit send.
+              This veteran prefers email. Tapping the button opens Gmail in a
+              new tab with the email already written, from the Google account
+              you use for the CRM. Review it and hit send; it goes out from
+              your Gmail and shows up in your Sent folder.
             </p>
           )}
           <p className="mt-2 text-[11px] text-muted-foreground">

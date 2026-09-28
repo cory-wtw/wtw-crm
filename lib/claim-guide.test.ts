@@ -30,15 +30,20 @@ describe("claimGuideSend", () => {
     expect(send).toMatchObject({ kind: "eight00", url: eight00Url() });
   });
 
-  it("builds a mailto link for email contacts", () => {
+  it("opens Gmail compose from the staff member's account for email contacts", () => {
     const send = claimGuideSend(
       { firstName: "Sam", preferredContact: "email", email: "sam@example.com" },
       GUIDE,
+      "cory@worththeirweight.org",
     );
     expect(send?.kind).toBe("email");
     if (send?.kind !== "email") return;
-    expect(send.href.startsWith("mailto:sam@example.com?subject=")).toBe(true);
-    expect(send.href).toContain(encodeURIComponent(GUIDE));
+    const url = new URL(send.href);
+    expect(url.origin + url.pathname).toBe("https://mail.google.com/mail/");
+    expect(url.searchParams.get("view")).toBe("cm");
+    expect(url.searchParams.get("to")).toBe("sam@example.com");
+    expect(url.searchParams.get("authuser")).toBe("cory@worththeirweight.org");
+    expect(url.searchParams.get("body")).toBe(claimGuideMessage("Sam", GUIDE));
   });
 
   it("returns null without a guide url or contact", () => {
