@@ -92,7 +92,6 @@ benefit, nothing more.
 | `monthlyBenefitBefore` | number | monthly VA benefit ($) before WTW — usually 0 |
 | `monthlyBenefitAfter` | number | monthly VA benefit ($) after we connected them |
 | `vsoIds` | string[] | linked VSO partners |
-| `assignedPhoneId` | string | linked Straight Talk loaner |
 | `createdBy`, `createdAt` | | |
 | `updatedBy`, `updatedAt` | | |
 
@@ -166,8 +165,7 @@ Audit log entries are written by Cloud Functions triggers on every relevant coll
 | Reassign veteran | ✅ | ❌ |
 | View VSO rolodex | ✅ | ✅ |
 | Create/edit VSO | ✅ | ✅ |
-| Create/edit phone | ✅ | ✅ |
-| Delete VSO / phone | ✅ | ❌ |
+| Delete VSO | ✅ | ❌ |
 | View audit log | ✅ | ❌ |
 | Manage users | ✅ | ❌ |
 

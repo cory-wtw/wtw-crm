@@ -12,9 +12,9 @@ import { dependentsAnswerSchema, idStatusSchema } from "./veteran";
  * Referrals and follow-ups are encounters rather than collections of their own:
  * the timeline on a veteran record is already the single history of everything
  * that happened to them, and a separate `matches` collection would mean a
- * foreign key nobody maintains. This codebase already carries two of those
- * (`vso.referralsMade` never increments, `phone.assignedVeteranId` never
- * syncs); a third would compound the weakness rather than isolate it.
+ * foreign key nobody maintains. This codebase already carries one of those
+ * (`vso.referralsMade` never increments); a second would compound the
+ * weakness rather than isolate it.
  */
 export const ENCOUNTER_TYPES = [
   "note",

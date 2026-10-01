@@ -5,7 +5,6 @@ import {
   canDeleteMedia,
   canDeleteVeteran,
   canEditMedia,
-  canEditPhone,
   canEditVeteran,
   canApproveImportedResource,
   canCreateReferral,
@@ -81,16 +80,13 @@ describe("canReassignVeteran / canDeleteVeteran", () => {
   });
 });
 
-describe("canEditVso / canEditPhone", () => {
+describe("canEditVso", () => {
   it("allows anyone signed in", () => {
     expect(canEditVso(ADMIN)).toBe(true);
     expect(canEditVso(STANDARD_A)).toBe(true);
-    expect(canEditPhone(ADMIN)).toBe(true);
-    expect(canEditPhone(STANDARD_A)).toBe(true);
   });
   it("blocks not-signed-in", () => {
     expect(canEditVso(null)).toBe(false);
-    expect(canEditPhone(null)).toBe(false);
   });
 });
 
@@ -123,7 +119,6 @@ describe("social role", () => {
     expect(canCreateVeteran(SOCIAL)).toBe(false);
     expect(canEditVeteran(SOCIAL, VET_A)).toBe(false);
     expect(canEditVso(SOCIAL)).toBe(false);
-    expect(canEditPhone(SOCIAL)).toBe(false);
     expect(canManageUsers(SOCIAL)).toBe(false);
     expect(canViewAuditLog(SOCIAL)).toBe(false);
     expect(canReassignVeteran(SOCIAL)).toBe(false);

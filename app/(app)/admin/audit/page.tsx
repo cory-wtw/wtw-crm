@@ -25,8 +25,6 @@ function resourceLink(type: ResourceType, id: string): string | null {
       return `/veterans/${id}`;
     case "vso":
       return `/vsos/${id}`;
-    case "phone":
-      return `/phones/${id}`;
     case "encounter": {
       // resourceId is "<veteranId>/<encounterId>"; link to the veteran.
       const slash = id.indexOf("/");

@@ -1,7 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { canEditVeteran, canReassignVeteran } from "@/lib/permissions";
-import { listPhones } from "@/lib/db/phones";
 import { listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { listVsos } from "@/lib/db/vsos";
@@ -26,11 +25,7 @@ export default async function EditVeteranPage({
   }
   const canReassign = canReassignVeteran(session);
 
-  const [users, vsos, phones] = await Promise.all([
-    listUsers(),
-    listVsos(),
-    listPhones(),
-  ]);
+  const [users, vsos] = await Promise.all([listUsers(), listVsos()]);
 
   return (
     <div className="space-y-6">
@@ -56,10 +51,6 @@ export default async function EditVeteranPage({
           label: v.affiliation
             ? `${v.fullName} (${v.affiliation})`
             : v.fullName,
-        }))}
-        phones={phones.map((p) => ({
-          id: p.id,
-          label: p.imeiSerial ? `${p.name} · ${p.imeiSerial}` : p.name,
         }))}
       />
     </div>
@@ -91,7 +82,6 @@ function veteranToFormValues(v: Veteran): VeteranFormInitial["values"] {
       ? v.monthlyBenefitAfter.toString()
       : "",
     vsoIds: v.vsoIds,
-    assignedPhoneId: v.assignedPhoneId ?? "",
     eight00ThreadId: v.eight00ThreadId ?? "",
   };
 }

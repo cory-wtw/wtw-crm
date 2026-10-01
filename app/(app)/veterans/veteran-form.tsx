@@ -23,7 +23,6 @@ import { createVeteranAction, editVeteranAction } from "./actions";
 
 export type AssigneeOption = { uid: string; label: string };
 export type VsoOption = { id: string; label: string };
-export type PhoneOption = { id: string; label: string };
 
 export type VeteranFormInitial = {
   id: string;
@@ -37,7 +36,6 @@ type Props = {
   canReassign: boolean;
   assignees: AssigneeOption[];
   vsos: VsoOption[];
-  phones: PhoneOption[];
 };
 
 // Form values are strings so empty inputs are easy to detect; we coerce
@@ -68,7 +66,6 @@ const formSchema = z.object({
   monthlyBenefitAfter: z.string().optional(),
 
   vsoIds: z.array(z.string()),
-  assignedPhoneId: z.string().optional(),
   eight00ThreadId: z.string().optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
@@ -93,7 +90,6 @@ export function VeteranForm({
   canReassign,
   assignees,
   vsos,
-  phones,
 }: Props) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -124,7 +120,6 @@ export function VeteranForm({
       monthlyBenefitBefore: "",
       monthlyBenefitAfter: "",
       vsoIds: [],
-      assignedPhoneId: "",
       eight00ThreadId: "",
       ...initial?.values,
     },
@@ -156,7 +151,6 @@ export function VeteranForm({
       monthlyBenefitBefore: toNumber(values.monthlyBenefitBefore) ?? 0,
       monthlyBenefitAfter: toNumber(values.monthlyBenefitAfter) ?? 0,
       vsoIds: values.vsoIds,
-      assignedPhoneId: values.assignedPhoneId || null,
       eight00ThreadId: extractEight00ThreadId(values.eight00ThreadId),
     };
 
@@ -382,19 +376,6 @@ export function VeteranForm({
                 ))
               )}
             </div>
-          }
-        />
-        <Field
-          label="Assigned Straight Talk phone"
-          input={
-            <Select {...register("assignedPhoneId")}>
-              <option value="">—</option>
-              {phones.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label}
-                </option>
-              ))}
-            </Select>
           }
         />
         <Field

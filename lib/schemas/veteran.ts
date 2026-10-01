@@ -174,7 +174,6 @@ export const veteranSchema = z.object({
 
   // Links
   vsoIds: z.array(z.string()).default([]),
-  assignedPhoneId: z.string().nullable().default(null),
   // The numeric id from an 800.com inbox thread URL
   // (https://app.800.com/company/worth-their-weight/inbox/{id}), so staff can
   // jump straight to the text thread with this veteran.

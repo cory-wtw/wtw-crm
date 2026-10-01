@@ -8,7 +8,6 @@ import {
 } from "@/lib/permissions";
 import { listAttachmentsForVeteran } from "@/lib/db/attachments";
 import { listEncounters } from "@/lib/db/encounters";
-import { getPhone } from "@/lib/db/phones";
 import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
@@ -56,13 +55,10 @@ export default async function VeteranDetailPage({
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
 
-  const [assignee, vsos, phone, encounters, allUsers, session, attachments] =
+  const [assignee, vsos, encounters, allUsers, session, attachments] =
     await Promise.all([
       veteran.assigneeUid ? getUser(veteran.assigneeUid) : null,
       getVsosByIds(veteran.vsoIds),
-      veteran.assignedPhoneId
-        ? getPhone(veteran.assignedPhoneId)
-        : null,
       listEncounters(veteran.id),
       listUsers(),
       getSession(),
@@ -266,11 +262,6 @@ export default async function VeteranDetailPage({
             ))}
           </ul>
         )}
-      </Details>
-
-      <Details title="Phone">
-        <Row label="Assigned phone" value={phone?.name ?? null} />
-        <Row label="IMEI / Serial" value={phone?.imeiSerial ?? null} />
       </Details>
 
       <Details title="Pipeline history">

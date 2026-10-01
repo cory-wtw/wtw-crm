@@ -106,14 +106,10 @@ export function canDeleteVeteran(session: SessionLike | null): boolean {
   return isAdmin(session);
 }
 
-/** Anyone signed in can create / edit VSOs and phones. They're shared
- *  org-wide reference data — gating writes to admins meant standard users
- *  had to flag down a manager to add a partner or log a loaner. */
+/** Anyone signed in can create / edit VSOs. They're shared org-wide
+ *  reference data — gating writes to admins meant standard users had to
+ *  flag down a manager to add a partner. */
 export function canEditVso(session: SessionLike | null): boolean {
-  return canAccessCrm(session);
-}
-
-export function canEditPhone(session: SessionLike | null): boolean {
   return canAccessCrm(session);
 }
 

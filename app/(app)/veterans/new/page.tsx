@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { canCreateVeteran, canReassignVeteran } from "@/lib/permissions";
-import { listPhones } from "@/lib/db/phones";
 import { listUsers } from "@/lib/db/users";
 import { listVsos } from "@/lib/db/vsos";
 import { VeteranForm } from "../veteran-form";
@@ -13,11 +12,7 @@ export default async function NewVeteranPage() {
   if (!canCreateVeteran(session)) redirect("/veterans");
   const canReassign = canReassignVeteran(session);
 
-  const [users, vsos, phones] = await Promise.all([
-    listUsers(),
-    listVsos(),
-    listPhones(),
-  ]);
+  const [users, vsos] = await Promise.all([listUsers(), listVsos()]);
 
   return (
     <div className="space-y-6">
@@ -41,14 +36,6 @@ export default async function NewVeteranPage() {
             ? `${v.fullName} (${v.affiliation})`
             : v.fullName,
         }))}
-        phones={phones
-          .filter(
-            (p) => p.status === "available" || p.status === "returned",
-          )
-          .map((p) => ({
-            id: p.id,
-            label: p.imeiSerial ? `${p.name} · ${p.imeiSerial}` : p.name,
-          }))}
       />
     </div>
   );

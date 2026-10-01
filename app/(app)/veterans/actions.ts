@@ -108,7 +108,6 @@ export async function createVeteranAction(
     dateLost: null,
     vsoIds: input.vsoIds ?? [],
     assigneeUid,
-    assignedPhoneId: input.assignedPhoneId ?? null,
     // Adding the record is itself the first contact — the check-in queue
     // shouldn't come knocking the moment a veteran is found.
     lastContactedAt: now,
@@ -193,7 +192,6 @@ export async function editVeteranAction(
     ...stageUpdates,
     vsoIds: input.vsoIds ?? [],
     assigneeUid: input.assigneeUid ?? null,
-    assignedPhoneId: input.assignedPhoneId ?? null,
     updatedBy: session.uid,
     updatedAt: now,
   });

@@ -65,7 +65,6 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     monthlyBenefitBefore: data.monthlyBenefitBefore ?? 0,
     monthlyBenefitAfter: data.monthlyBenefitAfter ?? 0,
     vsoIds: data.vsoIds ?? [],
-    assignedPhoneId: data.assignedPhoneId ?? null,
     eight00ThreadId: data.eight00ThreadId ?? null,
     createdBy: data.createdBy ?? "",
     createdAt: tsToDate(data.createdAt) ?? new Date(),
@@ -106,18 +105,6 @@ export async function listVeteransByVsoId(
   const snap = await adminDb
     .collection(COLLECTION)
     .where("vsoIds", "array-contains", vsoId)
-    .get();
-  return snap.docs.map((d) => deserialize(d.id, d.data()));
-}
-
-/** Veterans currently holding a given phone. Should be 0 or 1; returns
- * whatever Firestore has so admins can spot drift. */
-export async function listVeteransByPhoneId(
-  phoneId: string,
-): Promise<Veteran[]> {
-  const snap = await adminDb
-    .collection(COLLECTION)
-    .where("assignedPhoneId", "==", phoneId)
     .get();
   return snap.docs.map((d) => deserialize(d.id, d.data()));
 }
