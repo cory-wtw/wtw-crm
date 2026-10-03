@@ -44,7 +44,7 @@ What v1 got wrong, and what this version does instead.
 
 ## 2.1 `veterans` — fields added
 
-Existing fields stay exactly as they are: first name, last initial, one contact channel enforced by the `preferredContact` superRefine, optional birth year, city, state, `vsoIds[]`, `assignedPhoneId`, pipeline stage, `pipelineHistory[]`, the five stamped dates, `monthlyBenefitBefore` / `monthlyBenefitAfter`, audit stamps.
+Existing fields stay exactly as they are: first name, last initial, one contact channel enforced by the `preferredContact` superRefine, optional birth year, city, state, `vsoIds[]`, pipeline stage, `pipelineHistory[]`, the five stamped dates, `monthlyBenefitBefore` / `monthlyBenefitAfter`, audit stamps.
 
 Add to `veteranSchema` in `lib/schemas/veteran.ts`:
 
@@ -156,7 +156,7 @@ Outcomes are recorded as a second encounter of type `followUp`:
 
 `outcome` enum: `reached` / `unreachable` / `ineligible` / `declined` / `helped`.
 
-This keeps the interaction timeline as the single history of a veteran, which is what encounters are already for, and it means no dangling foreign keys. The codebase already has two link fields with no referential integrity (`vso.referralsMade` never increments, `phone.assignedVeteranId` never syncs), so adding a third pattern of unmaintained links would compound an existing weakness.
+This keeps the interaction timeline as the single history of a veteran, which is what encounters are already for, and it means no dangling foreign keys. The codebase already has a link field with no referential integrity (`vso.referralsMade` never increments), so adding a second pattern of unmaintained links would compound an existing weakness.
 
 ## 2.4 `verifications` — new top-level collection
 
