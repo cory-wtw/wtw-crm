@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Timestamp } from "firebase-admin/firestore";
-import { adminDb } from "@/lib/firebase/admin";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { adminDb, mediaBucket } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
@@ -20,6 +20,7 @@ import {
   pipelineStageSchema,
   veteranInputSchema,
 } from "@/lib/schemas";
+import { attachmentPathPrefix, isUploadPathUnder } from "@/lib/storage-paths";
 
 function tsToDate(value: unknown): Date | null {
   if (!value) return null;
@@ -174,7 +175,6 @@ export async function editVeteranAction(
   const now = new Date();
   const stageChanged = input.pipelineStage !== existing.pipelineStage;
 
-  const history: PipelineHistoryEntry[] = existing.pipelineHistory ?? [];
   const stageUpdates: Record<string, unknown> = {};
 
   if (stageChanged) {
@@ -183,7 +183,9 @@ export async function editVeteranAction(
       enteredAt: now,
       byUid: session.uid,
     };
-    stageUpdates.pipelineHistory = [...history, newEntry];
+    // arrayUnion, not read-modify-write: a concurrent stage change must not
+    // be erased by this one.
+    stageUpdates.pipelineHistory = FieldValue.arrayUnion(newEntry);
     stageUpdates[dateFieldForStage(input.pipelineStage)] = now;
   }
 
@@ -254,7 +256,6 @@ export async function changeStageAction(
   }
 
   const now = new Date();
-  const history: PipelineHistoryEntry[] = existing.pipelineHistory ?? [];
   const newEntry: PipelineHistoryEntry = {
     stage: newStage,
     enteredAt: now,
@@ -263,7 +264,7 @@ export async function changeStageAction(
 
   await docRef.update({
     pipelineStage: newStage,
-    pipelineHistory: [...history, newEntry],
+    pipelineHistory: FieldValue.arrayUnion(newEntry),
     [dateFieldForStage(newStage)]: now,
     updatedBy: session.uid,
     updatedAt: now,
@@ -359,11 +360,39 @@ export async function deleteVeteranAction(
   const snap = await docRef.get();
   if (!snap.exists) return { ok: false, error: "Veteran not found." };
 
-  // Delete encounter subcollection docs first so we don't leave orphans.
-  const encounters = await docRef.collection("encounters").listDocuments();
-  await Promise.all(encounters.map((e) => e.delete()));
+  // Files first: these are DD-214s and ID scans, and a deleted veteran must
+  // not leave them sitting in Storage with nothing pointing at them. A file
+  // that won't delete stops the whole delete, so it can be retried rather
+  // than orphaned.
+  const attachments = await adminDb
+    .collection("attachments")
+    .where("veteranId", "==", id)
+    .get();
+  await Promise.all(
+    attachments.docs
+      .map((a) => String(a.data().storagePath ?? ""))
+      // Only ever this veteran's own folder, whatever a record claims.
+      .filter((path) => isUploadPathUnder(path, attachmentPathPrefix(id)))
+      .map((path) =>
+        mediaBucket().file(path).delete({ ignoreNotFound: true }),
+      ),
+  );
 
-  await docRef.delete();
+  const [encounters, linkedMedia] = await Promise.all([
+    docRef.collection("encounters").listDocuments(),
+    adminDb.collection("media").where("linkedVeteranId", "==", id).get(),
+  ]);
+
+  const writer = adminDb.bulkWriter();
+  for (const a of attachments.docs) writer.delete(a.ref);
+  for (const e of encounters) writer.delete(e);
+  // The photo stays on the social wall; it just stops naming someone who's
+  // no longer on the roster.
+  for (const m of linkedMedia.docs) {
+    writer.update(m.ref, { linkedVeteranId: null, updatedAt: new Date() });
+  }
+  writer.delete(docRef);
+  await writer.close();
   await logAudit({
     action: "delete",
     resourceType: "veteran",

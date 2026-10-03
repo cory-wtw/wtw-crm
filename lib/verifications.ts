@@ -1,5 +1,8 @@
 import "server-only";
-import type { WriteBatch } from "firebase-admin/firestore";
+import type {
+  DocumentData,
+  DocumentReference,
+} from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import type {
   FollowUpOutcome,
@@ -20,8 +23,13 @@ export type VerificationEntry = {
   outcome?: FollowUpOutcome;
 };
 
+/** A WriteBatch or a Transaction — anything that can stage a set. */
+type Writer = {
+  set(ref: DocumentReference, data: DocumentData): unknown;
+};
+
 /**
- * Stage a verifications doc onto an existing batch.
+ * Stage a verifications doc onto an existing batch or transaction.
  *
  * Deliberately batch-scoped rather than fire-and-forget like `logAudit`: a
  * resource must never sit in `flagged` without a doc saying who flagged it and
@@ -29,7 +37,7 @@ export type VerificationEntry = {
  * not at all. Audit logging can afford to fail quietly; this can't.
  */
 export function stageVerification(
-  batch: WriteBatch,
+  batch: Writer,
   entry: VerificationEntry,
   at: Date = new Date(),
 ): void {

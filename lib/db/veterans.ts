@@ -109,11 +109,10 @@ export async function listVeteransByVsoId(
   return snap.docs.map((d) => deserialize(d.id, d.data()));
 }
 
-/** Stage counts for the dashboard, keyed by stage. */
-export async function countVeteransByStage(): Promise<
-  Record<PipelineStage, number>
-> {
-  const veterans = await listVeterans();
+/** Stage counts from veterans already in hand — no second collection read. */
+export function countByStage(
+  veterans: Pick<Veteran, "pipelineStage">[],
+): Record<PipelineStage, number> {
   const counts: Record<PipelineStage, number> = {
     found: 0,
     connected: 0,

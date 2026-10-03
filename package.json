@@ -9,8 +9,11 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-wtw-rules \"vitest run --config vitest.rules.config.mts\"",
     "typecheck": "tsc --noEmit",
     "make-admin": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/make-admin.ts",
+    "backfill-role-claims": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/backfill-role-claims.ts",
+    "revoke-attachment-tokens": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/revoke-attachment-tokens.ts",
     "import-va-facilities": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/import-va-facilities.ts",
     "enrich-urls": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/enrich-urls.ts",
     "seed-resources": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/seed-resources.ts",
@@ -25,10 +28,9 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "firebase": "^12.13.0",
-    "firebase-admin": "^13.10.0",
-    "firebase-functions": "^7.2.5",
+    "firebase-admin": "^14.5.0",
     "lucide-react": "^1.16.0",
-    "next": "16.2.6",
+    "next": "^16.3.8",
     "pdf-lib": "^1.17.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -38,16 +40,22 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "^16.3.8",
+    "firebase-tools": "^15.32.1",
     "sharp": "^0.35.4",
     "tailwindcss": "^4",
     "tsx": "^4.22.0",
     "typescript": "^5",
     "vitest": "^4.1.6"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.5",
+    "uuid": "^11.1.1"
   }
 }

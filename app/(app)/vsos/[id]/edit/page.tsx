@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { getVso } from "@/lib/db/vsos";
 import { VsoForm } from "../../vso-form";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export default async function EditVsoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireCrm();
   const { id } = await params;
   const session = await getSession();
   if (!session) notFound();

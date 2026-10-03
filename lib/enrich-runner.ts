@@ -15,6 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import Anthropic from "@anthropic-ai/sdk";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import {
@@ -23,6 +24,7 @@ import {
   extractLinks,
   htmlToText,
   isBlockedHost,
+  isPrivateAddress,
   normalizeUrl,
   parseProposal,
   proposalToInput,
@@ -40,6 +42,8 @@ import { resourceInputSchema, type ResourceInput } from "@/lib/schemas";
 export const ENRICH_MODEL = "claude-sonnet-4-6";
 export const ENRICH_SOURCE = "ai-enrich";
 const FETCH_TIMEOUT_MS = 15_000;
+/** Redirect hops followed per fetch, each one re-checked. */
+const MAX_REDIRECTS = 5;
 const MAX_TOKENS = 16_000;
 /** Below this there's nothing worth sending — the page likely renders client-side. */
 const MIN_PAGE_CHARS = 200;
@@ -156,37 +160,77 @@ export type EnrichOutcome =
   | { ok: false; error: string };
 
 /**
+ * Whether a URL may be fetched: http(s), not a blocked hostname, and every
+ * address its hostname resolves to is public. A public-looking name can
+ * point anywhere (127.0.0.1.nip.io), so the name check alone isn't enough.
+ *
+ * Residual gap: fetch() resolves the name again, so a DNS server that answers
+ * differently the second time (rebinding) can still slip through. Closing that
+ * needs a pinned-address dispatcher; the page is admin-only, and the metadata
+ * server additionally requires a header fetch() never sends.
+ */
+async function isFetchableUrl(url: URL): Promise<boolean> {
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  if (isBlockedHost(url.hostname)) return false;
+  try {
+    const addresses = await lookup(url.hostname, { all: true, verbatim: true });
+    return (
+      addresses.length > 0 &&
+      addresses.every(({ address }) => !isPrivateAddress(address))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fetch a page as readable text plus its raw HTML, refusing hosts a server must
  * not be aimed at.
  *
  * The host check runs here rather than at the entry point, so it covers every
- * fetch in a crawl — a page can link anywhere, including at a redirect that
- * lands on a private address.
+ * fetch in a crawl — a page can link anywhere — and redirects are followed by
+ * hand so each hop is checked too: a public page that 302s to a private
+ * address must not be followed blindly.
  */
 export async function fetchPage(
   url: string,
 ): Promise<
   { ok: true; text: string; html: string } | { ok: false; error: string }
 > {
-  if (isBlockedHost(new URL(url).hostname)) {
-    return {
-      ok: false,
-      error: "That host isn't reachable from here, by design.",
-    };
-  }
+  const blocked = {
+    ok: false as const,
+    error: "That host isn't reachable from here, by design.",
+  };
 
   try {
-    const response = await fetch(url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: {
-        // Say who we are rather than pretending to be a browser.
-        "user-agent": "WorthTheirWeightRoster/1.0 (+resource directory)",
-        accept: "text/html,application/xhtml+xml",
-      },
-    });
-    if (!response.ok) {
-      return { ok: false, error: `The page returned ${response.status}.` };
+    const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+    let current = new URL(url);
+    let response: Response | null = null;
+
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      if (!(await isFetchableUrl(current))) return blocked;
+      response = await fetch(current, {
+        redirect: "manual",
+        signal,
+        headers: {
+          // Say who we are rather than pretending to be a browser.
+          "user-agent": "WorthTheirWeightRoster/1.0 (+resource directory)",
+          accept: "text/html,application/xhtml+xml",
+        },
+      });
+      const location = response.headers.get("location");
+      if (response.status < 300 || response.status >= 400 || !location) break;
+      if (hop === MAX_REDIRECTS) {
+        return { ok: false, error: "The page redirected too many times." };
+      }
+      current = new URL(location, current);
+    }
+
+    if (!response || !response.ok) {
+      return {
+        ok: false,
+        error: `The page returned ${response?.status ?? "nothing"}.`,
+      };
     }
     const contentType = response.headers.get("content-type") ?? "";
     if (!contentType.includes("html") && !contentType.includes("text")) {

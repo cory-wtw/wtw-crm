@@ -7,6 +7,7 @@ import {
   RESOURCE_TYPE_LABELS,
   type ResourceType,
 } from "@/lib/schemas";
+import { requireAdmin } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ function resourceLink(type: ResourceType, id: string): string | null {
 }
 
 export default async function AuditLogPage() {
+  await requireAdmin();
   const logs = await listRecentAuditLogs(200);
 
   return (

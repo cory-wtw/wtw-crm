@@ -7,6 +7,7 @@ import { listVsos } from "@/lib/db/vsos";
 import { formatShortName } from "@/lib/name";
 import type { Veteran } from "@/lib/schemas";
 import { VeteranForm, type VeteranFormInitial } from "../../veteran-form";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function EditVeteranPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireCrm();
   const { id } = await params;
   const veteran = await getVeteran(id);
   if (!veteran) notFound();

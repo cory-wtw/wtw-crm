@@ -2,10 +2,12 @@ import Link from "next/link";
 import { getSession } from "@/lib/firebase/session";
 import { listVsos } from "@/lib/db/vsos";
 import { VsosTable } from "./vsos-table";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function VsosPage() {
+  await requireCrm();
   const [vsos, session] = await Promise.all([listVsos(), getSession()]);
   const canEdit = !!session;
 

@@ -7,6 +7,7 @@ import {
   scoreLink,
   htmlToText,
   isBlockedHost,
+  isPrivateAddress,
   MAX_PAGE_CHARS,
   normalizeUrl,
   parseProposal,
@@ -239,9 +240,50 @@ describe("isBlockedHost", () => {
     expect(isBlockedHost("8.8.8.8")).toBe(true);
   });
 
+  it("blocks IPv6 literals, including v4-mapped loopback", () => {
+    for (const host of ["[::ffff:7f00:1]", "::ffff:127.0.0.1", "fd00::1", "[::]"]) {
+      expect(isBlockedHost(host)).toBe(true);
+    }
+  });
+
+  it("blocks numeric shorthand hosts", () => {
+    expect(isBlockedHost("2130706433")).toBe(true);
+    expect(isBlockedHost("0x7f000001")).toBe(true);
+  });
+
   it("allows ordinary hostnames", () => {
     for (const host of ["example.org", "www.va.gov", "mash-chattanooga.org"]) {
       expect(isBlockedHost(host)).toBe(false);
+    }
+  });
+});
+
+describe("isPrivateAddress", () => {
+  it("flags private, loopback, link-local, and reserved addresses", () => {
+    for (const ip of [
+      "127.0.0.1",
+      "10.1.2.3",
+      "172.20.0.1",
+      "192.168.0.10",
+      "169.254.169.254",
+      "100.64.0.1",
+      "0.0.0.0",
+      "224.0.0.1",
+      "::1",
+      "::",
+      "::ffff:127.0.0.1",
+      "::ffff:7f00:1",
+      "fd12:3456::1",
+      "fe80::1",
+      "64:ff9b::a00:1",
+    ]) {
+      expect(isPrivateAddress(ip), ip).toBe(true);
+    }
+  });
+
+  it("passes public addresses", () => {
+    for (const ip of ["8.8.8.8", "152.133.1.1", "2607:f8b0:4004:c07::64"]) {
+      expect(isPrivateAddress(ip), ip).toBe(false);
     }
   });
 });

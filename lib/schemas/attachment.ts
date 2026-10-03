@@ -19,8 +19,12 @@ export const attachmentSchema = z.object({
   veteranId: z.string().min(1),
   /** Path within the Storage bucket, e.g. "attachments/{veteranId}/{ts}-{name}". */
   storagePath: z.string().min(1),
-  /** Tokenized download URL used to view/download the file. */
-  downloadUrl: z.string().url(),
+  /**
+   * Legacy: records made before attachments were served only through the
+   * session-checked API route carried a tokenized Storage URL. Never written
+   * now, and scripts/revoke-attachment-tokens.ts clears the old ones.
+   */
+  downloadUrl: z.string().url().optional(),
   contentType: z.string().min(1),
   sizeBytes: z.number().int().nonnegative(),
   /** The original filename, kept for reference even after a rename. */
@@ -35,26 +39,16 @@ export const attachmentSchema = z.object({
 export type Attachment = z.infer<typeof attachmentSchema>;
 
 /**
- * What the client sends when recording a freshly uploaded file. Lifecycle
- * fields are server-controlled and omitted here.
+ * What the client sends when recording a freshly uploaded file. Content
+ * type and size are read from Storage itself, and lifecycle fields are
+ * server-controlled, so neither is accepted here.
  */
-export const attachmentInputSchema = attachmentSchema
-  .pick({
-    veteranId: true,
-    storagePath: true,
-    downloadUrl: true,
-    contentType: true,
-    sizeBytes: true,
-    fileName: true,
-    name: true,
-  })
-  .extend({
-    sizeBytes: z
-      .number()
-      .int()
-      .nonnegative()
-      .max(ATTACHMENT_MAX_BYTES, "File is larger than the 25 MB limit"),
-  });
+export const attachmentInputSchema = attachmentSchema.pick({
+  veteranId: true,
+  storagePath: true,
+  fileName: true,
+  name: true,
+});
 export type AttachmentInput = z.infer<typeof attachmentInputSchema>;
 
 /**

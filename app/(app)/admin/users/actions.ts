@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { getSession } from "@/lib/firebase/session";
+import { claimsForUser } from "@/lib/auth-provisioning";
 import { normalizeEmail, userRoleSchema } from "@/lib/schemas";
 
 async function requireAdmin() {
@@ -85,10 +86,21 @@ export async function setUserActiveAction(
     return { ok: false, error: "You can't deactivate yourself." };
   }
 
-  await adminDb.collection("users").doc(uid).update({
+  const userRef = adminDb.collection("users").doc(uid);
+  const snap = await userRef.get();
+  if (!snap.exists) return { ok: false, error: "User not found." };
+
+  await userRef.update({
     active,
     updatedAt: new Date(),
   });
+
+  // Storage rules grant uploads by the role claim, so a deactivated user
+  // loses it (and a reactivated one gets it back).
+  await adminAuth.setCustomUserClaims(
+    uid,
+    claimsForUser({ role: snap.data()!.role ?? "standard", active }),
+  );
 
   if (!active) {
     // Revoke their refresh tokens so any open browser session ends quickly.
@@ -127,13 +139,17 @@ export async function changeUserRoleAction(
 
   const userRef = adminDb.collection("users").doc(uid);
   const snap = await userRef.get();
+  if (!snap.exists) return { ok: false, error: "User not found." };
   const before = snap.data()?.role ?? null;
 
   await userRef.update({
     role: role.data,
     updatedAt: new Date(),
   });
-  await adminAuth.setCustomUserClaims(uid, { role: role.data });
+  await adminAuth.setCustomUserClaims(
+    uid,
+    claimsForUser({ role: role.data, active: snap.data()?.active ?? false }),
+  );
 
   await logAudit({
     action: "update",

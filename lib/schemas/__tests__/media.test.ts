@@ -9,11 +9,7 @@ import {
 } from "..";
 
 const VALID = {
-  kind: "image" as const,
   storagePath: "media/u1/1700000000-abc-photo.jpg",
-  downloadUrl: "https://example.com/photo.jpg",
-  contentType: "image/jpeg",
-  sizeBytes: 2048,
   fileName: "photo.jpg",
   caption: "Ribbon cutting at the new HQ",
   tags: ["event", "2026"],
@@ -22,7 +18,7 @@ const VALID = {
 };
 
 describe("mediaInputSchema", () => {
-  it("accepts a valid image upload", () => {
+  it("accepts a valid upload", () => {
     const result = mediaInputSchema.safeParse(VALID);
     expect(result.success).toBe(true);
   });
@@ -37,37 +33,26 @@ describe("mediaInputSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("requires a valid download URL", () => {
+  it("drops client-claimed URL, type, size, and kind — the server reads those from Storage", () => {
     const result = mediaInputSchema.safeParse({
       ...VALID,
-      downloadUrl: "not-a-url",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects files over the 500 MB cap", () => {
-    const result = mediaInputSchema.safeParse({
-      ...VALID,
+      kind: "video",
+      downloadUrl: "https://evil.example/x.jpg",
+      contentType: "image/jpeg",
       sizeBytes: MEDIA_MAX_BYTES + 1,
     });
-    expect(result.success).toBe(false);
-  });
-
-  it("accepts a file exactly at the cap", () => {
-    const result = mediaInputSchema.safeParse({
-      ...VALID,
-      sizeBytes: MEDIA_MAX_BYTES,
-    });
     expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).not.toHaveProperty("downloadUrl");
+      expect(result.data).not.toHaveProperty("contentType");
+      expect(result.data).not.toHaveProperty("sizeBytes");
+      expect(result.data).not.toHaveProperty("kind");
+    }
   });
 
   it("defaults tags, consent, and veteran link when omitted", () => {
     const result = mediaInputSchema.safeParse({
-      kind: "video",
       storagePath: "media/u1/clip.mp4",
-      downloadUrl: "https://example.com/clip.mp4",
-      contentType: "video/mp4",
-      sizeBytes: 10,
       fileName: "clip.mp4",
       caption: "Veteran thank-you clip",
     });
@@ -77,11 +62,6 @@ describe("mediaInputSchema", () => {
       expect(result.data.consentOnFile).toBe(false);
       expect(result.data.linkedVeteranId).toBeNull();
     }
-  });
-
-  it("rejects a negative size", () => {
-    const result = mediaInputSchema.safeParse({ ...VALID, sizeBytes: -1 });
-    expect(result.success).toBe(false);
   });
 });
 

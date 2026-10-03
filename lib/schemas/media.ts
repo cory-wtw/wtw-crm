@@ -69,29 +69,19 @@ export const mediaSchema = z.object({
 export type Media = z.infer<typeof mediaSchema>;
 
 /**
- * What the client sends when recording a freshly uploaded file. Status and
- * lifecycle fields are server-controlled and omitted here.
+ * What the client sends when recording a freshly uploaded file. The kind,
+ * content type, size, and download URL are all read from the stored object
+ * by the server, and status and lifecycle fields are server-controlled, so
+ * none of them is accepted here.
  */
-export const mediaInputSchema = mediaSchema
-  .pick({
-    kind: true,
-    storagePath: true,
-    downloadUrl: true,
-    contentType: true,
-    sizeBytes: true,
-    fileName: true,
-    caption: true,
-    tags: true,
-    linkedVeteranId: true,
-    consentOnFile: true,
-  })
-  .extend({
-    sizeBytes: z
-      .number()
-      .int()
-      .nonnegative()
-      .max(MEDIA_MAX_BYTES, "File is larger than the 500 MB limit"),
-  });
+export const mediaInputSchema = mediaSchema.pick({
+  storagePath: true,
+  fileName: true,
+  caption: true,
+  tags: true,
+  linkedVeteranId: true,
+  consentOnFile: true,
+});
 export type MediaInput = z.infer<typeof mediaInputSchema>;
 
 /**

@@ -4,10 +4,12 @@ import { formatShortName } from "@/lib/name";
 import { getSession } from "@/lib/firebase/session";
 import { canViewVeteran } from "@/lib/permissions";
 import { UploadForm } from "../upload-form";
+import { requireSession } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewMediaPage() {
+  await requireSession();
   const session = await getSession();
   // Only load the veteran list for users allowed to see veteran data — a
   // social-only user must never see veteran names (PII). An empty list hides

@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -28,6 +31,11 @@ jobs:
 
       - name: Test
         run: npm test
+
+      # Firestore + Storage rules against the emulators (needs Java, which
+      # ubuntu-latest ships).
+      - name: Security rules
+        run: npm run test:rules
 
       - name: Build
         run: npm run build

@@ -1,48 +1,52 @@
 rules_version = '2';
 
-// Storage rules for the social media wall. Files live under
-// media/{uid}/{fileName}. The uploader must be signed in and can only write
-// into their own folder; anyone signed in can read (the gallery renders via
-// tokenized download URLs). Uploads are capped at 500 MB and must be an
-// image or video — mirrors MEDIA_MAX_BYTES / mediaKindFromContentType.
+// Storage rules. The browser only ever CREATES objects here — uploads go
+// straight from the client to Storage, then a Server Action records them.
+// Every read happens server-side (Admin SDK, bypasses these rules) or through
+// a tokenized media URL minted by the server, and every delete goes through
+// the Admin SDK. So clients get create and nothing else.
+//
+// Access is keyed on the `role` custom claim, never on `request.auth != null`:
+// Google sign-in creates a Firebase Auth user for ANY Google account before
+// createSession checks the invite allowlist, so "signed in" means nothing
+// here. The claim is set at provisioning and on every role/active change
+// (see lib/firebase/session.ts and app/(app)/admin/users/actions.ts);
+// `npm run backfill-role-claims` sets it for users created before that.
 service firebase.storage {
   match /b/{bucket}/o {
 
-    function signedIn() {
-      return request.auth != null;
+    function hasRole(roles) {
+      return request.auth != null &&
+             request.auth.token.role is string &&
+             request.auth.token.role in roles;
     }
 
-    match /media/{uid}/{fileName=**} {
-      allow read: if signedIn();
-
-      allow write: if signedIn() &&
-                      request.auth.uid == uid &&
-                      request.resource.size < 500 * 1024 * 1024 &&
-                      (request.resource.contentType.matches('image/.*') ||
-                       request.resource.contentType.matches('video/.*'));
-
-      // Deletes go through the Admin SDK (delete action + purge cron), which
-      // bypasses these rules. Block client-side deletes.
-      allow delete: if false;
+    // Social media wall. Files live under media/{uid}/{fileName}; the
+    // uploader can only create inside their own folder. Capped at 500 MB and
+    // must be an image or video — mirrors MEDIA_MAX_BYTES /
+    // mediaKindFromContentType.
+    match /media/{uid}/{fileName} {
+      allow create: if resource == null &&
+                       hasRole(['admin', 'standard', 'social']) &&
+                       request.auth.uid == uid &&
+                       request.resource.size < 500 * 1024 * 1024 &&
+                       (request.resource.contentType.matches('image/.*') ||
+                        request.resource.contentType.matches('video/.*'));
     }
 
-    // Veteran attachments (DD-214s, VA letters, ID scans, etc). Files live
-    // under attachments/{veteranId}/{fileName}. Gated the same way as
-    // media below: signedIn() only, not a role check — the `role` custom
-    // claim is set once at provisioning (see createSession in
-    // lib/firebase/session.ts) and never refreshed, so most existing
-    // users' ID tokens don't carry it. The real access gate (CRM-only,
-    // assignee/admin) lives in canEditVeteran + the veteran route, and
-    // every Firestore write goes through the Admin SDK regardless.
+    // Veteran attachments (DD-214s, VA letters, ID scans). Files live under
+    // attachments/{veteranId}/{fileName}, always as PDFs (lib/pdf-convert.ts).
+    // CRM staff only — social-only users never touch veteran data. Create
+    // only: no overwriting an existing document, and no reads, so the only
+    // way to fetch one is the session-checked /api/veterans/... route.
     // Capped at 25 MB — mirrors ATTACHMENT_MAX_BYTES.
-    match /attachments/{veteranId}/{fileName=**} {
-      allow read: if signedIn();
-
-      allow write: if signedIn() &&
-                      request.resource.size < 25 * 1024 * 1024;
-
-      // Deletes go through the Admin SDK. Block client-side deletes.
-      allow delete: if false;
+    match /attachments/{veteranId}/{fileName} {
+      // `resource == null`: Storage treats an upload to an existing path as a
+      // create too, so without it a "create" could overwrite a real DD-214.
+      allow create: if resource == null &&
+                       hasRole(['admin', 'standard']) &&
+                       request.resource.size < 25 * 1024 * 1024 &&
+                       request.resource.contentType == 'application/pdf';
     }
 
     // Deny everything else.

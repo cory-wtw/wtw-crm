@@ -10,6 +10,7 @@ import { getSession } from "@/lib/firebase/session";
 import { formatDate } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { canAccessCrm } from "@/lib/permissions";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +120,7 @@ function QueueSection({
 }
 
 export default async function OutreachPage() {
+  await requireCrm();
   const session = await getSession();
   if (!canAccessCrm(session)) redirect("/");
 

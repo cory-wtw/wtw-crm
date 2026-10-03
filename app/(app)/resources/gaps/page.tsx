@@ -6,10 +6,12 @@ import { getSession } from "@/lib/firebase/session";
 import { canAccessCrm } from "@/lib/permissions";
 import { summarizeDemand, type IntakeRun } from "@/lib/demand";
 import { BUCKET_LABELS } from "@/lib/schemas";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function RosterGapsPage() {
+  await requireCrm();
   const session = await getSession();
   if (!canAccessCrm(session)) redirect("/resources");
 

@@ -6,6 +6,7 @@ import { formatShortName } from "@/lib/name";
 import { getSession } from "@/lib/firebase/session";
 import { canEditMedia, canViewVeteran } from "@/lib/permissions";
 import { EditMediaForm } from "./edit-form";
+import { requireSession } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function EditMediaPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireSession();
   const { id } = await params;
   const session = await getSession();
   const media = await getMedia(id);

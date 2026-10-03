@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  countVeteransByStage,
+  countByStage,
   listVeterans,
   type VeteranListItem,
 } from "@/lib/db/veterans";
@@ -12,6 +12,7 @@ import {
   type PipelineStage,
 } from "@/lib/schemas";
 import { VeteransTable } from "./veterans-table";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +25,9 @@ const STAGE_ORDER: PipelineStage[] = [
 ];
 
 export default async function VeteransPage() {
-  const [veterans, counts] = await Promise.all([
-    listVeterans(),
-    countVeteransByStage(),
-  ]);
+  await requireCrm();
+  const veterans = await listVeterans();
+  const counts = countByStage(veterans);
   const total = STAGE_ORDER.reduce((sum, s) => sum + counts[s], 0);
 
   const totalMonthlyLift = veterans.reduce(

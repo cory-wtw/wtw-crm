@@ -5,10 +5,12 @@ import { getSession } from "@/lib/firebase/session";
 import { canAccessCrm } from "@/lib/permissions";
 import { needsClassification } from "@/lib/schemas";
 import { ClassifyQueue, type ClassifyItem } from "./classify-queue";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClassifyResourcesPage() {
+  await requireCrm();
   const session = await getSession();
   if (!canAccessCrm(session)) redirect("/resources");
 

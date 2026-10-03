@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { canApproveImportedResource } from "@/lib/permissions";
 import { ImportPanel } from "./import-panel";
+import { requireAdmin } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportResourcesPage() {
+  await requireAdmin();
   const session = await getSession();
   if (!canApproveImportedResource(session)) redirect("/resources");
 

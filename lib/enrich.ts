@@ -214,16 +214,51 @@ export function isBlockedHost(hostname: string): boolean {
   if (host === "metadata.google.internal" || host.endsWith(".internal")) {
     return true;
   }
-  if (host === "::1" || host === "0.0.0.0") return true;
+  // Any IP literal, v4 or v6: no legitimate resource is one, and it skips
+  // the DNS check below. Covers ::1, ::ffff:7f00:1, fd00::, 0.0.0.0, ...
+  if (host.includes(":")) return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
+  // Numeric shorthands URL parsing would otherwise turn into an address.
+  if (/^(0x[0-9a-f]+|\d+)$/.test(host)) return true;
+  return false;
+}
 
-  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
-  if (!ipv4) return false;
-  const [a, b] = ipv4.slice(1).map(Number);
-  if (a === 127 || a === 10 || a === 0) return true;
-  if (a === 169 && b === 254) return true; // link-local, incl. the metadata IP
-  if (a === 172 && b >= 16 && b <= 31) return true;
-  if (a === 192 && b === 168) return true;
-  return true; // any other bare IPv4 literal: no legitimate resource is one
+/**
+ * Whether a resolved address is one a server-side fetcher must not reach:
+ * loopback, private, link-local (incl. the metadata IP), CGNAT, multicast,
+ * reserved, and their IPv6 equivalents. A public hostname can resolve to any
+ * of these, so the hostname check above is not enough on its own.
+ */
+export function isPrivateAddress(address: string): boolean {
+  const ip = address.toLowerCase();
+
+  const v4 = /^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (v4) {
+    const [a, b] = v4.slice(1).map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) || // CGNAT
+      (a === 169 && b === 254) || // link-local, metadata
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      a >= 224 // multicast + reserved
+    );
+  }
+
+  if (!ip.includes(":")) return true; // not an address we understand
+  if (ip === "::" || ip === "::1") return true;
+  if (ip.startsWith("::ffff:")) return true; // mapped, in hex form
+  if (ip.startsWith("64:ff9b:")) return true; // NAT64
+  const first = parseInt(ip.split(":")[0] || "0", 16);
+  return (
+    (first & 0xfe00) === 0xfc00 || // fc00::/7 unique local
+    (first & 0xffc0) === 0xfe80 || // fe80::/10 link-local
+    (first & 0xff00) === 0xff00 // multicast
+  );
 }
 
 /** Split a pasted block into normalized, de-duplicated URLs. */

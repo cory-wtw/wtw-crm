@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { VsoForm } from "../vso-form";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewVsoPage() {
+  await requireCrm();
   const session = await getSession();
   if (!session) notFound();
 

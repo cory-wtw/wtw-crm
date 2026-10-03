@@ -5,7 +5,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
-import { canAccessCrm } from "@/lib/permissions";
+import { canAccessCrm, canApproveImportedResource } from "@/lib/permissions";
 import {
   derivedVerificationStatus,
   resourceInputSchema,
@@ -137,6 +137,21 @@ export async function editResourceAction(
   );
   const becameLive =
     input.verificationStatus === "live" && existingStatus !== "live";
+
+  // An imported or AI-drafted record lands flagged and needs an admin to put
+  // it in front of veterans (canApproveImportedResource). The edit form must
+  // not be a side door around that.
+  if (
+    becameLive &&
+    existing.sourceName &&
+    existingStatus === "flagged" &&
+    !canApproveImportedResource(session)
+  ) {
+    return {
+      ok: false,
+      error: "Only an admin can approve an imported record. Leave it flagged.",
+    };
+  }
 
   const updates = dropUndefined({
     ...input,

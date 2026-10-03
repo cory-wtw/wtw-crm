@@ -3,11 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytesResumable,
-} from "firebase/storage";
+import { ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase/client";
 import { MEDIA_MAX_BYTES, mediaKindFromContentType } from "@/lib/schemas";
 import { createMediaAction } from "./actions";
@@ -78,11 +74,15 @@ export function UploadForm({ veterans }: { veterans: VeteranOption[] }) {
     )}`;
 
     try {
+      // Storage rules check the role claim, which the server may have set
+      // after this tab's ID token was minted. Pick up the current one.
+      await auth.currentUser?.getIdToken(true);
+
       const task = uploadBytesResumable(storageRef(storage, path), file, {
         contentType: file.type,
       });
 
-      const downloadUrl = await new Promise<string>((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         task.on(
           "state_changed",
           (snap) =>
@@ -90,16 +90,12 @@ export function UploadForm({ veterans }: { veterans: VeteranOption[] }) {
               Math.round((snap.bytesTransferred / snap.totalBytes) * 100),
             ),
           reject,
-          () => getDownloadURL(task.snapshot.ref).then(resolve, reject),
+          () => resolve(),
         );
       });
 
       const res = await createMediaAction({
-        kind,
         storagePath: path,
-        downloadUrl,
-        contentType: file.type,
-        sizeBytes: file.size,
         fileName: file.name,
         caption: caption.trim(),
         tags: parseTags(tags),

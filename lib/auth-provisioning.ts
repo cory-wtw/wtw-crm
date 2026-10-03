@@ -40,3 +40,35 @@ export function decideAuth(input: {
     reason: "Your account isn't on the allowlist. Ask an admin to invite you.",
   };
 }
+
+/**
+ * The Firebase Auth custom claims a user should carry. Storage rules grant
+ * uploads by the `role` claim alone, so a deactivated user carries none —
+ * their still-valid ID token stops working at its next refresh.
+ */
+export function claimsForUser(user: {
+  role: UserRole;
+  active: boolean;
+}): { role?: UserRole } {
+  return user.active ? { role: user.role } : {};
+}
+
+/**
+ * Whether a verified ID token may be used to claim an invite or a session.
+ *
+ * Invites are keyed by email, so the email must be one the identity provider
+ * vouched for. Only Google sign-in is offered; if another provider (say
+ * email/password) were ever switched on in the console, an unverified
+ * account registered under an invited address must not walk off with it.
+ */
+export function isTrustedSignIn(token: {
+  email?: string;
+  email_verified?: boolean;
+  firebase?: { sign_in_provider?: string };
+}): boolean {
+  return (
+    !!token.email &&
+    token.email_verified === true &&
+    token.firebase?.sign_in_provider === "google.com"
+  );
+}

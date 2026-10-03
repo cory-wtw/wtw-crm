@@ -5,10 +5,12 @@ import { formatShortName } from "@/lib/name";
 import { getSession } from "@/lib/firebase/session";
 import { canViewVeteran } from "@/lib/permissions";
 import { MediaGallery, type MediaRow } from "./media-gallery";
+import { requireSession } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function SocialPage() {
+  await requireSession();
   const session = await getSession();
 
   // Social-only users can't see veteran data, so don't resolve linked-veteran

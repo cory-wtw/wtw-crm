@@ -3,10 +3,12 @@ import { getSession } from "@/lib/firebase/session";
 import { listResources } from "@/lib/db/resources";
 import { classificationGaps } from "@/lib/schemas";
 import { ResourcesTable } from "./resources-table";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function ResourcesPage() {
+  await requireCrm();
   const [resources, session] = await Promise.all([
     listResources(),
     getSession(),

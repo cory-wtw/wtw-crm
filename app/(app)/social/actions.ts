@@ -13,10 +13,13 @@ import {
 } from "@/lib/permissions";
 import { getSession } from "@/lib/firebase/session";
 import {
+  MEDIA_MAX_BYTES,
   mediaEditInputSchema,
   mediaInputSchema,
   mediaKindFromContentType,
 } from "@/lib/schemas";
+import { mediaDownloadUrl, statUploadedObject } from "@/lib/storage-objects";
+import { isUploadPathUnder, mediaPathPrefix } from "@/lib/storage-paths";
 
 function dropUndefined<T extends Record<string, unknown>>(
   obj: T,
@@ -42,7 +45,11 @@ function formatIssues(
 /**
  * Record a file that the client already uploaded to Firebase Storage. The
  * bytes never pass through the server — the browser uploads directly to
- * Storage (see upload-form.tsx) and hands us back the path + URL.
+ * Storage (see upload-form.tsx) and hands us back the path.
+ *
+ * The path is later deleted with Admin credentials, so it must be inside the
+ * caller's own media folder. Everything else about the file — kind, type,
+ * size, URL — is read from Storage, not taken from the browser.
  */
 export async function createMediaAction(
   rawInput: unknown,
@@ -56,18 +63,33 @@ export async function createMediaAction(
   }
   const input = parsed.data;
 
-  // Trust the MIME type over the client-declared kind.
-  const kind = mediaKindFromContentType(input.contentType);
+  if (!isUploadPathUnder(input.storagePath, mediaPathPrefix(session.uid))) {
+    return { ok: false, error: "That upload isn't in your media folder." };
+  }
+  const stored = await statUploadedObject(input.storagePath);
+  if (!stored) {
+    return { ok: false, error: "The upload didn't finish. Try again." };
+  }
+  const kind = mediaKindFromContentType(stored.contentType);
   if (!kind) {
     return { ok: false, error: "Only photos and videos are allowed." };
+  }
+  if (stored.sizeBytes > MEDIA_MAX_BYTES) {
+    return { ok: false, error: "File is larger than the 500 MB limit." };
   }
 
   const now = new Date();
   const doc = dropUndefined({
     ...input,
     kind,
+    contentType: stored.contentType,
+    sizeBytes: stored.sizeBytes,
+    downloadUrl: await mediaDownloadUrl(input.storagePath),
     tags: input.tags ?? [],
-    linkedVeteranId: input.linkedVeteranId ?? null,
+    // Social-only users never see veterans, so they can't link one.
+    linkedVeteranId: canViewVeteran(session)
+      ? (input.linkedVeteranId ?? null)
+      : null,
     status: "new" as const,
     usedAt: null,
     usedBy: null,
@@ -204,8 +226,16 @@ export async function deleteMediaAction(
 
   // Best-effort Storage cleanup — a missing object shouldn't block removing
   // the record.
+  // Only ever inside the uploader's own folder, whatever an older record
+  // claims — a media record must not be able to delete a veteran's file.
   try {
-    await mediaBucket().file(media.storagePath).delete({ ignoreNotFound: true });
+    if (isUploadPathUnder(media.storagePath, mediaPathPrefix(media.createdBy))) {
+      await mediaBucket()
+        .file(media.storagePath)
+        .delete({ ignoreNotFound: true });
+    } else {
+      console.error("media path outside its folder", id);
+    }
   } catch (err) {
     console.error("media storage delete failed", err);
   }

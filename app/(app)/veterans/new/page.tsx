@@ -4,10 +4,12 @@ import { canCreateVeteran, canReassignVeteran } from "@/lib/permissions";
 import { listUsers } from "@/lib/db/users";
 import { listVsos } from "@/lib/db/vsos";
 import { VeteranForm } from "../veteran-form";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewVeteranPage() {
+  await requireCrm();
   const session = await getSession();
   if (!canCreateVeteran(session)) redirect("/veterans");
   const canReassign = canReassignVeteran(session);

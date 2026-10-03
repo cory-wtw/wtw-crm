@@ -1,7 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { clearSession, createSession } from "@/lib/firebase/session";
+import {
+  clearSession,
+  createSession,
+  SignInRejected,
+} from "@/lib/firebase/session";
 
 export async function createSessionAction(
   idToken: string,
@@ -10,16 +14,14 @@ export async function createSessionAction(
     await createSession(idToken);
     return { ok: true };
   } catch (error) {
+    // Known rejections (not invited, deactivated) are written for the user.
+    // Anything else is infrastructure — log it, don't hand its details to
+    // someone who isn't signed in yet.
+    if (error instanceof SignInRejected) {
+      return { ok: false, error: error.message };
+    }
     console.error("createSession failed", error);
-    // Surface the real message so the user (and we) can see what's wrong.
-    // The known user-facing reasons come from decideAuth(); infrastructure
-    // errors (bad PEM, network) will also surface, which is the right
-    // tradeoff while we're still bedding in production.
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "Could not create a session. Try again.";
-    return { ok: false, error: message };
+    return { ok: false, error: "Could not create a session. Try again." };
   }
 }
 

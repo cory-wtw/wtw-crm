@@ -10,6 +10,7 @@ import {
   type PartnershipStatus,
   PIPELINE_LABELS,
 } from "@/lib/schemas";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function VsoDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireCrm();
   const { id } = await params;
   const [vso, session, veterans] = await Promise.all([
     getVso(id),

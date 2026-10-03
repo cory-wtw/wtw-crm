@@ -24,6 +24,11 @@ import {
 } from "@/lib/referral-text";
 import { stageVerification } from "@/lib/verifications";
 import {
+  revokeDownloadTokens,
+  statUploadedObject,
+} from "@/lib/storage-objects";
+import { attachmentPathPrefix, isUploadPathUnder } from "@/lib/storage-paths";
+import {
   canAccessCrm,
   canCreateReferral,
   canEditVeteran,
@@ -36,6 +41,7 @@ import {
   type EligibilityAnswers,
 } from "@/lib/intake";
 import {
+  ATTACHMENT_MAX_BYTES,
   attachmentInputSchema,
   attachmentRenameInputSchema,
   dependentsAnswerSchema,
@@ -595,7 +601,12 @@ async function requireVeteranEditAccess(
 /**
  * Record a file the client already uploaded to Firebase Storage. Mirrors
  * createMediaAction: the bytes never pass through the server, the browser
- * uploads directly to Storage and hands us back the path + URL.
+ * uploads directly to Storage and hands us back the path.
+ *
+ * The path is later downloaded and deleted with Admin credentials, so it
+ * must sit in this veteran's own folder. Type and size come from Storage,
+ * and the download token Firebase attaches on upload is stripped: the only
+ * way to fetch the file is the session-checked API route.
  */
 export async function createAttachmentAction(
   veteranId: string,
@@ -612,10 +623,36 @@ export async function createAttachmentAction(
   if (input.veteranId !== veteranId) {
     return { ok: false, error: "Veteran mismatch." };
   }
+  if (!isUploadPathUnder(input.storagePath, attachmentPathPrefix(veteranId))) {
+    return { ok: false, error: "That upload isn't in this veteran's folder." };
+  }
+  // One record per file: deleting a duplicate would take the file out from
+  // under the other record.
+  const duplicate = await adminDb
+    .collection("attachments")
+    .where("storagePath", "==", input.storagePath)
+    .limit(1)
+    .get();
+  if (!duplicate.empty) {
+    return { ok: false, error: "That file is already attached." };
+  }
+  const stored = await statUploadedObject(input.storagePath);
+  if (!stored) {
+    return { ok: false, error: "The upload didn't finish. Try again." };
+  }
+  if (stored.contentType !== "application/pdf") {
+    return { ok: false, error: "Attachments are stored as PDFs." };
+  }
+  if (stored.sizeBytes > ATTACHMENT_MAX_BYTES) {
+    return { ok: false, error: "File is larger than the 25 MB limit." };
+  }
+  await revokeDownloadTokens(input.storagePath);
 
   const now = new Date();
   const ref = await adminDb.collection("attachments").add({
     ...input,
+    contentType: stored.contentType,
+    sizeBytes: stored.sizeBytes,
     createdBy: access.session.uid,
     createdAt: now,
     updatedBy: access.session.uid,
@@ -689,10 +726,17 @@ export async function deleteAttachmentAction(
 
   // Best-effort Storage cleanup — a missing object shouldn't block removing
   // the record.
+  // Only ever inside this veteran's folder, whatever an older record claims.
   try {
-    await mediaBucket()
-      .file(attachment.storagePath)
-      .delete({ ignoreNotFound: true });
+    if (
+      isUploadPathUnder(attachment.storagePath, attachmentPathPrefix(veteranId))
+    ) {
+      await mediaBucket()
+        .file(attachment.storagePath)
+        .delete({ ignoreNotFound: true });
+    } else {
+      console.error("attachment path outside its folder", attachmentId);
+    }
   } catch (err) {
     console.error("attachment storage delete failed", err);
   }

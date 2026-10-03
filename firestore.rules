@@ -1,125 +1,15 @@
 rules_version = '2';
 
-// RBAC mirrors lib/permissions.ts. Note that today every Firestore write
-// goes through the Admin SDK in our Server Actions (which bypasses these
-// rules); these rules are belt-and-suspenders in case a future client-side
-// write path opens up. Keep them in sync with permissions.ts.
+// The browser never touches Firestore: every read and write goes through the
+// Admin SDK in Server Components and Server Actions, which bypass these rules.
+// So nothing is granted to client SDKs at all.
+//
+// This matters because Google sign-in creates a Firebase Auth user for ANY
+// Google account before createSession checks the invite allowlist. Rules
+// keyed on `request.auth != null` would hand that stranger the whole
+// database. Authorization lives in lib/permissions.ts, enforced server-side.
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return request.auth != null &&
-             request.auth.token.role == 'admin';
-    }
-
-    // Social-only users (the social media manager) can reach the media
-    // collection and nothing else. canAccessCrm gates the veteran/VSO/org/
-    // phone data collections. Mirrors isSocialOnly / canAccessCrm in
-    // permissions.ts.
-    function canAccessCrm() {
-      return request.auth != null &&
-             request.auth.token.role != 'social';
-    }
-
-    function isAssignee() {
-      return request.auth != null &&
-             resource.data.assigneeUid == request.auth.uid;
-    }
-
-    function assigneeUnchanged() {
-      return request.resource.data.assigneeUid == resource.data.assigneeUid;
-    }
-
-    match /users/{uid} {
-      // Users can read their own user doc. Admin SDK handles writes via
-      // the admin user-management UI.
-      allow read: if signedIn();
-      allow write: if false;
-    }
-
-    match /invites/{email} {
-      // Admin SDK only.
-      allow read, write: if false;
-    }
-
-    match /veterans/{id} {
-      allow read: if canAccessCrm();
-      allow create: if canAccessCrm();
-      // Admins can update anything. Standard users can update veterans
-      // assigned to them, as long as they're not changing the assignee.
-      allow update: if isAdmin() ||
-                       (isAssignee() && assigneeUnchanged());
-      allow delete: if isAdmin();
-
-      match /encounters/{encounterId} {
-        // Everyone with CRM access can read + create encounters. Edits +
-        // deletes require admin or the parent veteran's assignee.
-        allow read, create: if canAccessCrm();
-        allow update: if isAdmin() ||
-                         get(/databases/$(database)/documents/veterans/$(id))
-                           .data.assigneeUid == request.auth.uid;
-        allow delete: if false;
-      }
-    }
-
-    match /vsos/{id} {
-      allow read: if canAccessCrm();
-      allow create, update: if canAccessCrm();
-      allow delete: if false;
-    }
-
-    match /resources/{id} {
-      // Community resource directory (outside orgs we refer veterans to).
-      // Same shape as vsos: any CRM user can read/create/update.
-      allow read: if canAccessCrm();
-      allow create, update: if canAccessCrm();
-      allow delete: if false;
-    }
-
-    match /media/{id} {
-      // Social media wall. Anyone signed in can read, add, and update
-      // (mark used / new). Deletes are restricted to the uploader or an
-      // admin — mirrors canDeleteMedia in permissions.ts. In practice every
-      // write goes through the Admin SDK in Server Actions; these are
-      // belt-and-suspenders.
-      allow read: if signedIn();
-      allow create, update: if signedIn();
-      allow delete: if isAdmin() ||
-                       (signedIn() &&
-                        resource.data.createdBy == request.auth.uid);
-    }
-
-    match /attachments/{id} {
-      // Files attached to a veteran's record. Same CRM-access gate as the
-      // veteran collection itself — social-only users can't reach these.
-      // In practice every write goes through the Admin SDK in Server
-      // Actions; this is belt-and-suspenders.
-      allow read, create, update: if canAccessCrm();
-      allow delete: if canAccessCrm();
-    }
-
-    match /verifications/{id} {
-      // Append-only log of resource verification checks. Written only by the
-      // server (Admin SDK), in the same batch as the resource status change it
-      // justifies — never by a client, and never edited or deleted once
-      // written. CRM users can read it so the resource detail and the Phase 7
-      // review queue can show why a record was flagged.
-      allow read: if canAccessCrm();
-      allow write: if false;
-    }
-
-    match /auditLog/{id} {
-      // Written only by the server (Admin SDK). Admins can read via the
-      // /admin/audit page; the rule below is belt-and-suspenders.
-      allow read: if isAdmin();
-      allow write: if false;
-    }
-
-    // Deny-all for anything else.
     match /{document=**} {
       allow read, write: if false;
     }

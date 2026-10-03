@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { canRunIntake } from "@/lib/permissions";
 import { IntakeForm } from "./intake-form";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function IntakePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireCrm();
   const { id } = await params;
   const veteran = await getVeteran(id);
   if (!veteran) notFound();

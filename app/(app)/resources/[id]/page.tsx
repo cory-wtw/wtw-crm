@@ -19,6 +19,7 @@ import {
   VERIFICATION_RESULT_LABELS,
   VERIFICATION_STATUS_LABELS,
 } from "@/lib/schemas";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,7 @@ export default async function ResourceDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireCrm();
   const { id } = await params;
   const [resource, session, latestCheck] = await Promise.all([
     getResource(id),

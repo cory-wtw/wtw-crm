@@ -6,9 +6,12 @@ import "server-only";
  * form (filename*=) so names with accents/punctuation still work in
  * modern browsers per RFC 6266.
  */
-export function attachmentDisposition(name: string): string {
+export function attachmentDisposition(
+  name: string,
+  disposition: "attachment" | "inline" = "attachment",
+): string {
   const base = name.trim() || "file";
   const ascii = base.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
   const encoded = encodeURIComponent(base);
-  return `attachment; filename="${ascii}.pdf"; filename*=UTF-8''${encoded}.pdf`;
+  return `${disposition}; filename="${ascii}.pdf"; filename*=UTF-8''${encoded}.pdf`;
 }

@@ -3,11 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytesResumable,
-} from "firebase/storage";
+import { ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase/client";
 import { convertToPdf, isConvertibleFile } from "@/lib/pdf-convert";
 import { ATTACHMENT_MAX_BYTES } from "@/lib/schemas";
@@ -20,7 +16,6 @@ import {
 export type AttachmentRow = {
   id: string;
   name: string;
-  downloadUrl: string;
   sizeBytes: number;
   createdAtIso: string;
 };
@@ -183,13 +178,17 @@ function UploadForm({
         pdfBytes.byteOffset,
         pdfBytes.byteOffset + pdfBytes.byteLength,
       ) as ArrayBuffer;
+      // Storage rules check the role claim, which the server may have set
+      // after this tab's ID token was minted. Pick up the current one.
+      await auth.currentUser?.getIdToken(true);
+
       const task = uploadBytesResumable(
         storageRef(storage, path),
         new Blob([pdfArrayBuffer], { type: "application/pdf" }),
         { contentType: "application/pdf" },
       );
 
-      const downloadUrl = await new Promise<string>((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         task.on(
           "state_changed",
           (snap) =>
@@ -197,16 +196,13 @@ function UploadForm({
               Math.round((snap.bytesTransferred / snap.totalBytes) * 100),
             ),
           reject,
-          () => getDownloadURL(task.snapshot.ref).then(resolve, reject),
+          () => resolve(),
         );
       });
 
       const res = await createAttachmentAction(veteranId, {
         veteranId,
         storagePath: path,
-        downloadUrl,
-        contentType: "application/pdf",
-        sizeBytes: pdfBytes.byteLength,
         fileName: `${sanitize(name.trim())}.pdf`,
         name: name.trim(),
       });
@@ -381,7 +377,7 @@ function AttachmentItem({
           </form>
         ) : (
           <a
-            href={item.downloadUrl}
+            href={`/api/veterans/${veteranId}/attachments/${item.id}?inline=1`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm font-bold underline-offset-4 hover:underline"

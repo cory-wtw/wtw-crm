@@ -34,6 +34,7 @@ import {
 } from "@/lib/schemas";
 import { EncounterForm } from "./encounter-form";
 import { StageChanger } from "./stage-changer";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export default async function VeteranDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireCrm();
   const { id } = await params;
   const veteran = await getVeteran(id);
   if (!veteran) notFound();
@@ -403,7 +405,6 @@ export default async function VeteranDetailPage({
         items={attachments.map((a) => ({
           id: a.id,
           name: a.name,
-          downloadUrl: a.downloadUrl,
           sizeBytes: a.sizeBytes,
           createdAtIso: a.createdAt.toISOString(),
         }))}

@@ -3,7 +3,11 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { adminAuth } from "./admin";
 import { adminDb } from "./admin";
-import { decideAuth } from "@/lib/auth-provisioning";
+import {
+  claimsForUser,
+  decideAuth,
+  isTrustedSignIn,
+} from "@/lib/auth-provisioning";
 import {
   deleteInvite as deleteInviteDoc,
   getInvite,
@@ -22,17 +26,26 @@ export type Session = {
 };
 
 /**
+ * A rejection the user should see verbatim (not on the allowlist,
+ * deactivated, ...). Anything else createSession throws is infrastructure
+ * and gets a generic message — see createSessionAction.
+ */
+export class SignInRejected extends Error {}
+
+/**
  * Verifies the Firebase ID token, runs the allowlist + provisioning
- * decision, and mints an 8-hour session cookie. Throws when the user
- * isn't allowed so the calling Server Action surfaces a clear error.
+ * decision, and mints an 8-hour session cookie. Throws SignInRejected when
+ * the user isn't allowed so the calling Server Action surfaces a clear error.
  */
 export async function createSession(idToken: string): Promise<void> {
   const decoded = await adminAuth.verifyIdToken(idToken);
-  if (!decoded.email) {
-    throw new Error("Your Google account didn't provide an email address.");
+  if (!isTrustedSignIn(decoded)) {
+    throw new SignInRejected(
+      "Sign in with a verified Google account to continue.",
+    );
   }
 
-  const normalizedEmail = normalizeEmail(decoded.email);
+  const normalizedEmail = normalizeEmail(decoded.email!);
   const [existingUser, existingInvite] = await Promise.all([
     getUser(decoded.uid),
     getInvite(normalizedEmail),
@@ -45,7 +58,7 @@ export async function createSession(idToken: string): Promise<void> {
   });
 
   if (decision.action === "reject") {
-    throw new Error(decision.reason);
+    throw new SignInRejected(decision.reason);
   }
 
   const now = new Date();
@@ -68,11 +81,16 @@ export async function createSession(idToken: string): Promise<void> {
     });
     await deleteInviteDoc(normalizedEmail);
   } else {
-    // Existing active user — just touch lastLoginAt.
+    // Existing active user — touch lastLoginAt, and make sure the role claim
+    // Storage rules key on matches the users doc (it may predate claims).
     await adminDb
       .collection("users")
       .doc(decoded.uid)
       .update({ lastLoginAt: now });
+    const claims = claimsForUser(decision.user);
+    if (decoded.role !== claims.role) {
+      await adminAuth.setCustomUserClaims(decoded.uid, claims);
+    }
   }
 
   const sessionCookie = await adminAuth.createSessionCookie(idToken, {

@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { canRecordFollowUp } from "@/lib/permissions";
 import { FollowUpForm } from "./follow-up-form";
+import { requireCrm } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function FollowUpPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireCrm();
   const { id } = await params;
   const veteran = await getVeteran(id);
   if (!veteran) notFound();

@@ -226,6 +226,22 @@ Footer of every authenticated page:
 - [ ] No PII in client-side logs, error reports, or analytics
 - [ ] HTTPS only (Firebase Hosting handles this)
 
+### Access model (keep these true)
+
+- Google sign-in creates a Firebase Auth user for **any** Google account before the invite allowlist runs. So no rule may grant on `request.auth != null` alone.
+- Firestore rules deny all client access; every read/write is server-side (Admin SDK).
+- Storage rules allow **create only**, keyed on the `role` custom claim. Attachments are read only through `/api/veterans/...`; no download tokens are kept.
+- Every page calls `requireCrm()` / `requireAdmin()` / `requireSession()` from `lib/auth-guards.ts` itself. Layout checks don't count — they can be skipped on client navigation.
+- `npm run test:rules` runs the rules against the emulators (also in CI).
+
+### Rolling out a rules change that tightens access
+
+1. Deploy the app first (it sets role claims on login and on role/active changes).
+2. `npm run backfill-role-claims` — gives existing users the `role` claim Storage now requires.
+3. `npm run deploy-rules`.
+4. `npm run revoke-attachment-tokens` — kills old public download links to attachments.
+5. Optional hardening: a `beforeUserCreated` blocking function that rejects emails not in `invites`, so stray Google accounts never get an Auth user at all. (Don't just disable sign-up in the console — invited users sign up on first login.)
+
 ---
 
 ## AirTable migration

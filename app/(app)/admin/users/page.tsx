@@ -4,10 +4,12 @@ import { listInvites } from "@/lib/db/invites";
 import { listAllUsers } from "@/lib/db/users";
 import { formatDate } from "@/lib/format";
 import { UserAdmin } from "./user-admin";
+import { requireAdmin } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminUsersPage() {
+  await requireAdmin();
   const session = await getSession();
   if (!session) notFound();
   if (session.role !== "admin") redirect("/");
