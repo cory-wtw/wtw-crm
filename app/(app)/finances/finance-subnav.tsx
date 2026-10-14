@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/finances", label: "Overview", exact: true },
+  { href: "/finances/spending", label: "Spending" },
   { href: "/finances/transactions", label: "Transactions" },
   { href: "/finances/import", label: "Import CSV" },
   { href: "/finances/categories", label: "Categories" },

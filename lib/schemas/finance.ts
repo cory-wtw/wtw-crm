@@ -11,6 +11,7 @@ import { z } from "zod";
 export const TRANSACTIONS_COLLECTION = "transactions";
 export const CATEGORIES_COLLECTION = "transactionCategories";
 export const RECORDS_COLLECTION = "financeRecords";
+export const VENDOR_ALIASES_COLLECTION = "vendorAliases";
 
 export const TRANSACTION_TYPES = ["income", "expense"] as const;
 export const transactionTypeSchema = z.enum(TRANSACTION_TYPES);

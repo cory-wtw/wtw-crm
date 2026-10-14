@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import {
   CATEGORIES_COLLECTION as CATEGORIES,
   RECORDS_COLLECTION as RECORDS,
+  VENDOR_ALIASES_COLLECTION as VENDOR_ALIASES,
   type FinanceRecord,
   TRANSACTIONS_COLLECTION as TRANSACTIONS,
   type Allocation,
@@ -11,7 +12,7 @@ import {
   type TransactionSource,
 } from "@/lib/schemas";
 
-export { CATEGORIES, RECORDS, TRANSACTIONS };
+export { CATEGORIES, RECORDS, TRANSACTIONS, VENDOR_ALIASES };
 
 function deserializeTransaction(
   id: string,
@@ -128,4 +129,14 @@ export async function listRecords(): Promise<FinanceRecord[]> {
 export async function getRecord(id: string): Promise<FinanceRecord | null> {
   const doc = await adminDb.collection(RECORDS).doc(id).get();
   return doc.exists ? deserializeRecord(doc.id, doc.data()!) : null;
+}
+
+/** Vendor merges/renames from the Spending tab: raw vendor key → display name. */
+export async function listVendorAliases(): Promise<Record<string, string>> {
+  const snap = await adminDb.collection(VENDOR_ALIASES).get();
+  return Object.fromEntries(
+    snap.docs
+      .map((d) => [d.data().key as string, d.data().name as string] as const)
+      .filter(([k, v]) => k && v),
+  );
 }
