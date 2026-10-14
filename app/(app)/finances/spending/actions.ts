@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
-import { VENDOR_ALIASES } from "@/lib/db/finance";
+import { VENDOR_ALIASES, VENDOR_MONTHLY } from "@/lib/db/finance";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSession } from "@/lib/firebase/session";
 import { canManageFinances } from "@/lib/permissions";
@@ -46,6 +46,43 @@ export async function setVendorNameAction(
     resourceType: "vendorAlias",
     resourceId: keys.join(", ").slice(0, 200),
     diff: { name: { before: null, after: name || null } },
+  });
+  revalidatePath("/finances/spending");
+  return { ok: true };
+}
+
+const monthlySchema = z.object({
+  /** The vendor's raw keys, so the amount survives renames and merges. */
+  keys: z.array(z.string().min(1).max(200)).min(1).max(50),
+  name: z.string().trim().min(1).max(100),
+  /** null clears it and goes back to the estimate from recent charges. */
+  monthly: z.number().finite().min(0).max(1_000_000).nullable(),
+});
+
+/** Set (or clear) what a recurring bill costs per month, e.g. a contractor's new rate. */
+export async function setVendorMonthlyAction(
+  raw: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!canManageFinances(session))
+    return { ok: false, error: "Only admins can manage finances." };
+
+  const parsed = monthlySchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Enter an amount in dollars." };
+  const { keys, name, monthly } = parsed.data;
+  const batch = adminDb.batch();
+  for (const key of keys) {
+    const ref = adminDb.collection(VENDOR_MONTHLY).doc(createHash("sha1").update(key).digest("hex").slice(0, 24));
+    if (monthly == null) batch.delete(ref);
+    else batch.set(ref, { key, name, monthly: Math.round(monthly * 100) / 100, updatedBy: session.uid, updatedAt: new Date() });
+  }
+  await batch.commit();
+  await logAudit({
+    action: monthly == null ? "delete" : "update",
+    resourceType: "vendorMonthly",
+    resourceId: name.slice(0, 200),
+    diff: { monthly: { before: null, after: monthly } },
   });
   revalidatePath("/finances/spending");
   return { ok: true };

@@ -112,10 +112,32 @@ export function summarizeVendors(
     acc.ids.push(tx.id);
     groups.set(groupId, acc);
   }
-  return [...groups.values()]
+  // Fold groups that end up with the same label. Merging A into an
+  // un-renamed vendor B aliases A's keys to "B" while B's own rows are still
+  // grouped by raw key; without this they'd show as two "B" rows. Names are
+  // unique after this, which the page relies on for keys and drill-downs.
+  const label = (a: Acc) => [...a.names.entries()].sort((x, y) => y[1] - x[1])[0][0];
+  const byName = new Map<string, Acc>();
+  for (const a of groups.values()) {
+    const id = label(a).toLowerCase();
+    const into = byName.get(id);
+    if (!into) {
+      byName.set(id, a);
+      continue;
+    }
+    for (const k of a.keys) into.keys.add(k);
+    for (const [n, c] of a.names) into.names.set(n, (into.names.get(n) ?? 0) + c);
+    for (const [c, v] of a.byCat) into.byCat.set(c, (into.byCat.get(c) ?? 0) + v);
+    into.cents += a.cents;
+    into.count += a.count;
+    if (a.first < into.first) into.first = a.first;
+    if (a.last > into.last) into.last = a.last;
+    into.ids.push(...a.ids);
+  }
+  return [...byName.values()]
     .map((a) => ({
       // Most common spelling wins as the label.
-      name: [...a.names.entries()].sort((x, y) => y[1] - x[1])[0][0],
+      name: label(a),
       keys: [...a.keys],
       total: a.cents / 100,
       count: a.count,
@@ -130,13 +152,31 @@ export function summarizeVendors(
 export type RecurringCharge = {
   name: string;
   mainCategoryId: string;
-  /** Average of the last three calendar months that had charges. */
+  /** What the bill costs a month now: the admin's figure if set, else `estimated`. */
   monthly: number;
+  /**
+   * Net charges in the latest calendar month it billed — so two policies
+   * billed in the same month both count and an old spike doesn't. Things
+   * billed more often than monthly use the last full month instead, since
+   * the current one is still filling up.
+   */
+  estimated: number;
+  /** Set by an admin on the Spending tab (e.g. a contractor's new rate). */
+  override?: number;
+  /** Raw vendor keys in this group — what an override is saved against. */
+  keys: string[];
+  /** Latest billing dates, newest first; same-week charges combined. */
+  recentBills: { date: string; amount: number }[];
   lastDate: string;
-  lastAmount: number;
   monthsCharged: number;
   active: boolean;
 };
+
+/**
+ * Raw vendor key → monthly amount an admin entered. Keyed like aliases, not
+ * by display name, so renaming or merging a vendor keeps its amount.
+ */
+export type MonthlyOverrides = Record<string, number>;
 
 /**
  * A recurring charge counts as stopped once it has gone quiet for 1.5× its
@@ -178,6 +218,7 @@ export function findRecurring(
   transactions: readonly SpendTransaction[],
   aliases: VendorAliases,
   today: string,
+  overrides: MonthlyOverrides = {},
 ): RecurringCharge[] {
   const vendors = summarizeVendors(transactions, aliases);
   const byId = new Map(transactions.map((t) => [t.id, t]));
@@ -206,24 +247,41 @@ export function findRecurring(
     const positiveMonths = [...monthTotals.values()].filter((c) => c > 0);
     if (positiveMonths.length && Math.max(...positiveMonths) > BILL_SPREAD * median(positiveMonths)) continue;
 
-    const recent = months.slice(-3).map((m) => monthTotals.get(m)!);
     const last = charges.at(-1) ?? txs.at(-1)!;
-    // Gaps between billing dates. Charges within a few days of each other
-    // are one billing date — two loans repaid on alternate days, or an
+    // Group charges into billing dates. Charges within a few days of each
+    // other are one bill — two loans repaid on alternate days, or an
     // invoice and its tax line — so they don't shrink the usual gap.
-    const days: string[] = [];
-    for (const t of charges) {
-      if (!days.length || daysBetween(days[days.length - 1], t.date) > SAME_BILLING_DAYS) days.push(t.date);
+    const bills: { date: string; cents: number }[] = [];
+    for (const t of txs) {
+      const prev = bills.at(-1);
+      if (prev && daysBetween(prev.date, t.date) <= SAME_BILLING_DAYS) prev.cents += cents(t.amount);
+      else if (t.amount > 0) bills.push({ date: t.date, cents: cents(t.amount) });
+      // A credit weeks later isn't part of any bill's amount; it still
+      // counts in the month totals below.
     }
+    const days = bills.map((b) => b.date);
     const dayGaps = days.slice(1).map((d, i) => daysBetween(days[i], d));
     const usualGap = dayGaps.length ? median(dayGaps) : 30;
     const quietLimit = Math.min(MAX_QUIET_DAYS, Math.max(MIN_QUIET_DAYS, usualGap * QUIET_MULTIPLIER));
+
+    const thisMonth = today.slice(0, 7);
+    const basisMonth =
+      usualGap < 20 && months.at(-1) === thisMonth && months.length > 1 ? months.at(-2)! : months.at(-1)!;
+    // A credit bigger than the month's charge would show an active bill as
+    // $0; fall back to what was actually charged that month.
+    const net = monthTotals.get(basisMonth) ?? 0;
+    const charged = charges.filter((t) => t.date.startsWith(basisMonth)).reduce((s, t) => s + cents(t.amount), 0);
+    const estimated = (net > 0 ? net : charged) / 100;
+    const override = v.keys.map((k) => overrides[k]).find((x) => x != null);
     out.push({
       name: v.name,
       mainCategoryId: v.mainCategoryId,
-      monthly: Math.round(recent.reduce((s, c) => s + c, 0) / recent.length) / 100,
+      monthly: override ?? estimated,
+      estimated,
+      ...(override != null ? { override } : {}),
+      keys: v.keys,
+      recentBills: bills.slice(-3).reverse().map((b) => ({ date: b.date, amount: b.cents / 100 })),
       lastDate: last.date,
-      lastAmount: last.amount,
       monthsCharged: months.length,
       active: daysBetween(last.date, today) <= quietLimit,
     });
