@@ -47,7 +47,7 @@ export default async function AuthenticatedLayout({
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">
+      <header className="sticky top-0 z-20 print:hidden border-b border-border bg-card/80 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">
           <Link href="/veterans" className="flex min-w-0 items-center gap-2">
             <Image
@@ -91,7 +91,7 @@ export default async function AuthenticatedLayout({
       <div className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
         <div className="mx-auto w-full max-w-6xl">{children}</div>
       </div>
-      <footer className="border-t border-border py-4">
+      <footer className="border-t border-border py-4 print:hidden">
         <div className="mx-auto w-full max-w-6xl px-4 text-center text-[11px] leading-relaxed text-muted-foreground sm:px-6">
           <p>
             Worth Their Weight is not a law firm and does not provide legal

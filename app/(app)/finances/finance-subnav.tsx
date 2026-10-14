@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/finances", label: "Overview", exact: true },
+  { href: "/finances/impact", label: "Impact" },
   { href: "/finances/spending", label: "Spending" },
   { href: "/finances/transactions", label: "Transactions" },
   { href: "/finances/import", label: "Import CSV" },
@@ -15,7 +16,7 @@ const TABS = [
 export function FinanceSubnav() {
   const pathname = usePathname();
   return (
-    <nav className="mobile-touch-scroll flex items-center gap-1 overflow-x-auto border-b border-border pb-2">
+    <nav className="mobile-touch-scroll print:hidden flex items-center gap-1 overflow-x-auto border-b border-border pb-2">
       {TABS.map((tab) => {
         const active = tab.exact
           ? pathname === tab.href
