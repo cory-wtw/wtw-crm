@@ -21,3 +21,16 @@ export function formatDate(value: Date | string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return "—";
   return monthDay.format(date);
 }
+
+const usdCents = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** Dollars and cents — for the books, where rounding to the dollar hides things. */
+export function formatUsdCents(amount: number | null | undefined): string {
+  if (amount == null || Number.isNaN(amount)) return "—";
+  return usdCents.format(amount);
+}

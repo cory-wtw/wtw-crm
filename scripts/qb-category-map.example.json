@@ -1,0 +1,22 @@
+{
+  "accounts": {
+    "Checking": "skip",
+    "Savings": "skip",
+    "Credit Card": "skip",
+    "Opening Balance Equity": "skip",
+    "Retained Earnings": "skip",
+    "Uncategorized Asset": "skip",
+
+    "Contributions": { "category": "Individual donations" },
+    "Contributions:Recurring": { "category": "Recurring donations" },
+    "Grants": { "category": "Grants" },
+
+    "Office Supplies & Software": { "category": "Software & subscriptions" },
+    "Legal & Professional Services": { "category": "Professional fees" },
+    "Bank Charges & Fees": { "category": "Bank & payment fees" },
+    "Advertising & Marketing": { "category": "Marketing & fundraising" },
+    "Insurance": { "category": "Insurance" },
+    "Travel": { "category": "Travel" },
+    "Uncategorized Expense": { "category": "Other expense" }
+  }
+}
