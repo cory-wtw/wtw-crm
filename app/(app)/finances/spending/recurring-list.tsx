@@ -2,14 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { formatUsdCents } from "@/lib/format";
+import { formatShortDate, formatUsdCents } from "@/lib/format";
 import type { RecurringCharge } from "@/lib/finance/spending";
 import { setVendorMonthlyAction } from "./actions";
 
 type Row = RecurringCharge & { category: string };
-
-const short = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export function RecurringList({ rows, empty, bare }: { rows: Row[]; empty: string; bare?: boolean }) {
   if (rows.length === 0) return empty ? <p className="text-xs text-muted-foreground">{empty}</p> : null;
@@ -32,7 +29,7 @@ function RecurringItem({ row }: { row: Row }) {
   async function save(monthly: number | null) {
     setBusy(true);
     setError(null);
-    const res = await setVendorMonthlyAction({ name: row.name, monthly });
+    const res = await setVendorMonthlyAction({ keys: row.keys, name: row.name, monthly });
     setBusy(false);
     if (!res.ok) return setError(res.error);
     setEditing(false);
@@ -46,7 +43,7 @@ function RecurringItem({ row }: { row: Row }) {
           <p className="truncate text-sm font-bold">{row.name}</p>
           <p className="truncate text-xs text-muted-foreground">
             {row.category} · last bills:{" "}
-            {row.recentBills.map((b) => `${short(b.date)} ${formatUsdCents(b.amount)}`).join(" · ")}
+            {row.recentBills.map((b) => `${formatShortDate(b.date)} ${formatUsdCents(b.amount)}`).join(" · ")}
           </p>
         </div>
         <div className="shrink-0 text-right">
@@ -56,7 +53,12 @@ function RecurringItem({ row }: { row: Row }) {
           </p>
           <button
             type="button"
-            onClick={() => setEditing((v) => !v)}
+            onClick={() => {
+              // Start from the current figure every time; the saved amount
+              // may have changed since this row first rendered.
+              if (!editing) setValue(String(row.override ?? row.estimated));
+              setEditing(!editing);
+            }}
             className="text-[11px] font-bold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             {row.override != null ? "your amount · edit" : "set amount"}

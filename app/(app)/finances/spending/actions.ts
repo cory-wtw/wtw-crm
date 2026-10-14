@@ -52,6 +52,8 @@ export async function setVendorNameAction(
 }
 
 const monthlySchema = z.object({
+  /** The vendor's raw keys, so the amount survives renames and merges. */
+  keys: z.array(z.string().min(1).max(200)).min(1).max(50),
   name: z.string().trim().min(1).max(100),
   /** null clears it and goes back to the estimate from recent charges. */
   monthly: z.number().finite().min(0).max(1_000_000).nullable(),
@@ -68,16 +70,18 @@ export async function setVendorMonthlyAction(
 
   const parsed = monthlySchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "Enter an amount in dollars." };
-  const { name, monthly } = parsed.data;
-  const ref = adminDb
-    .collection(VENDOR_MONTHLY)
-    .doc(createHash("sha1").update(name.toLowerCase()).digest("hex").slice(0, 24));
-  if (monthly == null) await ref.delete();
-  else await ref.set({ name, monthly: Math.round(monthly * 100) / 100, updatedBy: session.uid, updatedAt: new Date() });
+  const { keys, name, monthly } = parsed.data;
+  const batch = adminDb.batch();
+  for (const key of keys) {
+    const ref = adminDb.collection(VENDOR_MONTHLY).doc(createHash("sha1").update(key).digest("hex").slice(0, 24));
+    if (monthly == null) batch.delete(ref);
+    else batch.set(ref, { key, name, monthly: Math.round(monthly * 100) / 100, updatedBy: session.uid, updatedAt: new Date() });
+  }
+  await batch.commit();
   await logAudit({
     action: monthly == null ? "delete" : "update",
-    resourceType: "vendorAlias",
-    resourceId: `monthly: ${name}`.slice(0, 200),
+    resourceType: "vendorMonthly",
+    resourceId: name.slice(0, 200),
     diff: { monthly: { before: null, after: monthly } },
   });
   revalidatePath("/finances/spending");

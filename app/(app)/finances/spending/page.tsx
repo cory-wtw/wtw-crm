@@ -3,7 +3,7 @@ import { listCategories, listTransactions, listVendorAliases, listVendorMonthly 
 import { describeRange, rangePresets, rangeQuery, resolveRange, todayIso } from "@/lib/finance/range";
 import { inRange } from "@/lib/finance/report";
 import { findRecurring, spendByMonth, summarizeVendors, vendorName } from "@/lib/finance/spending";
-import { formatUsdCents } from "@/lib/format";
+import { formatMonth, formatUsdCents } from "@/lib/format";
 import { RecurringList } from "./recurring-list";
 import { SpendingVendors, type VendorTx } from "./spending-vendors";
 
@@ -139,7 +139,7 @@ export default async function SpendingPage({
                   return (
                     <tr key={m.month} className="border-t border-border">
                       <td className="px-3 py-2 font-bold">
-                        {new Date(`${m.month}-01T00:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" })}
+                        {formatMonth(m.month)}
                       </td>
                       {topCats.map((id) => (
                         <td key={id} className="px-3 py-2 text-right tabular-nums text-muted-foreground">

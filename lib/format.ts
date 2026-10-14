@@ -34,3 +34,13 @@ export function formatUsdCents(amount: number | null | undefined): string {
   if (amount == null || Number.isNaN(amount)) return "—";
   return usdCents.format(amount);
 }
+
+/** "Sep 22" from a YYYY-MM-DD date. UTC so the day never shifts by timezone. */
+export function formatShortDate(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/** "Sep 2026" from a YYYY-MM month. */
+export function formatMonth(yyyyMm: string): string {
+  return new Date(`${yyyyMm}-01T00:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}

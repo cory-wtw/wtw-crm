@@ -142,12 +142,12 @@ export async function listVendorAliases(): Promise<Record<string, string>> {
   );
 }
 
-/** Monthly amounts an admin set on the Spending tab: lower-cased vendor name → dollars. */
+/** Monthly amounts an admin set on the Spending tab: raw vendor key → dollars. */
 export async function listVendorMonthly(): Promise<Record<string, number>> {
   const snap = await adminDb.collection(VENDOR_MONTHLY).get();
   return Object.fromEntries(
     snap.docs
-      .map((d) => [String(d.data().name ?? "").toLowerCase(), Number(d.data().monthly)] as const)
+      .map((d) => [String(d.data().key ?? ""), Number(d.data().monthly)] as const)
       .filter(([k, v]) => k && Number.isFinite(v)),
   );
 }

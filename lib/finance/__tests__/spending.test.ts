@@ -65,6 +65,16 @@ describe("summarizeVendors", () => {
     expect(v[0].name.toLowerCase()).toBe("payroll");
   });
 
+  it("merges into a vendor that was never renamed", () => {
+    const v = summarizeVendors(
+      [tx({ vendor: "Amazon", amount: 50 }), tx({ vendor: "", description: "AMZN MKTP US*2K4", amount: 25 })],
+      { "AMZN MKTP": "Amazon" },
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]).toMatchObject({ name: "Amazon", total: 75 });
+    expect(v[0].keys.sort()).toEqual(["AMAZON", "AMZN MKTP"]);
+  });
+
   it("respects the date range", () => {
     expect(summarizeVendors(rows, {}, { from: "2026-10-01" }).map((x) => x.name)).toEqual(["Gusto"]);
   });
@@ -130,8 +140,28 @@ describe("findRecurring", () => {
 
   it("prefers an amount the admin set", () => {
     const rows = monthly("Magic", ["2026-07", "2026-08", "2026-09"], 1000);
-    const [m] = findRecurring(rows, {}, "2026-10-13", { magic: 440 });
+    const [m] = findRecurring(rows, {}, "2026-10-13", { MAGIC: 440 });
     expect(m).toMatchObject({ monthly: 440, estimated: 1000, override: 440 });
+    // Renaming the vendor keeps the amount: it's saved against the raw key.
+    const [renamed] = findRecurring(rows, { MAGIC: "Hilda (Magic)" }, "2026-10-13", { MAGIC: 440 });
+    expect(renamed).toMatchObject({ name: "Hilda (Magic)", monthly: 440 });
+  });
+
+  it("doesn't let a late credit rewrite an older bill", () => {
+    const rows = [
+      ...monthly("Gusto", ["2026-07", "2026-08", "2026-09"], 380),
+      tx({ vendor: "Gusto", date: "2026-08-28", amount: -280 }),
+    ];
+    const [g] = findRecurring(rows, {}, "2026-10-01");
+    expect(g.recentBills.map((b) => b.amount)).toEqual([380, 380, 380]);
+  });
+
+  it("doesn't show an active bill as $0 when a credit outweighs the month", () => {
+    const rows = [
+      ...monthly("Netlify", ["2026-07", "2026-08", "2026-09"], 20),
+      tx({ vendor: "Netlify", date: "2026-09-20", amount: -25 }),
+    ];
+    expect(findRecurring(rows, {}, "2026-10-01")[0].monthly).toBe(20);
   });
 
   it("uses the last full month for biweekly billing", () => {
