@@ -100,7 +100,7 @@ export default async function AuthenticatedLayout({
             agents, or Veterans Service Organizations.
           </p>
           <p className="mt-2">
-            Worth Their Weight · 501(c)(3) status pending · EIN 41-5275144 ·
+            Worth Their Weight · 501(c)(3) nonprofit · EIN 41-5275144 ·
             1100 Market Street, Suite 712, Chattanooga, TN 37402 · Internal use only
           </p>
         </div>

@@ -130,6 +130,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /vendorAliases/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /auditLog/{id} {
       // Written only by the server (Admin SDK). Admins can read via the
       // /admin/audit page; the rule below is belt-and-suspenders.
