@@ -7,40 +7,66 @@ import { auth } from "@/lib/firebase/client";
 import { humanizeAuthError } from "@/lib/auth-errors";
 import { createSessionAction } from "./actions";
 
+/**
+ * Where sign-in is up to. Anything but "idle" locks the form: after the
+ * Google popup closes there are several quiet seconds (session cookie, then
+ * the first page render — much longer in dev while it compiles) where a
+ * second click would start the whole flow over.
+ */
+type Phase = "idle" | "google" | "session" | "loading";
+
+const PHASE_LABEL: Record<Exclude<Phase, "idle">, string> = {
+  google: "Waiting for Google…",
+  session: "Signing you in…",
+  loading: "Loading the Roster…",
+};
+
 export function LoginForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [, startTransition] = useTransition();
 
   async function onGoogleSignIn() {
+    if (phase !== "idle") return;
     setError(null);
+    setPhase("google");
     try {
       const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+      setPhase("session");
       const idToken = await cred.user.getIdToken();
       const result = await createSessionAction(idToken);
       if (!result.ok) {
         setError(result.error);
+        setPhase("idle");
         return;
       }
+      // Stay locked from here on: this component unmounts when the Roster
+      // renders, so there's nothing to reset.
+      setPhase("loading");
       startTransition(() => {
         router.replace("/");
         router.refresh();
       });
     } catch (err) {
       setError(humanizeAuthError(err));
+      setPhase("idle");
     }
   }
+
+  const busy = phase !== "idle";
 
   return (
     <div className="space-y-4">
       <button
         type="button"
         onClick={onGoogleSignIn}
-        disabled={isPending}
+        disabled={busy}
+        aria-busy={busy}
         className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
       >
-        <GoogleMark />
-        {isPending ? "Signing in…" : "Sign in with Google"}
+        {busy ? <Spinner /> : <GoogleMark />}
+        {busy ? PHASE_LABEL[phase] : "Sign in with Google"}
       </button>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <p className="text-center text-xs text-muted-foreground">
@@ -48,6 +74,15 @@ export function LoginForm() {
         in, ask an admin to invite you.
       </p>
     </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <span
+      aria-hidden
+      className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+    />
   );
 }
 
