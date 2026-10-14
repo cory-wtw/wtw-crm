@@ -10,3 +10,4 @@ export * from "./encounter";
 export * from "./media";
 export * from "./attachment";
 export * from "./audit";
+export * from "./finance";

@@ -45,6 +45,22 @@ service firebase.storage {
       allow delete: if false;
     }
 
+    // Finance source documents (ledger exports, statements, receipts).
+    // Files live under finance-records/{uid}/{fileName}. A signed-in user may
+    // only write into their own folder; the role claim isn't reliable in ID
+    // tokens (see attachments above), so the admin check happens in the
+    // server action that records the upload — an upload it rejects is never
+    // listed. Nobody reads these through the client SDK: downloads go
+    // through /api/finances/records/{id}, which checks for admin. Capped at
+    // 25 MB — mirrors RECORD_MAX_BYTES.
+    match /finance-records/{uid}/{fileName=**} {
+      allow read: if false;
+      allow write: if signedIn() &&
+                      request.auth.uid == uid &&
+                      request.resource.size < 25 * 1024 * 1024;
+      allow delete: if false;
+    }
+
     // Deny everything else.
     match /{allPaths=**} {
       allow read, write: if false;

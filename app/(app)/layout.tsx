@@ -38,7 +38,10 @@ export default async function AuthenticatedLayout({
         { href: "/resources", label: "Resources" },
         { href: "/social", label: "Social" },
         ...(session.role === "admin"
-          ? [{ href: "/admin/users", label: "Admin" }]
+          ? [
+              { href: "/finances", label: "Finances" },
+              { href: "/admin/users", label: "Admin" },
+            ]
           : []),
       ];
 

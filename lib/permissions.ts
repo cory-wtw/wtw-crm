@@ -172,3 +172,11 @@ export function canEditMedia(
   if (session.role === "admin") return true;
   return media.createdBy === session.uid;
 }
+
+/**
+ * The books are admin-only. Donor names and what WTW spends money on aren't
+ * something every volunteer with a CRM login needs to see.
+ */
+export function canManageFinances(session: SessionLike | null): boolean {
+  return isAdmin(session);
+}
