@@ -130,13 +130,26 @@ export function summarizeVendors(
 export type RecurringCharge = {
   name: string;
   mainCategoryId: string;
-  /** Average of the last three calendar months that had charges. */
+  /** What the bill costs a month now: the admin's figure if set, else `estimated`. */
   monthly: number;
+  /**
+   * Net charges in the latest calendar month it billed — so two policies
+   * billed in the same month both count and an old spike doesn't. Things
+   * billed more often than monthly use the last full month instead, since
+   * the current one is still filling up.
+   */
+  estimated: number;
+  /** Set by an admin on the Spending tab (e.g. a contractor's new rate). */
+  override?: number;
+  /** Latest billing dates, newest first; same-week charges combined. */
+  recentBills: { date: string; amount: number }[];
   lastDate: string;
-  lastAmount: number;
   monthsCharged: number;
   active: boolean;
 };
+
+/** Lower-cased vendor name → monthly amount an admin entered. */
+export type MonthlyOverrides = Record<string, number>;
 
 /**
  * A recurring charge counts as stopped once it has gone quiet for 1.5× its
@@ -178,6 +191,7 @@ export function findRecurring(
   transactions: readonly SpendTransaction[],
   aliases: VendorAliases,
   today: string,
+  overrides: MonthlyOverrides = {},
 ): RecurringCharge[] {
   const vendors = summarizeVendors(transactions, aliases);
   const byId = new Map(transactions.map((t) => [t.id, t]));
@@ -206,24 +220,35 @@ export function findRecurring(
     const positiveMonths = [...monthTotals.values()].filter((c) => c > 0);
     if (positiveMonths.length && Math.max(...positiveMonths) > BILL_SPREAD * median(positiveMonths)) continue;
 
-    const recent = months.slice(-3).map((m) => monthTotals.get(m)!);
     const last = charges.at(-1) ?? txs.at(-1)!;
-    // Gaps between billing dates. Charges within a few days of each other
-    // are one billing date — two loans repaid on alternate days, or an
+    // Group charges into billing dates. Charges within a few days of each
+    // other are one bill — two loans repaid on alternate days, or an
     // invoice and its tax line — so they don't shrink the usual gap.
-    const days: string[] = [];
-    for (const t of charges) {
-      if (!days.length || daysBetween(days[days.length - 1], t.date) > SAME_BILLING_DAYS) days.push(t.date);
+    const bills: { date: string; cents: number }[] = [];
+    for (const t of txs) {
+      const prev = bills.at(-1);
+      if (prev && daysBetween(prev.date, t.date) <= SAME_BILLING_DAYS) prev.cents += cents(t.amount);
+      else if (t.amount > 0) bills.push({ date: t.date, cents: cents(t.amount) });
+      else if (prev) prev.cents += cents(t.amount); // a refund nets against the bill before it
     }
+    const days = bills.map((b) => b.date);
     const dayGaps = days.slice(1).map((d, i) => daysBetween(days[i], d));
     const usualGap = dayGaps.length ? median(dayGaps) : 30;
     const quietLimit = Math.min(MAX_QUIET_DAYS, Math.max(MIN_QUIET_DAYS, usualGap * QUIET_MULTIPLIER));
+
+    const thisMonth = today.slice(0, 7);
+    const basisMonth =
+      usualGap < 20 && months.at(-1) === thisMonth && months.length > 1 ? months.at(-2)! : months.at(-1)!;
+    const estimated = Math.max(0, monthTotals.get(basisMonth) ?? 0) / 100;
+    const override = overrides[v.name.toLowerCase()];
     out.push({
       name: v.name,
       mainCategoryId: v.mainCategoryId,
-      monthly: Math.round(recent.reduce((s, c) => s + c, 0) / recent.length) / 100,
+      monthly: override ?? estimated,
+      estimated,
+      ...(override != null ? { override } : {}),
+      recentBills: bills.slice(-3).reverse().map((b) => ({ date: b.date, amount: b.cents / 100 })),
       lastDate: last.date,
-      lastAmount: last.amount,
       monthsCharged: months.length,
       active: daysBetween(last.date, today) <= quietLimit,
     });

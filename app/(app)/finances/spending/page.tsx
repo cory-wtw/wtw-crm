@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { listCategories, listTransactions, listVendorAliases } from "@/lib/db/finance";
+import { listCategories, listTransactions, listVendorAliases, listVendorMonthly } from "@/lib/db/finance";
 import { describeRange, rangePresets, rangeQuery, resolveRange, todayIso } from "@/lib/finance/range";
 import { inRange } from "@/lib/finance/report";
 import { findRecurring, spendByMonth, summarizeVendors, vendorName } from "@/lib/finance/spending";
 import { formatUsdCents } from "@/lib/format";
+import { RecurringList } from "./recurring-list";
 import { SpendingVendors, type VendorTx } from "./spending-vendors";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +16,11 @@ export default async function SpendingPage({
 }) {
   const today = todayIso();
   const range = resolveRange(await searchParams, today);
-  const [transactions, categories, aliases] = await Promise.all([
+  const [transactions, categories, aliases, overrides] = await Promise.all([
     listTransactions(),
     listCategories(),
     listVendorAliases(),
+    listVendorMonthly(),
   ]);
   const catName = Object.fromEntries(categories.map((c) => [c.id, c.name]));
   const rows = transactions.map((t) => ({
@@ -31,7 +33,7 @@ export default async function SpendingPage({
     categoryId: t.categoryId,
   }));
 
-  const recurring = findRecurring(rows, aliases, today);
+  const recurring = findRecurring(rows, aliases, today, overrides);
   const active = recurring.filter((r) => r.active);
   const stopped = recurring.filter((r) => !r.active);
   const monthlyTotal = active.reduce((s, r) => s + Math.round(r.monthly * 100), 0) / 100;
@@ -77,16 +79,16 @@ export default async function SpendingPage({
           </p>
         </div>
         <p className="text-xs text-muted-foreground">
-          Anything billed in three or more months (two back to back), or at least every few weeks. The monthly figure averages the last three months it charged. A charge counts as stopped once it has gone quiet for half again its usual billing gap (about 45 days for a monthly bill).
+          Each bill&apos;s monthly cost is what it charged in its latest billing cycle, unless you set an amount. A bill counts as stopped once it&apos;s gone quiet for half again its usual gap (about 45 days for a monthly bill).
         </p>
-        <RecurringTable rows={active} catName={catName} empty="No active recurring charges." />
+        <RecurringList rows={active.map((r) => ({ ...r, category: catName[r.mainCategoryId] ?? "Uncategorized" }))} empty="No active recurring charges." />
         {stopped.length > 0 && (
           <details className="rounded-lg border border-border bg-card">
             <summary className="cursor-pointer px-4 py-3 text-sm font-bold">
               Stopped ({stopped.length}) <span className="font-normal text-muted-foreground">— gone quiet for longer than usual</span>
             </summary>
             <div className="border-t border-border">
-              <RecurringTable rows={stopped} catName={catName} empty="" bare />
+              <RecurringList rows={stopped.map((r) => ({ ...r, category: catName[r.mainCategoryId] ?? "Uncategorized" }))} empty="" bare />
             </div>
           </details>
         )}
@@ -178,37 +180,5 @@ export default async function SpendingPage({
         />
       </section>
     </div>
-  );
-}
-
-function RecurringTable({
-  rows,
-  catName,
-  empty,
-  bare,
-}: {
-  rows: ReturnType<typeof findRecurring>;
-  catName: Record<string, string>;
-  empty: string;
-  bare?: boolean;
-}) {
-  if (rows.length === 0) return empty ? <p className="text-xs text-muted-foreground">{empty}</p> : null;
-  return (
-    <ul className={`divide-y divide-border ${bare ? "" : "rounded-lg border border-border bg-card"}`}>
-      {rows.map((r) => (
-        <li key={r.name} className="flex items-center gap-3 px-4 py-2.5">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold">{r.name}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {catName[r.mainCategoryId] ?? "Uncategorized"} · last {formatUsdCents(r.lastAmount)} on {r.lastDate} · {r.monthsCharged} months
-            </p>
-          </div>
-          <span className="shrink-0 text-sm font-bold tabular-nums">
-            {formatUsdCents(r.monthly)}
-            <span className="text-xs font-normal text-muted-foreground">/mo</span>
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }

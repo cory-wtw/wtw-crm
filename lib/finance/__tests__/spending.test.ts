@@ -106,6 +106,42 @@ describe("findRecurring", () => {
     expect(rawVendorKey({ vendor: "", description: "Return for GUSTO - FEE 505875" })).toBe(rawVendorKey({ vendor: "", description: "GUSTO - FEE 1" }));
   });
 
+  it("uses the latest billing cycle, not an average", () => {
+    const rows = [
+      tx({ vendor: "Magic", date: "2026-07-16", amount: 1080 }),
+      tx({ vendor: "Magic", date: "2026-08-27", amount: 1262 }),
+      tx({ vendor: "Magic", date: "2026-09-22", amount: 880 }),
+      // Two insurance policies billed two weeks apart both count.
+      ...["2026-07-06", "2026-08-08", "2026-09-08"].map((date) => tx({ vendor: "NEXT", date, amount: 21.9 })),
+      ...["2026-07-22", "2026-08-22", "2026-09-22"].map((date) => tx({ vendor: "NEXT", date, amount: 36.33 })),
+    ];
+    const r = findRecurring(rows, {}, "2026-10-13");
+    expect(r.find((x) => x.name === "Magic")).toMatchObject({
+      monthly: 880,
+      estimated: 880,
+      recentBills: [
+        { date: "2026-09-22", amount: 880 },
+        { date: "2026-08-27", amount: 1262 },
+        { date: "2026-07-16", amount: 1080 },
+      ],
+    });
+    expect(r.find((x) => x.name === "NEXT")?.monthly).toBe(58.23);
+  });
+
+  it("prefers an amount the admin set", () => {
+    const rows = monthly("Magic", ["2026-07", "2026-08", "2026-09"], 1000);
+    const [m] = findRecurring(rows, {}, "2026-10-13", { magic: 440 });
+    expect(m).toMatchObject({ monthly: 440, estimated: 1000, override: 440 });
+  });
+
+  it("uses the last full month for biweekly billing", () => {
+    const rows = ["2026-08-04", "2026-08-18", "2026-09-01", "2026-09-15", "2026-09-29", "2026-10-13"].map((date) =>
+      tx({ vendor: "Loan", date, amount: 100 }),
+    );
+    // October has only one payment so far; September had three.
+    expect(findRecurring(rows, {}, "2026-10-14")[0].monthly).toBe(300);
+  });
+
   it("skips shopping that happens to repeat monthly", () => {
     const rows = [
       tx({ vendor: "Walmart", date: "2026-07-03", amount: 612.4 }),

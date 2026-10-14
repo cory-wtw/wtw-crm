@@ -4,6 +4,7 @@ import {
   CATEGORIES_COLLECTION as CATEGORIES,
   RECORDS_COLLECTION as RECORDS,
   VENDOR_ALIASES_COLLECTION as VENDOR_ALIASES,
+  VENDOR_MONTHLY_COLLECTION as VENDOR_MONTHLY,
   type FinanceRecord,
   TRANSACTIONS_COLLECTION as TRANSACTIONS,
   type Allocation,
@@ -12,7 +13,7 @@ import {
   type TransactionSource,
 } from "@/lib/schemas";
 
-export { CATEGORIES, RECORDS, TRANSACTIONS, VENDOR_ALIASES };
+export { CATEGORIES, RECORDS, TRANSACTIONS, VENDOR_ALIASES, VENDOR_MONTHLY };
 
 function deserializeTransaction(
   id: string,
@@ -138,5 +139,15 @@ export async function listVendorAliases(): Promise<Record<string, string>> {
     snap.docs
       .map((d) => [d.data().key as string, d.data().name as string] as const)
       .filter(([k, v]) => k && v),
+  );
+}
+
+/** Monthly amounts an admin set on the Spending tab: lower-cased vendor name → dollars. */
+export async function listVendorMonthly(): Promise<Record<string, number>> {
+  const snap = await adminDb.collection(VENDOR_MONTHLY).get();
+  return Object.fromEntries(
+    snap.docs
+      .map((d) => [String(d.data().name ?? "").toLowerCase(), Number(d.data().monthly)] as const)
+      .filter(([k, v]) => k && Number.isFinite(v)),
   );
 }
