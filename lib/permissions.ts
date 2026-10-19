@@ -48,14 +48,17 @@ export function canCreateVeteran(session: SessionLike | null): boolean {
   return canAccessCrm(session);
 }
 
-/** Admins can edit any veteran. Standard can only edit ones assigned to them. */
+/**
+ * Anyone with CRM access can edit any veteran — assignment doesn't gate
+ * edits. The veteran stays in the signature so callers don't change if
+ * per-record rules ever come back.
+ */
 export function canEditVeteran(
   session: SessionLike | null,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   veteran: VeteranLike,
 ): boolean {
-  if (!canAccessCrm(session)) return false;
-  if (session!.role === "admin") return true;
-  return veteran.assigneeUid === session!.uid;
+  return canAccessCrm(session);
 }
 
 /**

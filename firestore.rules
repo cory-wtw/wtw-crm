@@ -25,11 +25,6 @@ service cloud.firestore {
              request.auth.token.role != 'social';
     }
 
-    function isAssignee() {
-      return request.auth != null &&
-             resource.data.assigneeUid == request.auth.uid;
-    }
-
     function assigneeUnchanged() {
       return request.resource.data.assigneeUid == resource.data.assigneeUid;
     }
@@ -49,19 +44,15 @@ service cloud.firestore {
     match /veterans/{id} {
       allow read: if canAccessCrm();
       allow create: if canAccessCrm();
-      // Admins can update anything. Standard users can update veterans
-      // assigned to them, as long as they're not changing the assignee.
+      // Any CRM user can update any veteran. Only admins can change the
+      // assignee.
       allow update: if isAdmin() ||
-                       (isAssignee() && assigneeUnchanged());
+                       (canAccessCrm() && assigneeUnchanged());
       allow delete: if isAdmin();
 
       match /encounters/{encounterId} {
-        // Everyone with CRM access can read + create encounters. Edits +
-        // deletes require admin or the parent veteran's assignee.
-        allow read, create: if canAccessCrm();
-        allow update: if isAdmin() ||
-                         get(/databases/$(database)/documents/veterans/$(id))
-                           .data.assigneeUid == request.auth.uid;
+        // Everyone with CRM access can read, create, and edit encounters.
+        allow read, create, update: if canAccessCrm();
         allow delete: if false;
       }
     }
