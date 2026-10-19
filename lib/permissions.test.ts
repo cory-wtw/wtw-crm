@@ -61,10 +61,10 @@ describe("canEditVeteran", () => {
     expect(canEditVeteran(ADMIN, VET_B)).toBe(true);
     expect(canEditVeteran(ADMIN, VET_UNASSIGNED)).toBe(true);
   });
-  it("standard can edit only their own", () => {
+  it("standard can edit any veteran", () => {
     expect(canEditVeteran(STANDARD_A, VET_A)).toBe(true);
-    expect(canEditVeteran(STANDARD_A, VET_B)).toBe(false);
-    expect(canEditVeteran(STANDARD_A, VET_UNASSIGNED)).toBe(false);
+    expect(canEditVeteran(STANDARD_A, VET_B)).toBe(true);
+    expect(canEditVeteran(STANDARD_A, VET_UNASSIGNED)).toBe(true);
   });
   it("not-signed-in can edit nothing", () => {
     expect(canEditVeteran(null, VET_A)).toBe(false);
@@ -216,9 +216,9 @@ describe("canRunIntake", () => {
     expect(canRunIntake(ADMIN, { assigneeUid: "u-b" })).toBe(true);
   });
 
-  it("lets a standard user run intake only on their own", () => {
+  it("lets a standard user run intake on any veteran", () => {
     expect(canRunIntake(STANDARD_A, { assigneeUid: "u-a" })).toBe(true);
-    expect(canRunIntake(STANDARD_A, { assigneeUid: "u-b" })).toBe(false);
+    expect(canRunIntake(STANDARD_A, { assigneeUid: "u-b" })).toBe(true);
   });
 
   it("keeps social-only users out", () => {
@@ -241,8 +241,8 @@ describe("canCreateReferral", () => {
     }
   });
 
-  it("keeps a standard user off someone else's veteran", () => {
-    expect(canCreateReferral(STANDARD_A, { assigneeUid: "u-b" })).toBe(false);
+  it("lets a standard user refer for any veteran", () => {
+    expect(canCreateReferral(STANDARD_A, { assigneeUid: "u-b" })).toBe(true);
   });
 
   it("keeps social-only users out entirely", () => {
@@ -269,9 +269,9 @@ describe("canRecordFollowUp", () => {
     expect(canRecordFollowUp(ADMIN, { assigneeUid: "u-b" })).toBe(true);
   });
 
-  it("keeps a standard user to their own caseload", () => {
+  it("lets a standard user record any veteran's follow-up", () => {
     expect(canRecordFollowUp(STANDARD_A, { assigneeUid: "u-a" })).toBe(true);
-    expect(canRecordFollowUp(STANDARD_A, { assigneeUid: "u-b" })).toBe(false);
+    expect(canRecordFollowUp(STANDARD_A, { assigneeUid: "u-b" })).toBe(true);
   });
 
   it("keeps social-only users out entirely", () => {

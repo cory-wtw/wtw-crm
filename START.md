@@ -159,7 +159,7 @@ Audit log entries are written by Cloud Functions triggers on every relevant coll
 | --- | --- | --- |
 | View any veteran | ✅ | ✅ |
 | Create veteran | ✅ | ✅ |
-| Edit veteran | ✅ | ✅ (only ones assigned to them) |
+| Edit veteran | ✅ | ✅ |
 | Delete veteran | ✅ | ❌ |
 | Change pipeline stage | ✅ | ✅ |
 | Reassign veteran | ✅ | ❌ |

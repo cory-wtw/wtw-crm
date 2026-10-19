@@ -185,7 +185,7 @@ export async function runIntakeAction(
   if (!canRunIntake(session, { assigneeUid: existing.assigneeUid ?? null })) {
     return {
       ok: false,
-      error: "You can only run intake for veterans assigned to you.",
+      error: "Your account can't run intake.",
     };
   }
 
@@ -433,7 +433,7 @@ export async function createReferralAction(
   ) {
     return {
       ok: false,
-      error: "You can only send referrals for veterans assigned to you.",
+      error: "Your account can't send referrals.",
     };
   }
 
@@ -586,7 +586,7 @@ async function requireVeteranEditAccess(
   ) {
     return {
       ok: false,
-      error: "You can only manage files for veterans assigned to you.",
+      error: "Your account can't manage files.",
     };
   }
   return { ok: true, session };

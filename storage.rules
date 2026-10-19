@@ -31,8 +31,8 @@ service firebase.storage {
     // media below: signedIn() only, not a role check — the `role` custom
     // claim is set once at provisioning (see createSession in
     // lib/firebase/session.ts) and never refreshed, so most existing
-    // users' ID tokens don't carry it. The real access gate (CRM-only,
-    // assignee/admin) lives in canEditVeteran + the veteran route, and
+    // users' ID tokens don't carry it. The real access gate (CRM-only)
+    // lives in canEditVeteran + the veteran route, and
     // every Firestore write goes through the Admin SDK regardless.
     // Capped at 25 MB — mirrors ATTACHMENT_MAX_BYTES.
     match /attachments/{veteranId}/{fileName=**} {

@@ -158,7 +158,7 @@ export async function editVeteranAction(
   ) {
     return {
       ok: false,
-      error: "You can only edit veterans assigned to you.",
+      error: "Your account can't edit veterans.",
     };
   }
 
@@ -245,7 +245,7 @@ export async function changeStageAction(
   ) {
     return {
       ok: false,
-      error: "You can only change the stage on veterans assigned to you.",
+      error: "Your account can't change the stage.",
     };
   }
 
