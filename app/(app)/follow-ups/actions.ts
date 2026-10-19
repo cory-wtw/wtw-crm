@@ -109,7 +109,7 @@ export async function recordFollowUpAction(
   ) {
     return {
       ok: false,
-      error: "You can only record follow-ups for veterans assigned to you.",
+      error: "Your account can't record follow-ups.",
     };
   }
 
