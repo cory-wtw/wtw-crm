@@ -7,6 +7,7 @@ import { getSession } from "@/lib/firebase/session";
 import { isSocialOnly, isSocialPath } from "@/lib/permissions";
 import { NavLink } from "./nav-link";
 import { MobileNav, type NavItem } from "./mobile-nav";
+import { version } from "@/package.json";
 
 export default async function AuthenticatedLayout({
   children,
@@ -62,6 +63,9 @@ export default async function AuthenticatedLayout({
               <span className="sm:hidden">WTW Roster</span>
               <span className="hidden sm:inline">
                 Worth Their Weight Roster
+              </span>
+              <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                v{version}
               </span>
             </span>
           </Link>
