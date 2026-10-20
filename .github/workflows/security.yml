@@ -166,7 +166,7 @@ jobs:
             For every finding:
             1. Confirm it is real by reading the code. If it is a false positive, suppress it
                narrowly with a comment saying why (CodeQL: `// codeql[<rule-id>]` on the line;
-               gitleaks: add the fingerprint to .gitleaksignore with a comment).
+               gitleaks: add an allowlist entry to .gitleaks.toml with a comment).
             2. Otherwise fix the root cause with the smallest correct change.
                - Dependencies: `npm audit fix` first; for the rest, bump the direct dependency
                  or add an `overrides` entry. Never use `--force` without checking the changelog
