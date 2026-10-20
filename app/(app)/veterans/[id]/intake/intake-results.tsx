@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
+import { startLine } from "@/lib/referral-text";
 import { MATCH_FLAG_LABELS } from "@/lib/matching/flags";
 import {
   GATE_FAILURE_LABELS,
   type GateFailure,
 } from "@/lib/matching/labels";
 import {
-  ACCESS_METHOD_LABELS,
   BUCKET_LABELS,
   TYPICAL_WAIT_LABELS,
   type Bucket,
@@ -515,10 +515,8 @@ function CandidateCard({
           )}
 
           <p className="text-sm">
-            <span className="font-bold">
-              {ACCESS_METHOD_LABELS[candidate.accessMethod]}:
-            </span>{" "}
-            {candidate.accessValue ?? "—"}
+            <span className="font-bold">How to start:</span>{" "}
+            {startLine(candidate)}
           </p>
 
           {candidate.eligibilityNotes && (
