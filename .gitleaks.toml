@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+# Firebase web API key — public by design (shipped to the browser); access is
+# enforced by firestore.rules / storage.rules, not by keeping this secret.
+[[allowlists]]
+description = "Firebase web API key"
+regexTarget = "match"
+regexes = ['''AIzaSyAbyv5AhyY2H4EvuxMVrfLYjUyoqUVw46w''']

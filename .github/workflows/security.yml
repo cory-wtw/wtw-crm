@@ -1,0 +1,187 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so new advisories against unchanged code still surface.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          output: sarif
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-codeql
+          path: sarif/
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      # Fails the PR if it introduces a new high/critical vulnerable dependency.
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  npm-audit:
+    name: Dependency scan (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: npm audit
+        run: npm audit --json > npm-audit.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-npm-audit
+          path: npm-audit.json
+      # Non-blocking until the existing backlog is cleared — new advisories
+      # are gated by dependency-review, and claude-fix works the rest.
+      - name: Check for high/critical advisories
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+  secrets:
+    name: Secret detection (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz \
+            | tar xz -C "$RUNNER_TEMP" gitleaks
+      - name: Scan history
+        run: $RUNNER_TEMP/gitleaks git . --redact --exit-code 0 --report-format json --report-path gitleaks.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-gitleaks
+          path: gitleaks.json
+      - name: Fail on leaks
+        run: |
+          jq -r '.[] | "::error file=\(.File),line=\(.StartLine)::\(.RuleID) in commit \(.Commit[:7]) (fingerprint \(.Fingerprint))"' gitleaks.json
+          n=$(jq length gitleaks.json)
+          if [ "$n" -gt 0 ]; then echo "::error::gitleaks found $n potential secret(s)"; exit 1; fi
+
+  claude-fix:
+    name: Claude fixes findings
+    needs: [codeql, npm-audit, secrets]
+    # Skip fork PRs and Dependabot (no secrets), and Claude's own pushes (no loops).
+    if: >-
+      always() &&
+      github.actor != 'dependabot[bot]' &&
+      github.actor != 'claude[bot]' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: report-*
+          path: security-reports
+      - name: Count findings
+        id: findings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd security-reports
+          codeql=$(cat report-codeql/*.sarif 2>/dev/null | jq -s '[.[].runs[].results | length] | add // 0')
+          leaks=$(cat report-gitleaks/gitleaks.json 2>/dev/null | jq -s '.[0] // [] | length')
+          deps=$(cat report-npm-audit/npm-audit.json 2>/dev/null | jq -s '.[0].metadata.vulnerabilities.total // 0')
+          total=$((codeql + leaks + deps))
+          echo "CodeQL: $codeql, gitleaks: $leaks, npm audit: $deps" | tee -a "$GITHUB_STEP_SUMMARY"
+          # Outside PRs, don't stack a second fix PR on top of an open one.
+          if [ "$GITHUB_EVENT_NAME" != pull_request ] && \
+             [ -n "$(gh pr list --head claude/security-fixes --state open --json number -q '.[].number')" ]; then
+            echo "Open claude/security-fixes PR already exists; skipping." | tee -a "$GITHUB_STEP_SUMMARY"
+            total=0
+          fi
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.findings.outputs.total != '0'
+        with:
+          node-version: "20"
+          cache: "npm"
+      - uses: anthropics/claude-code-action@v1
+        if: steps.findings.outputs.total != '0'
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-stub
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-stub
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-stub
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-stub
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "0"
+          NEXT_PUBLIC_FIREBASE_APP_ID: ci-stub
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm:*),Bash(npx tsc:*),Bash(git:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(jq:*),Bash(ls:*),Bash(cat:*)"
+          prompt: |
+            You are fixing security scan findings in ${{ github.repository }}.
+            Reports are in ./security-reports (do NOT commit that directory):
+              - report-codeql/*.sarif — CodeQL SAST results
+              - report-gitleaks/gitleaks.json — secrets found in git history (values redacted)
+              - report-npm-audit/npm-audit.json — vulnerable npm dependencies
+            Read AGENTS.md first; this repo uses a Next.js version with breaking
+            changes, so check node_modules/next/dist/docs/ before touching Next code.
+
+            For every finding:
+            1. Confirm it is real by reading the code. If it is a false positive, suppress it
+               narrowly with a comment saying why (CodeQL: `// codeql[<rule-id>]` on the line;
+               gitleaks: add an allowlist entry to .gitleaks.toml with a comment).
+            2. Otherwise fix the root cause with the smallest correct change.
+               - Dependencies: `npm audit fix` first; for the rest, bump the direct dependency
+                 or add an `overrides` entry. Never use `--force` without checking the changelog
+                 for breaking changes. Regenerate package-lock.json with npm, never by hand.
+               - Secrets: remove the value from the code and read it from an env var /
+                 apphosting secret instead. History can't be cleaned here — list every real
+                 secret under a "⚠️ Rotate these" heading in the PR body.
+            3. Never edit .github/workflows, never disable a test or lint rule, never weaken
+               firestore.rules / storage.rules.
+
+            Then run `npm ci`, `npm run typecheck`, `npm run lint`, `npm test` and `npm run build`.
+            Everything must pass; fix what you broke. If a finding can't be fixed safely, leave
+            it and explain why in the PR body.
+
+            Commit with a clear message.
+            ${{ github.event_name == 'pull_request'
+                && format('This is PR #{0}: push your commits to its branch with `git push origin HEAD:{1}`, then leave one `gh pr comment` summarising what you fixed and anything left.', github.event.pull_request.number, github.head_ref)
+                || 'Create branch `claude/security-fixes` from main, push it, and open a PR to main with `gh pr create`. In the body, list each finding and what you did about it.' }}
