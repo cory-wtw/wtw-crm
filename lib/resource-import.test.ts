@@ -191,3 +191,17 @@ describe("the checked-in seed file", () => {
     }
   });
 });
+
+describe("population restriction", () => {
+  it("maps the MST and homeless requirement labels", () => {
+    const result = parseSeedResource({
+      org_name: "Beyond MST",
+      buckets: ["Mental Health & Recovery"],
+      reqs: ["MST survivors only", "Homeless veterans only"],
+    });
+    expect(result.ok && result.input.populationRestriction).toEqual([
+      "mst",
+      "homeless",
+    ]);
+  });
+});

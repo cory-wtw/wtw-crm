@@ -3,11 +3,16 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
-import { GATE_FAILURE_LABELS, MATCH_FLAG_LABELS } from "@/lib/matching";
+import {
+  GATE_FAILURE_LABELS,
+  MATCH_FLAG_LABELS,
+  type GateFailure,
+} from "@/lib/matching";
 import {
   ACCESS_METHOD_LABELS,
   BUCKET_LABELS,
   TYPICAL_WAIT_LABELS,
+  type Bucket,
 } from "@/lib/schemas";
 import {
   createReferralAction,
@@ -16,6 +21,31 @@ import {
   type ReferralResult,
 } from "../actions";
 import { CrisisLine } from "./intake-form";
+
+/** The score, signal by signal, in the order staff reads it. */
+const BREAKDOWN_PARTS: [Exclude<keyof Candidate["breakdown"], "total">, string][] = [
+  ["crisis", "crisis"],
+  ["legalUnlock", "ID/legal first"],
+  ["bucketCoverage", "needs covered"],
+  ["geography", "distance"],
+  ["access", "access"],
+  ["wait", "wait"],
+  ["freshness", "freshness"],
+];
+
+/** A gate reason, with what the record serves when the reason is coverage —
+ *  a mis-bucketed record should be obvious without opening it. */
+function failureText(r: { failures: GateFailure[]; buckets: Bucket[] }): string {
+  return r.failures
+    .map((f) =>
+      f === "no-bucket-overlap"
+        ? `${GATE_FAILURE_LABELS[f]} (serves ${
+            r.buckets.map((b) => BUCKET_LABELS[b]).join(", ") || "nothing set"
+          })`
+        : GATE_FAILURE_LABELS[f],
+    )
+    .join(" · ");
+}
 
 /** How many resources go in one referral packet. */
 const PACKET_SIZE = 5;
@@ -323,7 +353,7 @@ export function IntakeResults({
                   {r.organizationName}
                 </label>
                 <span className="text-xs text-muted-foreground">
-                  Gated out: {r.failures.map((f) => GATE_FAILURE_LABELS[f]).join(", ") || "—"}
+                  Gated out: {failureText(r) || "—"}
                 </span>
               </li>
             ))}
@@ -376,9 +406,7 @@ export function IntakeResults({
                       <p className="text-xs text-muted-foreground">
                         {r.failures.length === 0
                           ? "Passed the gates but ranked below the short list"
-                          : r.failures
-                              .map((f) => GATE_FAILURE_LABELS[f])
-                              .join(" · ")}
+                          : failureText(r)}
                       </p>
                     </div>
                     <button
@@ -472,6 +500,12 @@ function CandidateCard({
               score {candidate.score}
             </span>
           </div>
+
+          <p className="text-[11px] text-muted-foreground">
+            {BREAKDOWN_PARTS.filter(([key]) => candidate.breakdown[key] > 0)
+              .map(([key, label]) => `${label} ${candidate.breakdown[key]}`)
+              .join(" · ")}
+          </p>
 
           {oneLiner && (
             <p className="line-clamp-2 text-sm text-muted-foreground">

@@ -15,6 +15,12 @@ import {
   MIN_DISCHARGE_RANK,
   type Resource,
 } from "@/lib/schemas";
+import {
+  countiesForLocality,
+  countyForPlace,
+  nearbyCounties,
+  sameCounty,
+} from "@/lib/geo/counties";
 import type { MatchInput } from "./types";
 
 /** Why a resource was excluded. Codes, so the review screen can label them. */
@@ -27,6 +33,7 @@ export const GATE_FAILURES = [
   "valid-id",
   "era",
   "dependents",
+  "population",
   "no-bucket-overlap",
   "unverified",
 ] as const;
@@ -42,6 +49,7 @@ export const GATE_FAILURE_LABELS: Record<GateFailure, string> = {
   "valid-id": "Requires a valid ID",
   era: "Restricted to other service eras",
   dependents: "Requires dependents",
+  population: "Only serves a group they're not in",
   "no-bucket-overlap": "Doesn't cover what they need",
   unverified: "Record not verified",
 };
@@ -58,10 +66,8 @@ export type GateResult = {
  *
  * Normalizes case, punctuation, and spacing, then matches on the whole string
  * or on a whole-word run inside it, so "Chattanooga" matches a locality
- * recorded as "Chattanooga, TN" or "Greater Chattanooga". It does NOT know
- * that Chattanooga sits in Hamilton County — city-to-county resolution needs a
- * lookup table this system doesn't have, so a county-scoped resource must list
- * the cities it covers. Phase 0 is where that shows up.
+ * recorded as "Chattanooga, TN" or "Greater Chattanooga". Text only — county
+ * resolution lives in localityMatch, which falls back to this.
  */
 export function matchesLocality(locality: string, city: string): boolean {
   const normalize = (value: string) =>
@@ -86,6 +92,39 @@ export function matchesLocality(locality: string, city: string): boolean {
 }
 
 /**
+ * How close a local resource's service area comes to where the veteran lives.
+ *
+ * `local`: one of its localities names their city, or resolves to their county
+ * ("Walker County" for Rossville, "LaFayette" for a 30741 ZIP). `nearby`: both
+ * sit in the Chattanooga metro, which crosses the state line — a Hamilton
+ * County program is a short drive from Rossville. `null`: neither.
+ */
+export function localityMatch(
+  v: MatchInput,
+  r: Resource,
+): "local" | "nearby" | null {
+  const home = countyForPlace({ zip: v.zip, city: v.city, state: v.state });
+  let best: "local" | "nearby" | null = null;
+
+  for (const locality of r.geoLocalities) {
+    if (
+      v.city &&
+      v.state &&
+      r.geoStates.includes(v.state) &&
+      matchesLocality(locality, v.city)
+    ) {
+      return "local";
+    }
+    if (!home) continue;
+    for (const county of countiesForLocality(locality, r.geoStates)) {
+      if (sameCounty(county, home)) return "local";
+      if (nearbyCounties(county, home)) best = "nearby";
+    }
+  }
+  return best;
+}
+
+/**
  * Whether a resource will take this veteran.
  *
  * Unknown answers fail closed. An unstated discharge ranks with
@@ -103,16 +142,14 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
     return { passes: false, failures: ["not-crisis-capable"] };
   }
 
-  if (r.geoScope !== "national") {
-    if (!v.state || !r.geoStates.includes(v.state)) {
-      failures.push("geography");
-    } else if (r.geoScope !== "state") {
-      if (
-        !v.city ||
-        !r.geoLocalities.some((locality) => matchesLocality(locality, v.city!))
-      ) {
-        failures.push("locality");
-      }
+  if (r.geoScope === "state") {
+    if (!v.state || !r.geoStates.includes(v.state)) failures.push("geography");
+  } else if (r.geoScope !== "national") {
+    // A metro match may cross the state line, so locality is tried first.
+    if (!localityMatch(v, r)) {
+      failures.push(
+        !v.state || !r.geoStates.includes(v.state) ? "geography" : "locality",
+      );
     }
   }
 
@@ -141,6 +178,15 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
   // unknown: better a shorter list than a wasted trip.
   if (r.requiresDependents && v.hasDependents !== "yes") {
     failures.push("dependents");
+  }
+
+  // Only a stated membership opens this. An MST resource offered to someone who
+  // never raised it is a guess about them, and a wrong one is a bad call.
+  if (
+    r.populationRestriction.length > 0 &&
+    !r.populationRestriction.some((p) => v.situations?.includes(p))
+  ) {
+    failures.push("population");
   }
 
   if (!r.buckets.some((bucket) => v.needs.includes(bucket))) {

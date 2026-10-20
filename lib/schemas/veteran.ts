@@ -128,6 +128,9 @@ export const veteranSchema = z.object({
   // Location
   city: z.string().optional(),
   state: z.string().optional(),
+  /** Resolves to a county for matching — resources list counties, and a city
+   *  name alone can't always say which one. */
+  zip: z.string().optional(),
 
   // Eligibility keys, captured at intake. All optional — a call can end early,
   // and a half-finished intake still has to leave a usable record. Every one of

@@ -12,6 +12,7 @@ import {
   type Resource,
   STALE_AFTER_DAYS,
 } from "@/lib/schemas";
+import { localityMatch } from "./gates";
 import type { MatchInput } from "./types";
 
 /**
@@ -28,6 +29,8 @@ export const RANKING_WEIGHTS = {
   legalUnlock: 200,
   geography: {
     locality: 120,
+    /** A neighboring county in the same metro — close, not home. */
+    nearby: 90,
     state: 80,
     national: 40,
   },
@@ -122,7 +125,9 @@ export function scoreResource(
       ? RANKING_WEIGHTS.geography.national
       : r.geoScope === "state"
         ? RANKING_WEIGHTS.geography.state
-        : RANKING_WEIGHTS.geography.locality;
+        : localityMatch(v, r) === "nearby"
+          ? RANKING_WEIGHTS.geography.nearby
+          : RANKING_WEIGHTS.geography.locality;
 
   const access = RANKING_WEIGHTS.access[r.accessMethod];
   const wait = RANKING_WEIGHTS.wait[r.typicalWait];

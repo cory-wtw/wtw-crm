@@ -29,6 +29,21 @@ export const ACCESS_METHOD_LABELS: Record<AccessMethod, string> = {
   referral: "Referral required",
 };
 
+/**
+ * Groups a resource serves exclusively. A resource that lists one only takes
+ * veterans in it — an MST helpline offered to someone who never raised MST
+ * reads as a guess about them, and HUD-VASH offered to someone with a roof
+ * wastes the call.
+ */
+export const POPULATIONS = ["mst", "homeless"] as const;
+export const populationSchema = z.enum(POPULATIONS);
+export type Population = z.infer<typeof populationSchema>;
+
+export const POPULATION_LABELS: Record<Population, string> = {
+  mst: "Military sexual trauma survivors",
+  homeless: "Veterans who are homeless",
+};
+
 /** How long from first contact to being seen. */
 export const TYPICAL_WAITS = [
   "sameday",
@@ -162,6 +177,9 @@ export const resourceSchema = z.object({
   /** Empty means unrestricted. */
   eraRestriction: z.array(serviceEraSchema).default([]),
   requiresDependents: z.boolean().default(false),
+  /** Empty means open to everyone. Otherwise the veteran must be in one of
+   *  these groups — stated at intake, never inferred. */
+  populationRestriction: z.array(populationSchema).default([]),
   /** Same-day intake available. The only resources surfaced when a veteran
    *  has nowhere safe tonight. */
   crisisCapable: z.boolean().default(false),

@@ -51,6 +51,7 @@ const formSchema = z.object({
   birthYear: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+  zip: z.string().optional(),
 
   // Eligibility keys. Blank here means "no answer on file" and is written as
   // an explicit clear — unlike intake, where blank means "not asked".
@@ -111,6 +112,7 @@ export function VeteranForm({
       birthYear: "",
       city: "",
       state: "",
+      zip: "",
       dischargeCharacter: "",
       serviceEra: "",
       idStatus: "",
@@ -139,6 +141,7 @@ export function VeteranForm({
       birthYear: toNumber(values.birthYear),
       city: values.city || undefined,
       state: values.state || undefined,
+      zip: values.zip?.trim() || undefined,
       // null, not undefined: this form is the one place a stored eligibility
       // answer can be cleared, and undefined would be dropped before it ever
       // reached Firestore.
@@ -217,6 +220,10 @@ export function VeteranForm({
         />
         <Field label="City" input={<Input {...register("city")} />} />
         <Field label="State" input={<Input {...register("state")} />} />
+        <Field
+          label="ZIP"
+          input={<Input inputMode="numeric" {...register("zip")} />}
+        />
       </Section>
 
       <Section title="Eligibility keys">

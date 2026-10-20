@@ -314,6 +314,8 @@ export function parseSeedResource(source: SeedResource): SeedParse {
     ["requires dependents", "requiresDependents"],
     ["requires a valid id", "requiresValidId"],
     ["same-day / crisis capable", "crisisCapable"],
+    ["mst survivors only", "populationRestriction"],
+    ["homeless veterans only", "populationRestriction"],
   ]);
   for (const req of reqs) {
     if (!KNOWN_REQS.has(req)) errors.push(`unknown requirement "${req}"`);
@@ -356,6 +358,10 @@ export function parseSeedResource(source: SeedResource): SeedParse {
     requiresValidId: reqs.has("requires a valid id"),
     eraRestriction: [],
     requiresDependents: reqs.has("requires dependents"),
+    populationRestriction: [
+      ...(reqs.has("mst survivors only") ? (["mst"] as const) : []),
+      ...(reqs.has("homeless veterans only") ? (["homeless"] as const) : []),
+    ],
     crisisCapable: reqs.has("same-day / crisis capable"),
 
     accessMethod,
