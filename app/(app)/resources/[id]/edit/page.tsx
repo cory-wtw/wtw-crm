@@ -38,6 +38,7 @@ export default async function EditResourcePage({
             eligibility: resource.eligibility ?? "",
             eligibilityNotes: resource.eligibilityNotes ?? "",
             services: resource.services ?? "",
+            helpsWith: resource.helpsWith ?? "",
 
             buckets: resource.buckets,
             geoScope: resource.geoScope,

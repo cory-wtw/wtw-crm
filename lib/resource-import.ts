@@ -42,6 +42,7 @@ export type SeedResource = {
   phone?: string;
   email?: string;
   primary_services?: string;
+  what_they_help_with?: string;
   description?: string;
   eligibility_req?: string;
   buckets?: string[];
@@ -347,6 +348,7 @@ export function parseSeedResource(source: SeedResource): SeedParse {
     eligibility: text(raw.eligibility_req),
     eligibilityNotes: text(raw.elig_notes),
     services: text(raw.primary_services),
+    helpsWith: text(raw.what_they_help_with),
 
     buckets,
     geoScope,

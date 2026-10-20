@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { tidyVeteran } from "@/lib/tidy";
 import { redirect } from "next/navigation";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
@@ -81,7 +82,7 @@ export async function createVeteranAction(
   if (!parsed.success) {
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
-  const input = parsed.data;
+  const input = tidyVeteran(parsed.data);
 
   const now = new Date();
   const stage = input.pipelineStage ?? "found";
@@ -142,7 +143,7 @@ export async function editVeteranAction(
   if (!parsed.success) {
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
-  const input = parsed.data;
+  const input = tidyVeteran(parsed.data);
 
   const docRef = adminDb.collection("veterans").doc(id);
   const existingSnap = await docRef.get();

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { tidyResource } from "@/lib/tidy";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { findByExternalId } from "@/lib/external-id";
@@ -105,7 +106,7 @@ export async function importResourcesAction(
 
     const existingId = await findByExternalId(mapped.externalId);
     const shared = dropUndefined({
-      ...validated.data,
+      ...tidyResource(validated.data),
       externalId: mapped.externalId,
       updatedBy: guard.session.uid,
       updatedAt: now,

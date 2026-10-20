@@ -54,6 +54,7 @@ const FIELD_LABELS: Record<
   ReferralResult["substitutions"][number]["field"],
   string
 > = {
+  helpsWith: "what-they-help-with line",
   description: "description",
   services: "services line",
   eligibilityNotes: "eligibility notes",

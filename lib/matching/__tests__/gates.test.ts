@@ -7,6 +7,7 @@ import {
   matchesLocality,
   passesGates,
 } from "../gates";
+import { housingPopulations } from "@/lib/schemas";
 import { aResource, aVeteran, daysBefore } from "./fixtures";
 
 describe("passesGates", () => {
@@ -451,7 +452,7 @@ describe("county resolution (Rossville, GA)", () => {
 
   it("matches a city to the county a resource lists", () => {
     expect(passesGates(april(), walkerOnly).passes).toBe(true);
-    expect(localityMatch(april(), walkerOnly)).toBe("local");
+    expect(localityMatch(april(), walkerOnly)).toBe("county");
   });
 
   it("resolves from ZIP alone", () => {
@@ -466,7 +467,7 @@ describe("county resolution (Rossville, GA)", () => {
       geoStates: ["GA"],
       geoLocalities: ["LaFayette"],
     });
-    expect(localityMatch(april(), lafayette)).toBe("local");
+    expect(localityMatch(april(), lafayette)).toBe("county");
   });
 
   it("treats the Chattanooga metro as in range across the state line", () => {
@@ -475,7 +476,7 @@ describe("county resolution (Rossville, GA)", () => {
       geoStates: ["TN"],
       geoLocalities: ["Chattanooga area"],
     });
-    expect(localityMatch(april(), chattanooga)).toBe("nearby");
+    expect(localityMatch(april(), chattanooga)).toBe("adjacent");
     expect(passesGates(april(), chattanooga).passes).toBe(true);
   });
 
@@ -516,5 +517,24 @@ describe("population restriction", () => {
 
   it("leaves unrestricted resources alone", () => {
     expect(passesGates(aVeteran(), aResource()).passes).toBe(true);
+  });
+});
+
+describe("housing status", () => {
+  const ssvf = aResource({ populationRestriction: ["homeless", "housing-risk"] });
+  const hudVash = aResource({ populationRestriction: ["homeless"] });
+  const at = (status?: "stable" | "at-risk" | "homeless") =>
+    aVeteran({ situations: housingPopulations(status) });
+
+  it("hides SSVF from someone stably housed or unasked", () => {
+    expect(passesGates(at("stable"), ssvf).passes).toBe(false);
+    expect(passesGates(at(undefined), ssvf).passes).toBe(false);
+  });
+
+  it("offers SSVF at risk or homeless, HUD-VASH homeless only", () => {
+    expect(passesGates(at("at-risk"), ssvf).passes).toBe(true);
+    expect(passesGates(at("homeless"), ssvf).passes).toBe(true);
+    expect(passesGates(at("at-risk"), hudVash).passes).toBe(false);
+    expect(passesGates(at("homeless"), hudVash).passes).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  neutralizePronouns,
   buildReferralPacket,
   buildReferralText,
   describeResource,
@@ -351,10 +352,103 @@ describe("buildReferralText", () => {
       firstName: "John",
       resources: [aPacketResource()],
     });
-    expect(text).toContain("Here's the organization we talked about.");
+    expect(text).toContain("Here is one organization that fits what you told me.");
   });
 
   it("carries the standing disclaimer", () => {
     expect(packet()).toContain("is not a law firm");
+  });
+});
+
+describe("April's email", () => {
+  const april = () =>
+    buildReferralText({
+      firstName: "April",
+      needs: ["housing", "work", "legal"],
+      resources: [
+        aPacketResource({
+          organizationName: "American Legion Post 214",
+          description: "Local American Legion post. He can stop by any time.",
+          helpsWith: "Help from other veterans with benefits and getting connected.",
+          buckets: ["claims"],
+          accessMethod: "walkin",
+          accessValue: "423-255-5438",
+          whatToBring: "His DD-214 and his ID",
+        }),
+        aPacketResource({
+          organizationName: "United Way 211",
+          buckets: ["housing"],
+          accessMethod: "phone",
+          accessValue: "Dial 211 and ask for veteran housing help",
+        }),
+        aPacketResource({ organizationName: "A", buckets: ["housing"] }),
+        aPacketResource({ organizationName: "B", buckets: ["housing"] }),
+        aPacketResource({ organizationName: "C", buckets: ["work"] }),
+      ],
+    });
+
+  it("opens with free, then counts in words", () => {
+    const text = april();
+    expect(text).toContain(
+      "Everything is free. This doesn't cost you anything. Not now, not ever.",
+    );
+    expect(text).toContain("Here are five organizations that fit what you told me.");
+    expect(text.indexOf("Everything is free")).toBeLessThan(text.indexOf("Here are five"));
+  });
+
+  it("uses the plain-language line for what they do", () => {
+    expect(april()).toContain(
+      "What they do: Help from other veterans with benefits and getting connected.",
+    );
+  });
+
+  it("only puts Call in front of a number, and offers a call for walk-ins", () => {
+    const text = april();
+    expect(text).toContain("How to start: Dial 211 and ask for veteran housing help.");
+    expect(text).not.toContain("Call Dial");
+    expect(text).toContain("How to start: Walk in, or call 423-255-5438.");
+  });
+
+  it("has no he/him/his", () => {
+    const text = april();
+    expect(text).not.toMatch(/\b(he|him|his|himself)\b/i);
+    expect(text).toContain("Bring: Their DD-214 and their ID");
+  });
+
+  it("names a need nothing covers instead of dropping it", () => {
+    expect(april()).toContain(
+      "We don't have an organization on this list yet for: Legal & Records. We're still looking.",
+    );
+  });
+
+  it("says a dead end is ours to fix", () => {
+    expect(april()).toMatch(/dead end.*we'll keep looking/);
+  });
+
+  it("signs off, then the disclaimer last", () => {
+    const text = april();
+    expect(text).toContain(
+      "Cory Gold\nExecutive Director, Worth Their Weight\ncory@worththeirweight.org",
+    );
+    expect(text.trimEnd().endsWith("Veterans Service Organizations.")).toBe(true);
+    expect(text.indexOf("cory@")).toBeLessThan(text.indexOf("not a law firm"));
+  });
+});
+
+describe("neutralizePronouns", () => {
+  it("rewrites he/him/his with the verb agreed", () => {
+    expect(neutralizePronouns("He needs to bring his ID so we can help him.")).toBe(
+      "They need to bring their ID so we can help them.",
+    );
+    expect(neutralizePronouns("he's welcome; he is eligible; he has served")).toBe(
+      "they're welcome; they are eligible; they have served",
+    );
+    expect(neutralizePronouns("his or her DD-214")).toBe("their DD-214");
+  });
+
+  it("leaves words that merely contain the letters alone", () => {
+    expect(neutralizePronouns("The shelter helps the hungry")).toBe(
+      "The shelter helps the hungry",
+    );
   });
 });

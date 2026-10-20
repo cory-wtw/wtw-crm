@@ -28,9 +28,11 @@ export const RANKING_WEIGHTS = {
   crisis: 1000,
   legalUnlock: 200,
   geography: {
-    locality: 120,
-    /** A neighboring county in the same metro — close, not home. */
-    nearby: 90,
+    /** Local resources, nearest first — see localityMatch. */
+    city: 140,
+    county: 120,
+    adjacent: 100,
+    metro: 90,
     state: 80,
     national: 40,
   },
@@ -125,9 +127,7 @@ export function scoreResource(
       ? RANKING_WEIGHTS.geography.national
       : r.geoScope === "state"
         ? RANKING_WEIGHTS.geography.state
-        : localityMatch(v, r) === "nearby"
-          ? RANKING_WEIGHTS.geography.nearby
-          : RANKING_WEIGHTS.geography.locality;
+        : RANKING_WEIGHTS.geography[localityMatch(v, r) ?? "county"];
 
   const access = RANKING_WEIGHTS.access[r.accessMethod];
   const wait = RANKING_WEIGHTS.wait[r.typicalWait];
