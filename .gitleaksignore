@@ -1,4 +1,0 @@
-# Firebase web API key — public by design (shipped to the browser); access is
-# enforced by firestore.rules / storage.rules, not by keeping this secret.
-5d9767abfa075b4f2e349ec5dcde38b4fc22a8c2:apphosting.yaml:gcp-api-key:18
-bdf47f486f7be12c9dd50b9332ca6fafb4ccb068:apphosting.yaml:gcp-api-key:18
