@@ -88,6 +88,7 @@ jobs:
           path: gitleaks.json
       - name: Fail on leaks
         run: |
+          jq -r '.[] | "::error file=\(.File),line=\(.StartLine)::\(.RuleID) in commit \(.Commit[:7]) (fingerprint \(.Fingerprint))"' gitleaks.json
           n=$(jq length gitleaks.json)
           if [ "$n" -gt 0 ]; then echo "::error::gitleaks found $n potential secret(s)"; exit 1; fi
 
