@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { tidyResource } from "@/lib/tidy";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
@@ -47,7 +48,7 @@ export async function createResourceAction(
   if (!parsed.success) {
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
-  const input = parsed.data;
+  const input = tidyResource(parsed.data);
 
   const now = new Date();
   const doc = dropUndefined({
@@ -110,7 +111,7 @@ export async function editResourceAction(
   if (!parsed.success) {
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
-  const input = parsed.data;
+  const input = tidyResource(parsed.data);
 
   const ref = adminDb.collection("resources").doc(id);
   const snap = await ref.get();

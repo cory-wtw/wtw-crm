@@ -11,7 +11,8 @@ import { getSession } from "@/lib/firebase/session";
 import {
   findCandidates,
   intakeFlags,
-  organizationKey,
+  firstOfEachOrganization,
+  organizationKeys,
   passesGates,
   resourceFlags,
   type GateFailure,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/matching";
 import {
   buildReferralPacket,
+  neutralizePronouns,
   SCREEN_PATTERN_LABELS,
   type PacketSubstitution,
 } from "@/lib/referral-text";
@@ -43,6 +45,8 @@ import {
   dependentsAnswerSchema,
   dischargeCharacterSchema,
   idStatusSchema,
+  housingPopulations,
+  housingStatusSchema,
   populationSchema,
   receivingVaBenefitsSchema,
   serviceEraSchema,
@@ -67,6 +71,12 @@ function maxDate(a: Date | null, b: Date): Date {
   return a && a > b ? a : b;
 }
 
+/** Record text as staff sees it on the review screen: gender-neutral, the
+ *  same words the email will use. */
+function neutral(text: string | undefined): string | null {
+  return text ? neutralizePronouns(text) : null;
+}
+
 /** How many candidates the review screen shows. */
 const SHORT_LIST = 8;
 
@@ -84,6 +94,7 @@ const intakeInputSchema = z.object({
   receivingVaBenefits: receivingVaBenefitsSchema.optional(),
   needs: z.array(bucketSchema).default([]),
   situations: z.array(populationSchema).default([]),
+  housingStatus: housingStatusSchema.optional(),
   dischargeCharacter: dischargeCharacterSchema.optional(),
   serviceEra: serviceEraSchema.optional(),
   idStatus: idStatusSchema.optional(),
@@ -241,7 +252,11 @@ export async function runIntakeAction(
     state: existing.state ?? undefined,
     city: existing.city ?? undefined,
     zip: existing.zip ?? undefined,
-    situations: input.situations,
+    // Housing answer folds into the same gate: SSVF and HUD-VASH only open
+    // for someone who said they're at risk or homeless.
+    situations: [
+      ...new Set([...input.situations, ...housingPopulations(input.housingStatus)]),
+    ],
     // Everything we know, not just what was asked today — a question skipped
     // this call still matches on the answer given last week.
     dischargeCharacter: effective.dischargeCharacter,
@@ -266,14 +281,14 @@ export async function runIntakeAction(
     ({ resource, score, breakdown, matchedBuckets }) => ({
       id: resource.id,
       organizationName: resource.organizationName,
-      description: resource.description ?? null,
-      services: resource.services ?? null,
+      description: neutral(resource.description),
+      services: neutral(resource.services),
       buckets: resource.buckets,
       matchedBuckets,
       accessMethod: resource.accessMethod,
       accessValue: resource.accessValue ?? null,
-      whatToBring: resource.whatToBring ?? null,
-      eligibilityNotes: resource.eligibilityNotes ?? null,
+      whatToBring: neutral(resource.whatToBring),
+      eligibilityNotes: neutral(resource.eligibilityNotes),
       typicalWait: resource.typicalWait,
       verificationStatus: resource.verificationStatus,
       lastVerified: resource.lastVerified?.toISOString() ?? null,
@@ -289,17 +304,12 @@ export async function runIntakeAction(
   //
   // One row per organization: a duplicate record of something already on the
   // short list, or already listed here, is noise with a contradictory reason.
-  const seenNames = new Set(
-    ranked.map((r) => organizationKey(r.resource.organizationName)),
-  );
-  const excluded: ExcludedResource[] = resources
-    .filter((r) => !shortListed.has(r.id))
-    .filter((r) => {
-      const k = organizationKey(r.organizationName);
-      if (seenNames.has(k)) return false;
-      seenNames.add(k);
-      return true;
-    })
+  const seen = new Set(ranked.flatMap((r) => organizationKeys(r.resource)));
+  const excluded: ExcludedResource[] = firstOfEachOrganization(
+    resources.filter((r) => !shortListed.has(r.id)),
+    (r) => r,
+    seen,
+  )
     .map((r) => ({
       id: r.id,
       organizationName: r.organizationName,
@@ -499,6 +509,8 @@ export async function createReferralAction(
       const resource = byId.get(r.resourceId)!;
       return {
         organizationName: resource.organizationName,
+        helpsWith: resource.helpsWith ?? null,
+        buckets: resource.buckets,
         description: resource.description ?? null,
         services: resource.services ?? null,
         eligibilityNotes: resource.eligibilityNotes ?? null,
@@ -507,6 +519,7 @@ export async function createReferralAction(
         whatToBring: resource.whatToBring ?? null,
       };
     }),
+    needs: input.bucketsIdentified,
   });
 
   // Map each substitution back to the resource it came from, so both the

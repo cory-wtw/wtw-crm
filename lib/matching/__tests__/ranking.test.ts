@@ -117,7 +117,7 @@ describe("scoreResource", () => {
   it("scores geography by how local the resource is", () => {
     const at = (geoScope: "national" | "state" | "local") =>
       scoreResource(aVeteran(), aResource({ geoScope }), NOW).geography;
-    expect(at("local")).toBe(RANKING_WEIGHTS.geography.locality);
+    expect(at("local")).toBe(RANKING_WEIGHTS.geography.county);
     expect(at("state")).toBe(RANKING_WEIGHTS.geography.state);
     expect(at("national")).toBe(RANKING_WEIGHTS.geography.national);
     expect(at("local")).toBeGreaterThan(at("state"));
@@ -279,27 +279,32 @@ describe("rankResources", () => {
 });
 
 describe("metro geography", () => {
-  it("scores a neighboring metro county below the veteran's own", () => {
+  it("ranks city > county > adjacent county > metro > state", () => {
     const april = aVeteran({ city: "Rossville", state: "GA" });
-    const own = scoreResource(
+    const at = (geoStates: string[], locality: string) =>
+      scoreResource(
+        april,
+        aResource({ geoScope: "local", geoStates, geoLocalities: [locality] }),
+        NOW,
+      ).geography;
+    const city = at(["GA"], "Rossville");
+    const county = at(["GA"], "Walker County");
+    const adjacent = at(["TN"], "Chattanooga");
+    const metro = at(["TN"], "Cleveland");
+    const state = scoreResource(
       april,
-      aResource({
-        geoScope: "local",
-        geoStates: ["GA"],
-        geoLocalities: ["Walker County"],
-      }),
+      aResource({ geoScope: "state", geoStates: ["GA"] }),
       NOW,
-    );
-    const nearby = scoreResource(
-      april,
-      aResource({
-        geoScope: "local",
-        geoStates: ["TN"],
-        geoLocalities: ["Chattanooga"],
-      }),
-      NOW,
-    );
-    expect(own.geography).toBe(RANKING_WEIGHTS.geography.locality);
-    expect(nearby.geography).toBe(RANKING_WEIGHTS.geography.nearby);
+    ).geography;
+    expect([city, county, adjacent, metro]).toEqual([
+      RANKING_WEIGHTS.geography.city,
+      RANKING_WEIGHTS.geography.county,
+      RANKING_WEIGHTS.geography.adjacent,
+      RANKING_WEIGHTS.geography.metro,
+    ]);
+    expect(city).toBeGreaterThan(county);
+    expect(county).toBeGreaterThan(adjacent);
+    expect(adjacent).toBeGreaterThan(metro);
+    expect(metro).toBeGreaterThan(state);
   });
 });

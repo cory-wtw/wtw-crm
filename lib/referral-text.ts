@@ -18,7 +18,13 @@
  * borrowed sentence is screened, and a sentence that trips the screen is
  * replaced wholesale rather than edited: a half-redacted line is worse than a
  * neutral one, because it reads like it still means something specific.
+ *
+ * Borrowed text is also made gender-neutral before it goes out: records were
+ * written with a typical caller in mind ("bring his DD-214"), and the person
+ * reading this email may not be him.
  */
+
+import { BUCKET_LABELS, type Bucket } from "@/lib/schemas";
 
 /**
  * Money in any shape a staff member is likely to type. The amount is captured
@@ -67,6 +73,53 @@ export const SCREEN_PATTERN_LABELS: Record<ScreenTrip["pattern"], string> = {
   "outcome-or-claim": "outcome or claim language",
 };
 
+/** Keep the first letter's case when swapping a word. */
+function matchCase(original: string, replacement: string): string {
+  return original[0] === original[0].toUpperCase()
+    ? replacement[0].toUpperCase() + replacement.slice(1)
+    : replacement;
+}
+
+/** "needs" → "need", "carries" → "carry", "goes" → "go" — agreeing a verb
+ *  with "they". Only called on a word that followed "he" or "she". */
+function pluralVerb(word: string): string {
+  const lower = word.toLowerCase();
+  if (lower === "is") return "are";
+  if (lower === "was") return "were";
+  if (lower === "has") return "have";
+  if (lower === "does") return "do";
+  if (lower === "doesn't") return "don't";
+  if (lower === "isn't") return "aren't";
+  if (lower === "wasn't") return "weren't";
+  if (lower === "hasn't") return "haven't";
+  if (/[^aeiou]ies$/.test(lower)) return word.slice(0, -3) + "y";
+  if (/(sses|shes|ches|xes|zes|oes)$/.test(lower)) return word.slice(0, -2);
+  if (/[^s]s$/.test(lower)) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * Rewrite he/him/his (and she) as they/them/their, agreeing the verb that
+ * follows. "Bring his DD-214" → "Bring their DD-214"; "he needs" → "they
+ * need". "Her" is left alone — it can't be told apart from "their" vs "them"
+ * without parsing, and the records that prompted this all say "he".
+ */
+export function neutralizePronouns(text: string): string {
+  return text
+    .replace(/\b(his or her|her or his|his\/her)\b/gi, (m) => matchCase(m, "their"))
+    .replace(/\b(him or her|her or him|him\/her)\b/gi, (m) => matchCase(m, "them"))
+    .replace(/\b(he or she|she or he|he\/she|s\/he)\b/gi, (m) => matchCase(m, "they"))
+    .replace(/\b(himself|herself)\b/gi, (m) => matchCase(m, "themselves"))
+    .replace(/\b(he|she)'s\b/gi, (m) => matchCase(m, "they're"))
+    .replace(/\b(he|she)'(ll|d)\b/gi, (m, _p, rest) => matchCase(m, `they'${rest}`))
+    .replace(/\b(he|she)\s+([A-Za-z']+)/gi, (m, p, verb) =>
+      `${matchCase(p, "they")} ${pluralVerb(verb)}`,
+    )
+    .replace(/\b(he|she)\b/gi, (m) => matchCase(m, "they"))
+    .replace(/\bhim\b/gi, (m) => matchCase(m, "them"))
+    .replace(/\bhis\b/gi, (m) => matchCase(m, "their"));
+}
+
 /** First sentence, trimmed to something that reads on one line. */
 export function firstSentence(text: string, maxLength = 160): string {
   const flattened = text.replace(/\s+/g, " ").trim();
@@ -91,17 +144,22 @@ const NEUTRAL_DESCRIPTION = "Ask them what they can help with.";
  * replaced. A silent substitution would defeat the human read that is the
  * actual guarantee here.
  */
+type DescribedField = "helpsWith" | "description" | "services";
+
 export function describeResource(input: {
+  helpsWith?: string | null;
   description?: string | null;
   services?: string | null;
-}): { line: string; trip: (ScreenTrip & { field: "description" | "services" }) | null } {
-  let firstTrip: (ScreenTrip & { field: "description" | "services" }) | null =
-    null;
+}): { line: string; trip: (ScreenTrip & { field: DescribedField }) | null } {
+  let firstTrip: (ScreenTrip & { field: DescribedField }) | null = null;
 
-  for (const field of ["description", "services"] as const) {
+  // The plain-language line first: it was written for exactly this. The
+  // description is for staff and tends to open with who they are ("Local
+  // American Legion post."), which tells a veteran nothing about what to ask.
+  for (const field of ["helpsWith", "description", "services"] as const) {
     const candidate = input[field];
     if (!candidate) continue;
-    const sentence = firstSentence(candidate);
+    const sentence = firstSentence(neutralizePronouns(candidate));
     if (!sentence) continue;
     const trip = screenForPacket(sentence);
     if (!trip) return { line: sentence, trip: firstTrip };
@@ -113,6 +171,11 @@ export function describeResource(input: {
 
 export type PacketResource = {
   organizationName: string;
+  /** Plain-language "what they help with" — preferred for "What they do". */
+  helpsWith?: string | null;
+  /** Which needs it serves, to say which of the veteran's needs went
+   *  unanswered. Optional: without it, nothing is reported missing. */
+  buckets?: Bucket[];
   description?: string | null;
   services?: string | null;
   /** Eligibility the gates can't express, in the organization's own words. */
@@ -122,16 +185,43 @@ export type PacketResource = {
   whatToBring?: string | null;
 };
 
+/**
+ * Starts with a phone number — "423-855-6570", "(423) 855-6570", "211",
+ * "988", "423-855-6570 (local) or 877-927-8387 (24/7)". An address
+ * ("1300 Premier Drive") or an instruction ("Dial 211 and ask for…") doesn't.
+ */
+export function startsWithPhone(value: string): boolean {
+  return /^((\+?1[\s.-]?)?(\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}|[2-9]11|988)\b/.test(
+    value.trim(),
+  );
+}
+
+/** Free text as a sentence: capitalized, ending in punctuation. */
+function asSentence(value: string): string {
+  const text = value.trim();
+  const capped = text[0].toUpperCase() + text.slice(1);
+  return /[.!?)]$/.test(capped) ? capped : `${capped}.`;
+}
+
 /** How to start, phrased as an instruction the veteran can act on. */
 export function startLine(resource: PacketResource): string {
-  const value = resource.accessValue?.trim();
+  const raw = resource.accessValue?.trim();
+  const value = raw ? neutralizePronouns(raw) : raw;
   switch (resource.accessMethod) {
     case "phone":
-      return value ? `Call ${value}.` : "Call them.";
+      // "Call" only goes in front of a number. A field that already holds
+      // an instruction ("Dial 211 and ask for…") reads as-is.
+      if (!value) return "Call them.";
+      return startsWithPhone(value) ? `Call ${value}.` : asSentence(value);
     case "web":
-      return value ? `Apply online at ${value}.` : "Apply on their website.";
+      if (!value) return "Apply on their website.";
+      return /^(https?:\/\/|www\.|[\w-]+\.[a-z]{2,}(\/|$))/i.test(value)
+        ? `Apply online at ${value}.`
+        : asSentence(value);
     case "walkin":
-      return value ? `Walk in at ${value}.` : "Walk in during opening hours.";
+      if (!value) return "Walk in during opening hours.";
+      if (startsWithPhone(value)) return `Walk in, or call ${value}.`;
+      return /^\d/.test(value) ? `Walk in at ${value}.` : asSentence(value);
     case "referral":
       return value
         ? `Ask ${value} to refer you — they take referrals only.`
@@ -139,8 +229,48 @@ export function startLine(resource: PacketResource): string {
   }
 }
 
-const CHECK_BACK =
-  "We'll check back with you in two weeks to see how these went.";
+/**
+ * Nobody should come away from this feeling handed off. A list of numbers can
+ * read like "here, go away" — so the email says plainly that a dead end is
+ * ours to fix, and that we're still here either way.
+ */
+const STAY_WITH_YOU = [
+  "If any of these turn out to be a dead end, or they can't help, don't worry. That's not on you. Just let us know and we'll keep looking until we find something that works.",
+  "We'll check back with you in two weeks to see how these went. You don't have to wait for us, either. Reply to this email any time.",
+];
+
+const FREE = "Everything is free. This doesn't cost you anything. Not now, not ever.";
+
+const SIGNATURE = [
+  "Cory Gold",
+  "Executive Director, Worth Their Weight",
+  "cory@worththeirweight.org",
+];
+
+const DISCLAIMER =
+  "Worth Their Weight is not a law firm and does not provide legal representation before the U.S. Department of Veterans Affairs. All claims-related services are performed by VA-accredited attorneys, agents, or Veterans Service Organizations.";
+
+const NUMBER_WORDS = [
+  "zero", "one", "two", "three", "four", "five",
+  "six", "seven", "eight", "nine", "ten",
+];
+
+/** "five organizations that fit what you told me." */
+function introLine(count: number): string {
+  if (count === 1) return "Here is one organization that fits what you told me.";
+  const n = NUMBER_WORDS[count] ?? String(count);
+  return `Here are ${n} organizations that fit what you told me.`;
+}
+
+/** One line naming the needs nothing on the list covers, or null. */
+export function uncoveredLine(needs: Bucket[], resources: PacketResource[]): string | null {
+  if (!resources.every((r) => r.buckets)) return null;
+  const covered = new Set(resources.flatMap((r) => r.buckets ?? []));
+  const missing = needs.filter((need) => !covered.has(need));
+  if (missing.length === 0) return null;
+  const names = missing.map((b) => BUCKET_LABELS[b]).join(", ");
+  return `We don't have an organization on this list yet for: ${names}. We're still looking.`;
+}
 
 /**
  * Build the packet.
@@ -152,7 +282,7 @@ const CHECK_BACK =
 export type PacketSubstitution = {
   resourceIndex: number;
   organizationName: string;
-  field: "description" | "services" | "eligibilityNotes" | "whatToBring";
+  field: DescribedField | "eligibilityNotes" | "whatToBring";
   pattern: ScreenTrip["pattern"];
   match: string;
 };
@@ -166,15 +296,14 @@ export type ReferralPacket = {
 export function buildReferralPacket(input: {
   firstName: string;
   resources: PacketResource[];
+  /** What the veteran said they needed. Any not covered gets one line. */
+  needs?: Bucket[];
 }): ReferralPacket {
   const greeting = input.firstName.trim()
     ? `${input.firstName.trim()},`
     : "Hello,";
 
-  const intro =
-    input.resources.length === 1
-      ? "Here's the organization we talked about."
-      : `Here are the ${input.resources.length} organizations we talked about.`;
+  const intro = introLine(input.resources.length);
 
   const substitutions: PacketSubstitution[] = [];
 
@@ -201,7 +330,9 @@ export function buildReferralPacket(input: {
     // the call is worth making. Screened like any other borrowed sentence,
     // and dropped rather than replaced when it trips — there is no neutral
     // stand-in for "who they take" that says anything true.
-    const notes = resource.eligibilityNotes?.trim();
+    const notes = resource.eligibilityNotes
+      ? neutralizePronouns(resource.eligibilityNotes).trim()
+      : "";
     if (notes) {
       const trip = screenForPacket(notes);
       if (trip) {
@@ -222,7 +353,9 @@ export function buildReferralPacket(input: {
 
     lines.push(`   How to start: ${startLine(resource)}`);
 
-    const bring = resource.whatToBring?.trim();
+    const bring = resource.whatToBring
+      ? neutralizePronouns(resource.whatToBring).trim()
+      : "";
     if (bring) {
       const trip = screenForPacket(bring);
       if (trip) {
@@ -243,17 +376,22 @@ export function buildReferralPacket(input: {
     return lines.join("\n");
   });
 
+  const uncovered = uncoveredLine(input.needs ?? [], input.resources);
+
   const text = [
     greeting,
+    "",
+    FREE,
     "",
     intro,
     "",
     blocks.join("\n\n"),
     "",
-    CHECK_BACK,
+    ...(uncovered ? [uncovered, ""] : []),
+    ...STAY_WITH_YOU.flatMap((line) => [line, ""]),
+    ...SIGNATURE,
     "",
-    "Worth Their Weight",
-    "Worth Their Weight is not a law firm and does not provide legal representation before the U.S. Department of Veterans Affairs. All claims-related services are performed by VA-accredited attorneys, agents, or Veterans Service Organizations.",
+    DISCLAIMER,
   ].join("\n");
 
   return { text, substitutions };
@@ -263,6 +401,7 @@ export function buildReferralPacket(input: {
 export function buildReferralText(input: {
   firstName: string;
   resources: PacketResource[];
+  needs?: Bucket[];
 }): string {
   return buildReferralPacket(input).text;
 }

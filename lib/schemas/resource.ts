@@ -35,14 +35,37 @@ export const ACCESS_METHOD_LABELS: Record<AccessMethod, string> = {
  * reads as a guess about them, and HUD-VASH offered to someone with a roof
  * wastes the call.
  */
-export const POPULATIONS = ["mst", "homeless"] as const;
+export const POPULATIONS = ["mst", "homeless", "housing-risk"] as const;
 export const populationSchema = z.enum(POPULATIONS);
 export type Population = z.infer<typeof populationSchema>;
 
 export const POPULATION_LABELS: Record<Population, string> = {
   mst: "Military sexual trauma survivors",
   homeless: "Veterans who are homeless",
+  "housing-risk": "Veterans about to lose their housing",
 };
+
+/**
+ * Where the veteran is living, asked at intake. Not stored: it changes month
+ * to month, and a stale "stably housed" would hide SSVF from someone who has
+ * since lost their place.
+ */
+export const HOUSING_STATUSES = ["stable", "at-risk", "homeless"] as const;
+export const housingStatusSchema = z.enum(HOUSING_STATUSES);
+export type HousingStatus = z.infer<typeof housingStatusSchema>;
+
+export const HOUSING_STATUS_LABELS: Record<HousingStatus, string> = {
+  stable: "Stably housed",
+  "at-risk": "At risk of losing it",
+  homeless: "Homeless now",
+};
+
+/** The population a housing answer puts someone in, for the gate. */
+export function housingPopulations(status: HousingStatus | undefined): Population[] {
+  if (status === "homeless") return ["homeless"];
+  if (status === "at-risk") return ["housing-risk"];
+  return [];
+}
 
 /** How long from first contact to being seen. */
 export const TYPICAL_WAITS = [
@@ -157,6 +180,13 @@ export const resourceSchema = z.object({
   description: z.string().optional(),
   eligibility: z.string().optional(),
   services: z.string().optional(),
+  /**
+   * What they help with, in a phrase a veteran would use — "Help with rent and
+   * keeping your home." This is the "What they do" line in the referral email;
+   * the description is for staff and often opens with who they are, not what
+   * they do.
+   */
+  helpsWith: z.string().max(160, "Keep it to one short line").optional(),
 
   // --- Gates. Hard eligibility, evaluated boolean-only by lib/matching. ---
 

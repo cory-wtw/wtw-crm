@@ -16,6 +16,7 @@ import {
   type Resource,
 } from "@/lib/schemas";
 import {
+  adjacentCounties,
   countiesForLocality,
   countyForPlace,
   nearbyCounties,
@@ -91,20 +92,27 @@ export function matchesLocality(locality: string, city: string): boolean {
   );
 }
 
+/** How close a local resource comes to the veteran, nearest first. */
+export const LOCALITY_TIERS = ["city", "county", "adjacent", "metro"] as const;
+export type LocalityTier = (typeof LOCALITY_TIERS)[number];
+
 /**
  * How close a local resource's service area comes to where the veteran lives.
  *
- * `local`: one of its localities names their city, or resolves to their county
- * ("Walker County" for Rossville, "LaFayette" for a 30741 ZIP). `nearby`: both
- * sit in the Chattanooga metro, which crosses the state line — a Hamilton
- * County program is a short drive from Rossville. `null`: neither.
+ * `city`: one of its localities names their city. `county`: one resolves to
+ * their county ("Walker County", or "LaFayette" for a Rossville veteran).
+ * `adjacent`: a county sharing a border with theirs, state line or not.
+ * `metro`: both in the Chattanooga metro but not touching. `null`: none —
+ * outside their area.
  */
-export function localityMatch(
-  v: MatchInput,
-  r: Resource,
-): "local" | "nearby" | null {
+export function localityMatch(v: MatchInput, r: Resource): LocalityTier | null {
   const home = countyForPlace({ zip: v.zip, city: v.city, state: v.state });
-  let best: "local" | "nearby" | null = null;
+  let best: LocalityTier | null = null;
+  const consider = (tier: LocalityTier) => {
+    if (!best || LOCALITY_TIERS.indexOf(tier) < LOCALITY_TIERS.indexOf(best)) {
+      best = tier;
+    }
+  };
 
   for (const locality of r.geoLocalities) {
     if (
@@ -113,12 +121,13 @@ export function localityMatch(
       r.geoStates.includes(v.state) &&
       matchesLocality(locality, v.city)
     ) {
-      return "local";
+      return "city";
     }
     if (!home) continue;
     for (const county of countiesForLocality(locality, r.geoStates)) {
-      if (sameCounty(county, home)) return "local";
-      if (nearbyCounties(county, home)) best = "nearby";
+      if (sameCounty(county, home)) consider("county");
+      else if (adjacentCounties(county, home)) consider("adjacent");
+      else if (nearbyCounties(county, home)) consider("metro");
     }
   }
   return best;

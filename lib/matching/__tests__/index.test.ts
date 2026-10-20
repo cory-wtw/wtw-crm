@@ -105,3 +105,21 @@ describe("duplicate records", () => {
     expect(ranked).toHaveLength(1);
   });
 });
+
+describe("duplicate records by website", () => {
+  it("collapses two names for the same site", () => {
+    const ranked = findCandidates(aVeteran(), [
+      aResource({ id: "a", organizationName: "Chattanooga Area Food Bank", website: "https://www.chattfoodbank.org/" }),
+      aResource({ id: "b", organizationName: "CAFB Walker County", website: "chattfoodbank.org" }),
+    ]);
+    expect(ranked).toHaveLength(1);
+  });
+
+  it("keeps different pages on a shared host apart", () => {
+    const ranked = findCandidates(aVeteran(), [
+      aResource({ id: "a", organizationName: "Chattanooga Vet Center", website: "https://www.va.gov/chattanooga-vet-center/" }),
+      aResource({ id: "b", organizationName: "Chattanooga VA Clinic", website: "https://www.va.gov/tennessee-valley-health-care/" }),
+    ]);
+    expect(ranked).toHaveLength(2);
+  });
+});

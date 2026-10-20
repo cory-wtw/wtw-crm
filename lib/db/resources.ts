@@ -45,6 +45,7 @@ function deserialize(
     description: data.description ?? undefined,
     eligibility: data.eligibility ?? undefined,
     services: data.services ?? undefined,
+    helpsWith: data.helpsWith ?? undefined,
 
     // Gates. Every default here is the permissive value, so a record written
     // before these fields existed reads as unrestricted rather than silently

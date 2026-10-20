@@ -31,6 +31,26 @@ const CHATTANOOGA_METRO = new Set([
   "GA:whitfield",
 ]);
 
+/**
+ * Counties that share a border, around the metro. One direction is enough —
+ * adjacentCounties checks both.
+ */
+const BORDERS: [string, string[]][] = [
+  ["GA:walker", ["GA:catoosa", "GA:dade", "GA:chattooga", "GA:whitfield", "TN:hamilton"]],
+  ["GA:catoosa", ["GA:whitfield", "TN:hamilton"]],
+  ["GA:dade", ["TN:hamilton", "TN:marion", "AL:jackson", "AL:dekalb"]],
+  ["GA:whitfield", ["GA:murray", "TN:hamilton", "TN:bradley"]],
+  ["GA:murray", ["TN:bradley", "TN:polk"]],
+  ["GA:chattooga", ["AL:dekalb", "AL:cherokee"]],
+  ["TN:hamilton", ["TN:marion", "TN:sequatchie", "TN:bledsoe", "TN:rhea", "TN:meigs", "TN:bradley"]],
+  ["TN:marion", ["TN:sequatchie", "TN:grundy", "TN:franklin", "AL:jackson"]],
+  ["TN:bradley", ["TN:meigs", "TN:mcminn", "TN:polk"]],
+];
+
+const ADJACENT = new Set(
+  BORDERS.flatMap(([a, bs]) => bs.flatMap((b) => [`${a}|${b}`, `${b}|${a}`])),
+);
+
 const CITY_COUNTY: Record<string, Record<string, string>> = {
   GA: {
     rossville: "walker",
@@ -124,6 +144,11 @@ function key(c: County): string {
 
 export function sameCounty(a: County, b: County): boolean {
   return key(a) === key(b);
+}
+
+/** The two counties share a border, state line or not. */
+export function adjacentCounties(a: County, b: County): boolean {
+  return ADJACENT.has(`${key(a)}|${key(b)}`);
 }
 
 /** Both counties sit in the Chattanooga metro, on either side of the line. */

@@ -42,6 +42,7 @@ const formSchema = z.object({
   eligibility: z.string().optional(),
   eligibilityNotes: z.string().optional(),
   services: z.string().optional(),
+  helpsWith: z.string().optional(),
 
   buckets: z.array(z.string()),
 
@@ -116,6 +117,7 @@ export function ResourceForm({ initial }: Props) {
       eligibility: "",
       eligibilityNotes: "",
       services: "",
+      helpsWith: "",
       buckets: [],
       geoScope: "national",
       geoStates: "",
@@ -156,6 +158,7 @@ export function ResourceForm({ initial }: Props) {
       eligibility: values.eligibility || undefined,
       eligibilityNotes: values.eligibilityNotes || undefined,
       services: values.services || undefined,
+      helpsWith: values.helpsWith?.trim() || undefined,
 
       buckets: values.buckets,
 
@@ -230,6 +233,14 @@ export function ResourceForm({ initial }: Props) {
       </Section>
 
       <Section title="Details">
+        <Field
+          label="What they help with"
+          hint="One plain line for the veteran's email — 'Help with rent and keeping your home.' Not who they are; what they'll do for you. No he/she."
+          error={errors.helpsWith?.message}
+          full
+        >
+          <Input {...register("helpsWith")} placeholder="Help finding work and job training." />
+        </Field>
         <Field
           label="Primary service(s) offered"
           hint="What this org actually provides — e.g. 'rent assistance, utility help, food pantry'."

@@ -15,7 +15,8 @@ import {
   DISCHARGE_CHARACTER_LABELS,
   ID_STATUSES,
   ID_STATUS_LABELS,
-  POPULATIONS,
+  HOUSING_STATUSES,
+  HOUSING_STATUS_LABELS,
   RECEIVING_VA_BENEFITS,
   RECEIVING_VA_BENEFITS_LABELS,
   SERVICE_ERAS,
@@ -35,6 +36,7 @@ const formSchema = z.object({
   receivingVaBenefits: z.enum(["", ...RECEIVING_VA_BENEFITS]),
   needs: z.array(z.string()),
   situations: z.array(z.string()),
+  housingStatus: z.enum(["", ...HOUSING_STATUSES]),
   idStatus: z.enum(["", ...ID_STATUSES]),
   dischargeCharacter: z.enum(["", ...DISCHARGE_CHARACTERS]),
   serviceEra: z.enum(["", ...SERVICE_ERAS]),
@@ -51,12 +53,6 @@ type Props = {
   /** What the last intake recorded, and when. Seeds the needs boxes so a call
    *  that matched nobody doesn't cost staff the assessment. */
   lastIntake: { needs: Bucket[]; on: string } | null;
-};
-
-const SITUATION_PROMPTS: Record<Population, string> = {
-  mst: "They've told us they experienced military sexual trauma.",
-  homeless:
-    "Homeless right now — no place of their own (shelter, car, couch, street).",
 };
 
 const NEEDS_LEAD_IN =
@@ -85,6 +81,7 @@ export function IntakeForm({
       receivingVaBenefits: "",
       needs: lastIntake?.needs ?? [],
       situations: [],
+      housingStatus: "",
       idStatus: "",
       dischargeCharacter: "",
       serviceEra: "",
@@ -121,6 +118,7 @@ export function IntakeForm({
       // say what the veteran told us, not what we inferred from it.
       needs: values.needs as Bucket[],
       situations: values.situations as Population[],
+      housingStatus: values.housingStatus || undefined,
       idStatus: values.idStatus || undefined,
       dischargeCharacter: values.dischargeCharacter || undefined,
       serviceEra: values.serviceEra || undefined,
@@ -261,24 +259,33 @@ export function IntakeForm({
 
           <Section
             title="Programs for specific groups"
-            blurb="Some programs only take one group. Tick only what they've told you — never ask about MST to fill this in. Not saved to their record."
+            blurb="Some programs only take one group. Not saved to their record."
           >
-            <div className="space-y-2 md:col-span-2">
-              {POPULATIONS.map((population) => (
-                <label
-                  key={population}
-                  className="flex items-start gap-3 rounded-md border border-input bg-background p-3 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    value={population}
-                    {...register("situations")}
-                    className="mt-0.5 accent-[color:var(--wtw-brand-gold)]"
-                  />
-                  <span>{SITUATION_PROMPTS[population]}</span>
-                </label>
-              ))}
-            </div>
+            <Question prompt="Where are you living right now — is it stable, are you about to lose it, or are you without a place?">
+              <Radios
+                name="housingStatus"
+                register={register}
+                options={HOUSING_STATUSES.map((value) => ({
+                  value,
+                  label: HOUSING_STATUS_LABELS[value],
+                }))}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                SSVF and HUD-VASH only show up for at risk or homeless.
+              </p>
+            </Question>
+            <label className="flex items-start gap-3 rounded-md border border-input bg-background p-3 text-sm md:col-span-2">
+              <input
+                type="checkbox"
+                value="mst"
+                {...register("situations")}
+                className="mt-0.5 accent-[color:var(--wtw-brand-gold)]"
+              />
+              <span>
+                They&rsquo;ve told us they experienced military sexual trauma.
+                Tick only if they raised it &mdash; never ask to fill this in.
+              </span>
+            </label>
           </Section>
 
           <Section

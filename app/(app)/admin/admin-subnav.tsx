@@ -8,6 +8,7 @@ const TABS = [
   { href: "/admin/resources/enrich", label: "Draft resources" },
   { href: "/admin/resources/import", label: "Load JSON" },
   { href: "/admin/zips", label: "Fill in ZIPs" },
+  { href: "/admin/tidy", label: "Tidy data" },
   { href: "/admin/audit", label: "Audit log" },
 ];
 
