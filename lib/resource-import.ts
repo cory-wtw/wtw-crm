@@ -136,6 +136,53 @@ function splitList(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
+const LIST_FIELDS = ["buckets", "eras", "reqs"] as const;
+
+/**
+ * Coerce hand-edited values into the shape the mapper expects.
+ *
+ * Hand-fixed JSON drifts: a list where text was expected ("states": ["TN"]),
+ * text where a list was ("reqs": "Requires a valid ID"), a number for a phone,
+ * a null for a blank. Without this the mapper threw on `.trim()` and the
+ * screen just did nothing. Harmless drift is absorbed; anything else is named.
+ */
+function normalizeShapes(raw: unknown, errors: string[]): SeedResource {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    errors.push("record must be an object { ... }");
+    return {};
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value === null || value === undefined) continue;
+    const isList = (LIST_FIELDS as readonly string[]).includes(key);
+    if (isList) {
+      const items = Array.isArray(value) ? value : [value];
+      const strings: string[] = [];
+      for (const item of items) {
+        if (item === null || item === undefined || item === "") continue;
+        if (typeof item === "string") strings.push(item);
+        else
+          errors.push(
+            `${key} should be a list of text, got ${JSON.stringify(item)}`,
+          );
+      }
+      out[key] = strings;
+    } else if (typeof value === "string") {
+      out[key] = value;
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      out[key] = String(value);
+    } else if (
+      Array.isArray(value) &&
+      value.every((v) => typeof v === "string" || typeof v === "number")
+    ) {
+      out[key] = value.join(", ");
+    } else {
+      errors.push(`${key} should be text, got ${JSON.stringify(value)}`);
+    }
+  }
+  return out as SeedResource;
+}
+
 export type SeedParse =
   | { ok: true; input: ResourceInput; externalId: string; warnings: string[] }
   | { ok: false; errors: string[] };
@@ -156,9 +203,12 @@ export function seedExternalId(orgName: string): string {
  * Returns every problem at once rather than the first: a person fixing a JSON
  * file wants the whole list, not five more runs.
  */
-export function parseSeedResource(raw: SeedResource): SeedParse {
+export function parseSeedResource(source: SeedResource): SeedParse {
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  const raw = normalizeShapes(source, errors);
+  if (errors.length > 0) return { ok: false, errors };
 
   const organizationName = raw.org_name?.trim();
   if (!organizationName) {
@@ -177,7 +227,9 @@ export function parseSeedResource(raw: SeedResource): SeedParse {
   if (buckets.length === 0 && errors.length === 0) {
     // Not fatal, but it matches nobody until somebody classifies it, and
     // silence about that is how the directory filled up with dead records.
-    warnings.push("no buckets — this record will match nobody until it has one");
+    warnings.push(
+      "no buckets — this record will match nobody until it has one",
+    );
   }
 
   // Service area. `local` must name its localities or the schema rejects it,
@@ -322,9 +374,8 @@ export function parseSeedResource(raw: SeedResource): SeedParse {
     // that would mean opening five records to flip a switch they already set.
     // The human action is still there: it's typing --commit.
     verificationStatus,
-    fragility: raw.fragility?.trim().toLowerCase() === "fragile"
-      ? "fragile"
-      : "stable",
+    fragility:
+      raw.fragility?.trim().toLowerCase() === "fragile" ? "fragile" : "stable",
     sourceName: text(raw.source),
   };
 
