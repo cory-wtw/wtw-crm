@@ -31,8 +31,8 @@ export const RANKING_WEIGHTS = {
     /** Local resources, nearest first — see localityMatch. */
     city: 140,
     county: 120,
-    adjacent: 100,
-    metro: 90,
+    nearby: 100,
+    area: 90,
     state: 80,
     national: 40,
   },

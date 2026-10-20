@@ -6,7 +6,7 @@
  * The plan is recomputed on apply rather than trusting what the browser saw.
  */
 
-import { codes } from "zipcodes/lib/codes.js";
+import { zipRows } from "@/lib/geo/counties";
 import { adminDb } from "@/lib/firebase/admin";
 import { buildZipIndex, inferZip, type ZipIndex } from "@/lib/zip-infer";
 
@@ -34,7 +34,7 @@ export type ZipPlan = {
 
 let index: ZipIndex | null = null;
 function zipIndex(): ZipIndex {
-  index ??= buildZipIndex(Object.values(codes));
+  index ??= buildZipIndex(zipRows());
   return index;
 }
 

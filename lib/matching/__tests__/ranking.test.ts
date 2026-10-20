@@ -279,7 +279,7 @@ describe("rankResources", () => {
 });
 
 describe("metro geography", () => {
-  it("ranks city > county > adjacent county > metro > state", () => {
+  it("ranks city > county > nearby > area > state", () => {
     const april = aVeteran({ city: "Rossville", state: "GA" });
     const at = (geoStates: string[], locality: string) =>
       scoreResource(
@@ -289,22 +289,22 @@ describe("metro geography", () => {
       ).geography;
     const city = at(["GA"], "Rossville");
     const county = at(["GA"], "Walker County");
-    const adjacent = at(["TN"], "Chattanooga");
-    const metro = at(["TN"], "Cleveland");
+    const nearby = at(["TN"], "Chattanooga");
+    const area = at(["TN"], "Cleveland");
     const state = scoreResource(
       april,
       aResource({ geoScope: "state", geoStates: ["GA"] }),
       NOW,
     ).geography;
-    expect([city, county, adjacent, metro]).toEqual([
+    expect([city, county, nearby, area]).toEqual([
       RANKING_WEIGHTS.geography.city,
       RANKING_WEIGHTS.geography.county,
-      RANKING_WEIGHTS.geography.adjacent,
-      RANKING_WEIGHTS.geography.metro,
+      RANKING_WEIGHTS.geography.nearby,
+      RANKING_WEIGHTS.geography.area,
     ]);
     expect(city).toBeGreaterThan(county);
-    expect(county).toBeGreaterThan(adjacent);
-    expect(adjacent).toBeGreaterThan(metro);
-    expect(metro).toBeGreaterThan(state);
+    expect(county).toBeGreaterThan(nearby);
+    expect(nearby).toBeGreaterThan(area);
+    expect(area).toBeGreaterThan(state);
   });
 });
