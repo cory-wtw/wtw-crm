@@ -66,14 +66,24 @@ export function ImportPanel() {
       setPreviews(null);
       return;
     }
-    setParseError(null);
-    setPreviews(
-      extracted.map((raw) => ({
-        raw,
-        name: raw?.org_name?.trim() || "(unnamed)",
-        parsed: parseSeedResource(raw ?? {}),
-      })),
-    );
+    try {
+      setPreviews(
+        extracted.map((raw) => ({
+          raw,
+          name:
+            (typeof raw?.org_name === "string" && raw.org_name.trim()) ||
+            "(unnamed)",
+          parsed: parseSeedResource(raw ?? {}),
+        })),
+      );
+      setParseError(null);
+    } catch (error) {
+      // Never fail silently — on a tablet there is no console to look in.
+      setPreviews(null);
+      setParseError(
+        `Couldn't read those records: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   const ready = previews?.filter((p) => p.parsed.ok) ?? [];

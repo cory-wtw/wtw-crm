@@ -80,7 +80,8 @@ export async function importResourcesAction(
   const now = new Date();
 
   for (const raw of rawRecords as SeedResource[]) {
-    const name = raw?.org_name?.trim() || "(unnamed)";
+    const name =
+      (typeof raw?.org_name === "string" && raw.org_name.trim()) || "(unnamed)";
 
     const mapped = parseSeedResource(raw ?? {});
     if (!mapped.ok) {
