@@ -12,7 +12,7 @@ import {
   type Resource,
   STALE_AFTER_DAYS,
 } from "@/lib/schemas";
-import { localityMatch } from "./gates";
+import { localityMatch, type LocalityTier } from "./gates";
 import type { MatchInput } from "./types";
 
 /**
@@ -108,11 +108,18 @@ export function matchedBuckets(
   return r.buckets.filter((bucket) => v.needs.includes(bucket));
 }
 
+/** Out of range scores nothing — never a silent "same county". */
+function localGeography(tier: LocalityTier | null): number {
+  return tier ? RANKING_WEIGHTS.geography[tier] : 0;
+}
+
 /** Score one gate survivor. Higher is better; nothing here is negative. */
 export function scoreResource(
   v: MatchInput,
   r: Resource,
   now: Date = new Date(),
+  /** The tier the gates already worked out; computed here when omitted. */
+  locality?: LocalityTier | null,
 ): ScoreBreakdown {
   const crisis =
     v.safeTonight === false && r.crisisCapable ? RANKING_WEIGHTS.crisis : 0;
@@ -127,7 +134,7 @@ export function scoreResource(
       ? RANKING_WEIGHTS.geography.national
       : r.geoScope === "state"
         ? RANKING_WEIGHTS.geography.state
-        : RANKING_WEIGHTS.geography[localityMatch(v, r) ?? "county"];
+        : localGeography(locality === undefined ? localityMatch(v, r) : locality);
 
   const access = RANKING_WEIGHTS.access[r.accessMethod];
   const wait = RANKING_WEIGHTS.wait[r.typicalWait];
@@ -166,10 +173,12 @@ export function rankResources(
   v: MatchInput,
   survivors: Resource[],
   now: Date = new Date(),
+  /** Locality tiers from the gates, so they aren't computed twice. */
+  localities?: Map<Resource, LocalityTier | null | undefined>,
 ): RankedResource[] {
   return survivors
     .map((resource) => {
-      const breakdown = scoreResource(v, resource, now);
+      const breakdown = scoreResource(v, resource, now, localities?.get(resource));
       return {
         resource,
         score: breakdown.total,

@@ -46,6 +46,31 @@ export function normalizeState(value: string | undefined): string | null {
   return STATE_CODES[text] ?? null;
 }
 
+/** Full state names, longest first, so "west virginia" wins over "virginia". */
+const STATE_NAMES_LONGEST_FIRST = Object.keys(STATE_CODES).sort(
+  (a, b) => b.length - a.length,
+);
+
+/**
+ * A state named at the end of lower-cased text — "walker county ga",
+ * "charleston west virginia", or just "ga" — split off from the rest. Null when
+ * the text doesn't end in a state.
+ */
+export function trailingState(text: string): { state: string; rest: string } | null {
+  for (const name of STATE_NAMES_LONGEST_FIRST) {
+    if (text === name || text.endsWith(` ${name}`)) {
+      return { state: STATE_CODES[name], rest: text.slice(0, -name.length).trim() };
+    }
+  }
+  const words = text.split(" ");
+  const code = normalizeState(words[words.length - 1]);
+  // "co" is Colorado and also "County" abbreviated; only trust it on its own.
+  if (code && (words[words.length - 1] !== "co" || words.length === 1)) {
+    return { state: code, rest: words.slice(0, -1).join(" ") };
+  }
+  return null;
+}
+
 /**
  * City as a lookup key. Spacing and punctuation vanish ("La Fayette" =
  * "LaFayette", "Soddy-Daisy" = "Soddy Daisy") and the usual abbreviations

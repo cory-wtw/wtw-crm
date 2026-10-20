@@ -32,6 +32,9 @@ import type { GateFailure } from "./labels";
 
 export type GateResult = {
   passes: boolean;
+  /** For a local resource, how close it came — computed once here and reused
+   *  by ranking. Undefined for statewide and national resources. */
+  locality?: LocalityTier | null;
   /** Every gate that failed, not just the first — a resource can miss on
    *  several, and staff should see all of them at once. */
   failures: GateFailure[];
@@ -133,11 +136,13 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
     return { passes: false, failures: ["not-crisis-capable"] };
   }
 
+  let locality: LocalityTier | null | undefined;
   if (r.geoScope === "state") {
     if (!v.state || !r.geoStates.includes(v.state)) failures.push("geography");
   } else if (r.geoScope !== "national") {
-    // A metro match may cross the state line, so locality is tried first.
-    if (!localityMatch(v, r)) {
+    // A nearby match may cross the state line, so locality is tried first.
+    locality = localityMatch(v, r);
+    if (!locality) {
       failures.push(
         !v.state || !r.geoStates.includes(v.state) ? "geography" : "locality",
       );
@@ -188,7 +193,7 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
   // are withheld until a human resolves them.
   if (!isMatchable(r.verificationStatus)) failures.push("unverified");
 
-  return { passes: failures.length === 0, failures };
+  return { passes: failures.length === 0, failures, locality };
 }
 
 /** The resources that will take this veteran, in input order. */

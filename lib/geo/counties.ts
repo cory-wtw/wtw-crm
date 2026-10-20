@@ -11,7 +11,12 @@
  */
 
 import data from "./us-zips.json";
-import { cityKey, type ZipRow } from "@/lib/zip-infer";
+import {
+  cityKey,
+  normalizeState,
+  trailingState,
+  type ZipRow,
+} from "@/lib/zip-infer";
 
 /** zip → [city, state, county, latitude, longitude] */
 const ZIPS = data as unknown as Record<string, [string, string, string, number, number]>;
@@ -37,12 +42,20 @@ export function zipRows(): ZipRow[] {
   }));
 }
 
+/**
+ * County as a lookup key: "St. Clair County" = "Saint Clair", and GeoNames'
+ * "City and County of San Francisco" = "San Francisco County".
+ */
 function countyName(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
-    .replace(/ (county|co|parish|borough|census area|city and borough)$/, "")
-    .trim();
+    .trim()
+    .replace(/^(city and county of|city and borough of|county of|city of) /, "")
+    .replace(/ (county|co|parish|borough|census area|city and borough|municipality)$/, "")
+    .split(" ")
+    .map((w) => (w === "st" ? "saint" : w === "ste" ? "sainte" : w))
+    .join(" ");
 }
 
 function centroid(points: Point[]): Point {
@@ -105,7 +118,8 @@ export function placeForZip(zip: string | undefined): Place | null {
 
 /** A city's place: its county and the middle of its ZIPs. */
 export function placeForCity(city: string, state: string): Place | null {
-  return index().cities.get(`${state.trim().toUpperCase()}|${cityKey(city)}`) ?? null;
+  const code = normalizeState(state);
+  return code ? (index().cities.get(`${code}|${cityKey(city)}`) ?? null) : null;
 }
 
 /**
@@ -127,56 +141,68 @@ const FILLER = new Set([
   "nw", "ne", "sw", "se", "surrounding", "counties", "county", "co",
 ]);
 
-const STATE_WORDS: Record<string, string> = {
-  alabama: "AL", georgia: "GA", tennessee: "TN", "north carolina": "NC",
-  "south carolina": "SC", kentucky: "KY", virginia: "VA", florida: "FL",
-  mississippi: "MS", "new york": "NY",
-};
+const COUNTY_WORDS = new Set(["county", "counties", "co", "parish", "parishes"]);
+
+const cache = new Map<string, Place[]>();
 
 /**
  * Every county or city a resource's locality string names, read against the
- * states it serves. "Walker County", "Walker Co., GA", "LaFayette",
- * "Greater Chattanooga", "Walker County, Catoosa County" all resolve.
+ * states it serves. "Walker County", "Walker Co., GA", "Serving Walker
+ * County", "Hamilton County area", "LaFayette", "Greater Chattanooga",
+ * "Walker County, Catoosa County" all resolve. Cached: the same few locality
+ * strings are read on every intake.
  */
 export function placesForLocality(locality: string, resourceStates: string[]): Place[] {
+  const cacheKey = `${resourceStates.join(",")}|${locality}`;
+  const hit = cache.get(cacheKey);
+  if (hit) return hit;
+
   const { counties, cities } = index();
   const found: Place[] = [];
   const add = (p: Place | undefined) => {
     if (p && !found.includes(p)) found.push(p);
   };
 
-  for (const part of locality.split(/[,;/]| and | & /i)) {
-    let text = part.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  // Parts, each with the states it may be in. A part that is only a state
+  // ("Walker County, GA" → "GA") narrows the part before it.
+  const parts: { text: string; states: string[] }[] = [];
+  for (const raw of locality.split(/[,;/]| and | & /i)) {
+    let text = raw.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
     if (!text) continue;
-
-    // A trailing state narrows the lookup: "..., GA" or "Georgia".
     let states = resourceStates.map((s) => s.toUpperCase());
-    for (const [name, code] of Object.entries(STATE_WORDS)) {
-      if (text === name || text.endsWith(` ${name}`)) {
-        states = [code];
-        text = text.slice(0, -name.length).trim();
-      }
-    }
-    const last = text.split(" ").pop() ?? "";
-    if (last.length === 2 && /^[a-z]{2}$/.test(last) && !["co"].includes(last)) {
-      const code = last.toUpperCase();
-      if (resourceStates.includes(code) || Object.values(STATE_WORDS).includes(code)) {
-        states = [code];
-        text = text.slice(0, -2).trim();
-      }
-    }
-    if (!text) continue;
-
-    const county = /^(.*?)\s+(county|co|parish)$/.exec(text)?.[1];
-    for (const state of states) {
-      if (county) {
-        add(counties.get(`${state}|${countyName(county)}`));
+    const tail = trailingState(text);
+    if (tail) {
+      if (!tail.rest) {
+        if (parts.length > 0) parts[parts.length - 1].states = [tail.state];
         continue;
       }
-      // Longest run of words that names a city: "lookout mountain" before
-      // "mountain", and filler like "greater" or "area" never on its own.
-      const words = text.split(" ");
-      const used = new Array(words.length).fill(false);
+      states = [tail.state];
+      text = tail.rest;
+    }
+    parts.push({ text, states });
+  }
+
+  for (const { text, states } of parts) {
+    const words = text.split(" ");
+    const used = new Array<boolean>(words.length).fill(false);
+
+    for (const state of states) {
+      // Counties: the one to three words just before "County", longest that
+      // exists — so "serving walker county" finds Walker, not "serving walker".
+      words.forEach((word, at) => {
+        if (!COUNTY_WORDS.has(word)) return;
+        for (let len = Math.min(3, at); len >= 1; len--) {
+          const place = counties.get(`${state}|${countyName(words.slice(at - len, at).join(" "))}`);
+          if (place) {
+            add(place);
+            for (let j = at - len; j <= at; j++) used[j] = true;
+            return;
+          }
+        }
+      });
+
+      // Cities: the longest run of words that names one — "lookout mountain"
+      // before "mountain", and filler like "greater" or "area" never alone.
       for (let len = Math.min(4, words.length); len >= 1; len--) {
         for (let i = 0; i + len <= words.length; i++) {
           if (used.slice(i, i + len).some(Boolean)) continue;
@@ -191,6 +217,8 @@ export function placesForLocality(locality: string, resourceStates: string[]): P
       }
     }
   }
+
+  cache.set(cacheKey, found);
   return found;
 }
 

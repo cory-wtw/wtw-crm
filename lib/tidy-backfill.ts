@@ -45,32 +45,40 @@ export async function planTidy(): Promise<TidyRow[]> {
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Rebuilds the plan and writes it, with an audit entry per record. */
+/**
+ * Rebuilds the plan and writes it, with an audit entry per record. Each record
+ * is re-read and re-tidied inside its own transaction, so an edit saved while
+ * this ran is tidied as it now stands rather than overwritten by the preview.
+ */
 export async function applyTidy(actor: { uid: string; email: string }): Promise<number> {
   const rows = await planTidy();
   const now = new Date();
-  for (let i = 0; i < rows.length; i += 200) {
-    const batch = adminDb.batch();
-    for (const row of rows.slice(i, i + 200)) {
-      const updates = Object.fromEntries(
-        Object.entries(row.changes).map(([k, c]) => [k, c.after]),
-      );
-      batch.update(adminDb.collection(row.collection).doc(row.id), {
-        ...updates,
+  let written = 0;
+  for (const row of rows) {
+    const ref = adminDb.collection(row.collection).doc(row.id);
+    const wrote = await adminDb.runTransaction(async (tx) => {
+      const data = (await tx.get(ref)).data();
+      if (!data) return false;
+      const tidied = row.collection === "veterans" ? tidyVeteran(data) : tidyResource(data);
+      const changes = tidyChanges(data, tidied);
+      if (Object.keys(changes).length === 0) return false;
+      tx.update(ref, {
+        ...Object.fromEntries(Object.entries(changes).map(([k, c]) => [k, c.after])),
         updatedBy: actor.uid,
         updatedAt: now,
       });
-      batch.set(adminDb.collection("auditLog").doc(), {
+      tx.set(adminDb.collection("auditLog").doc(), {
         actorUid: actor.uid,
         actorEmail: actor.email,
         action: "update",
         resourceType: row.collection === "veterans" ? "veteran" : "resource",
         resourceId: row.id,
-        diff: row.changes,
+        diff: changes,
         at: now,
       });
-    }
-    await batch.commit();
+      return true;
+    });
+    if (wrote) written++;
   }
-  return rows.length;
+  return written;
 }

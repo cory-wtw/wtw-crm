@@ -116,7 +116,15 @@ describe("scoreResource", () => {
 
   it("scores geography by how local the resource is", () => {
     const at = (geoScope: "national" | "state" | "local") =>
-      scoreResource(aVeteran(), aResource({ geoScope }), NOW).geography;
+      scoreResource(
+        aVeteran(),
+        aResource({
+          geoScope,
+          geoStates: geoScope === "national" ? [] : ["TN"],
+          geoLocalities: geoScope === "local" ? ["Hamilton County"] : [],
+        }),
+        NOW,
+      ).geography;
     expect(at("local")).toBe(RANKING_WEIGHTS.geography.county);
     expect(at("state")).toBe(RANKING_WEIGHTS.geography.state);
     expect(at("national")).toBe(RANKING_WEIGHTS.geography.national);
@@ -306,5 +314,12 @@ describe("metro geography", () => {
     expect(county).toBeGreaterThan(nearby);
     expect(nearby).toBeGreaterThan(area);
     expect(area).toBeGreaterThan(state);
+  });
+});
+
+describe("out of range", () => {
+  it("scores a local resource out of range as 0, not county", () => {
+    const far = aResource({ geoScope: "local", geoStates: ["NY"], geoLocalities: ["Saratoga County"] });
+    expect(scoreResource(aVeteran(), far, NOW).geography).toBe(0);
   });
 });

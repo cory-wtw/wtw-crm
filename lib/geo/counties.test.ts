@@ -56,3 +56,26 @@ describe("distance", () => {
     expect(sameCounty(rossville, chattanooga)).toBe(false);
   });
 });
+
+describe("review fixes", () => {
+  it("lets a trailing state narrow the county before it", () => {
+    const places = placesForLocality("Walker County, GA", ["GA", "AL"]);
+    expect(places).toHaveLength(1);
+    expect(places[0]).toMatchObject({ state: "GA", county: "walker" });
+  });
+
+  it("finds a county inside a longer phrase", () => {
+    expect(placesForLocality("Serving Walker County", ["GA"])[0]).toMatchObject({ county: "walker" });
+    expect(placesForLocality("Hamilton County area", ["TN"])[0]).toMatchObject({ county: "hamilton" });
+  });
+
+  it("matches Saint / St. county spellings", () => {
+    expect(placesForLocality("Saint Clair County", ["AL"])).toHaveLength(1);
+    expect(placesForLocality("St. Clair County", ["AL"])).toHaveLength(1);
+  });
+
+  it("reads West Virginia as WV, and a full state name for a city", () => {
+    expect(placesForLocality("Charleston, West Virginia", ["WV", "VA"])[0]).toMatchObject({ state: "WV" });
+    expect(placeForVeteran({ city: "Rossville", state: "Georgia" })).toMatchObject({ county: "walker" });
+  });
+});

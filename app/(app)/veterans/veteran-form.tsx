@@ -141,7 +141,7 @@ export function VeteranForm({
       birthYear: toNumber(values.birthYear),
       city: values.city || undefined,
       state: values.state || undefined,
-      zip: values.zip?.trim() || undefined,
+      zip: values.zip?.trim() || null,
       // null, not undefined: this form is the one place a stored eligibility
       // answer can be cleared, and undefined would be dropped before it ever
       // reached Firestore.
