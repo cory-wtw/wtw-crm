@@ -476,7 +476,7 @@ describe("county resolution (Rossville, GA)", () => {
       geoStates: ["TN"],
       geoLocalities: ["Chattanooga area"],
     });
-    expect(localityMatch(april(), chattanooga)).toBe("adjacent");
+    expect(localityMatch(april(), chattanooga)).toBe("nearby");
     expect(passesGates(april(), chattanooga).passes).toBe(true);
   });
 

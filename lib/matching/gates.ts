@@ -16,47 +16,25 @@ import {
   type Resource,
 } from "@/lib/schemas";
 import {
-  adjacentCounties,
-  countiesForLocality,
-  countyForPlace,
-  nearbyCounties,
+  milesBetween,
+  placeForVeteran,
+  placesForLocality,
   sameCounty,
 } from "@/lib/geo/counties";
 import type { MatchInput } from "./types";
 
-/** Why a resource was excluded. Codes, so the review screen can label them. */
-export const GATE_FAILURES = [
-  "not-crisis-capable",
-  "geography",
-  "locality",
-  "discharge",
-  "va-enrollment",
-  "valid-id",
-  "era",
-  "dependents",
-  "population",
-  "no-bucket-overlap",
-  "unverified",
-] as const;
-export type GateFailure = (typeof GATE_FAILURES)[number];
-
-/** Staff-facing reasons, for the "why was this excluded" list in Phase 3. */
-export const GATE_FAILURE_LABELS: Record<GateFailure, string> = {
-  "not-crisis-capable": "No same-day intake",
-  geography: "Outside their service area",
-  locality: "Outside their city or county",
-  discharge: "Discharge doesn't meet their floor",
-  "va-enrollment": "Requires VA enrollment",
-  "valid-id": "Requires a valid ID",
-  era: "Restricted to other service eras",
-  dependents: "Requires dependents",
-  population: "Only serves a group they're not in",
-  "no-bucket-overlap": "Doesn't cover what they need",
-  unverified: "Record not verified",
-};
+export {
+  GATE_FAILURES,
+  GATE_FAILURE_LABELS,
+  type GateFailure,
+} from "./labels";
+import type { GateFailure } from "./labels";
 
 export type GateResult = {
   passes: boolean;
+  /** For a local resource, how close it came — computed once here and reused
+   *  by ranking. Undefined for statewide and national resources. */
+  locality?: LocalityTier | null;
   /** Every gate that failed, not just the first — a resource can miss on
    *  several, and staff should see all of them at once. */
   failures: GateFailure[];
@@ -93,27 +71,27 @@ export function matchesLocality(locality: string, city: string): boolean {
 }
 
 /** How close a local resource comes to the veteran, nearest first. */
-export const LOCALITY_TIERS = ["city", "county", "adjacent", "metro"] as const;
+export const LOCALITY_TIERS = ["city", "county", "nearby", "area"] as const;
 export type LocalityTier = (typeof LOCALITY_TIERS)[number];
+
+/**
+ * Straight-line miles that still count as in range: `nearby` is about a
+ * neighboring county's reach (Rossville to downtown Chattanooga is 6), `area`
+ * a metro's (Rossville to Cleveland, TN is 30). Past that, a local resource
+ * is out of range.
+ */
+export const NEARBY_MILES = 25;
+export const AREA_MILES = 45;
 
 /**
  * How close a local resource's service area comes to where the veteran lives.
  *
- * `city`: one of its localities names their city. `county`: one resolves to
+ * `city`: one of its localities is their city. `county`: one is, or sits in,
  * their county ("Walker County", or "LaFayette" for a Rossville veteran).
- * `adjacent`: a county sharing a border with theirs, state line or not.
- * `metro`: both in the Chattanooga metro but not touching. `null`: none —
- * outside their area.
+ * `nearby` / `area`: the nearest listed place is within NEARBY_MILES /
+ * AREA_MILES, state line or not. `null`: none — outside their area.
  */
 export function localityMatch(v: MatchInput, r: Resource): LocalityTier | null {
-  const home = countyForPlace({ zip: v.zip, city: v.city, state: v.state });
-  let best: LocalityTier | null = null;
-  const consider = (tier: LocalityTier) => {
-    if (!best || LOCALITY_TIERS.indexOf(tier) < LOCALITY_TIERS.indexOf(best)) {
-      best = tier;
-    }
-  };
-
   for (const locality of r.geoLocalities) {
     if (
       v.city &&
@@ -123,14 +101,21 @@ export function localityMatch(v: MatchInput, r: Resource): LocalityTier | null {
     ) {
       return "city";
     }
-    if (!home) continue;
-    for (const county of countiesForLocality(locality, r.geoStates)) {
-      if (sameCounty(county, home)) consider("county");
-      else if (adjacentCounties(county, home)) consider("adjacent");
-      else if (nearbyCounties(county, home)) consider("metro");
+  }
+
+  const home = placeForVeteran({ zip: v.zip, city: v.city, state: v.state });
+  if (!home) return null;
+
+  let nearest = Infinity;
+  for (const locality of r.geoLocalities) {
+    for (const place of placesForLocality(locality, r.geoStates)) {
+      if (sameCounty(place, home)) return "county";
+      nearest = Math.min(nearest, milesBetween(place, home));
     }
   }
-  return best;
+  if (nearest <= NEARBY_MILES) return "nearby";
+  if (nearest <= AREA_MILES) return "area";
+  return null;
 }
 
 /**
@@ -151,11 +136,13 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
     return { passes: false, failures: ["not-crisis-capable"] };
   }
 
+  let locality: LocalityTier | null | undefined;
   if (r.geoScope === "state") {
     if (!v.state || !r.geoStates.includes(v.state)) failures.push("geography");
   } else if (r.geoScope !== "national") {
-    // A metro match may cross the state line, so locality is tried first.
-    if (!localityMatch(v, r)) {
+    // A nearby match may cross the state line, so locality is tried first.
+    locality = localityMatch(v, r);
+    if (!locality) {
       failures.push(
         !v.state || !r.geoStates.includes(v.state) ? "geography" : "locality",
       );
@@ -206,7 +193,7 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
   // are withheld until a human resolves them.
   if (!isMatchable(r.verificationStatus)) failures.push("unverified");
 
-  return { passes: failures.length === 0, failures };
+  return { passes: failures.length === 0, failures, locality };
 }
 
 /** The resources that will take this veteran, in input order. */

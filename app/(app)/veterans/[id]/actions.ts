@@ -8,6 +8,7 @@ import { computeDiff } from "@/lib/audit-diff";
 import { getAttachment } from "@/lib/db/attachments";
 import { getResourcesByIds, listResources } from "@/lib/db/resources";
 import { getSession } from "@/lib/firebase/session";
+import { placeForZip } from "@/lib/geo/counties";
 import {
   findCandidates,
   intakeFlags,
@@ -249,7 +250,9 @@ export async function runIntakeAction(
   // re-ask what we already know.
   const matchInput: MatchInput = {
     safeTonight: input.safeTonight,
-    state: existing.state ?? undefined,
+    // A ZIP already says which state — a record with a ZIP and no state
+    // shouldn't fail every statewide resource.
+    state: existing.state || placeForZip(existing.zip)?.state || undefined,
     city: existing.city ?? undefined,
     zip: existing.zip ?? undefined,
     // Housing answer folds into the same gate: SSVF and HUD-VASH only open

@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
+import { MATCH_FLAG_LABELS } from "@/lib/matching/flags";
 import {
   GATE_FAILURE_LABELS,
-  MATCH_FLAG_LABELS,
   type GateFailure,
-} from "@/lib/matching";
+} from "@/lib/matching/labels";
 import {
   ACCESS_METHOD_LABELS,
   BUCKET_LABELS,

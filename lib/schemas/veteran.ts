@@ -241,6 +241,9 @@ export const veteranInputSchema = veteranSchema
     serviceEra: serviceEraSchema.nullish(),
     idStatus: idStatusSchema.nullish(),
     hasDependents: dependentsAnswerSchema.nullish(),
+    // Null clears it: a ZIP left over from an old address would keep winning
+    // over the corrected city at matching.
+    zip: z.string().nullish(),
   })
   .superRefine(refinePreferredContact);
 export type VeteranInput = z.infer<typeof veteranInputSchema>;

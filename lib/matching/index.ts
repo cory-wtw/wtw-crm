@@ -13,7 +13,7 @@ export * from "./ranking";
 export * from "./flags";
 
 import type { Resource } from "@/lib/schemas";
-import { passesGates } from "./gates";
+import { passesGates, type LocalityTier } from "./gates";
 import { rankResources, type RankedResource } from "./ranking";
 import type { MatchInput } from "./types";
 
@@ -29,8 +29,13 @@ export function findCandidates(
   resources: Resource[],
   { limit, now }: { limit?: number; now?: Date } = {},
 ): RankedResource[] {
-  const survivors = resources.filter((r) => passesGates(v, r).passes);
-  const ranked = dedupeByName(rankResources(v, survivors, now));
+  const localities = new Map<Resource, LocalityTier | null | undefined>();
+  const survivors = resources.filter((r) => {
+    const result = passesGates(v, r);
+    localities.set(r, result.locality);
+    return result.passes;
+  });
+  const ranked = dedupeByName(rankResources(v, survivors, now, localities));
   return limit === undefined ? ranked : ranked.slice(0, limit);
 }
 

@@ -452,3 +452,21 @@ describe("neutralizePronouns", () => {
     );
   });
 });
+
+describe("review fixes", () => {
+  it("doesn't read a street address as 411", () => {
+    expect(startLine(aPacketResource({ accessMethod: "walkin", accessValue: "411 Broad St" }))).toBe(
+      "Walk in at 411 Broad St.",
+    );
+    expect(startLine(aPacketResource({ accessMethod: "phone", accessValue: "211" }))).toBe("Call 211.");
+    expect(startLine(aPacketResource({ accessMethod: "phone", accessValue: "988 (press 1)" }))).toBe(
+      "Call 988 (press 1).",
+    );
+  });
+
+  it("agrees the verb past an adverb", () => {
+    expect(neutralizePronouns("He always brings his DD-214. He also focuses on work.")).toBe(
+      "They always bring their DD-214. They also focus on work.",
+    );
+  });
+});

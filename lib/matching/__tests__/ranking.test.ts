@@ -116,7 +116,15 @@ describe("scoreResource", () => {
 
   it("scores geography by how local the resource is", () => {
     const at = (geoScope: "national" | "state" | "local") =>
-      scoreResource(aVeteran(), aResource({ geoScope }), NOW).geography;
+      scoreResource(
+        aVeteran(),
+        aResource({
+          geoScope,
+          geoStates: geoScope === "national" ? [] : ["TN"],
+          geoLocalities: geoScope === "local" ? ["Hamilton County"] : [],
+        }),
+        NOW,
+      ).geography;
     expect(at("local")).toBe(RANKING_WEIGHTS.geography.county);
     expect(at("state")).toBe(RANKING_WEIGHTS.geography.state);
     expect(at("national")).toBe(RANKING_WEIGHTS.geography.national);
@@ -279,7 +287,7 @@ describe("rankResources", () => {
 });
 
 describe("metro geography", () => {
-  it("ranks city > county > adjacent county > metro > state", () => {
+  it("ranks city > county > nearby > area > state", () => {
     const april = aVeteran({ city: "Rossville", state: "GA" });
     const at = (geoStates: string[], locality: string) =>
       scoreResource(
@@ -289,22 +297,29 @@ describe("metro geography", () => {
       ).geography;
     const city = at(["GA"], "Rossville");
     const county = at(["GA"], "Walker County");
-    const adjacent = at(["TN"], "Chattanooga");
-    const metro = at(["TN"], "Cleveland");
+    const nearby = at(["TN"], "Chattanooga");
+    const area = at(["TN"], "Cleveland");
     const state = scoreResource(
       april,
       aResource({ geoScope: "state", geoStates: ["GA"] }),
       NOW,
     ).geography;
-    expect([city, county, adjacent, metro]).toEqual([
+    expect([city, county, nearby, area]).toEqual([
       RANKING_WEIGHTS.geography.city,
       RANKING_WEIGHTS.geography.county,
-      RANKING_WEIGHTS.geography.adjacent,
-      RANKING_WEIGHTS.geography.metro,
+      RANKING_WEIGHTS.geography.nearby,
+      RANKING_WEIGHTS.geography.area,
     ]);
     expect(city).toBeGreaterThan(county);
-    expect(county).toBeGreaterThan(adjacent);
-    expect(adjacent).toBeGreaterThan(metro);
-    expect(metro).toBeGreaterThan(state);
+    expect(county).toBeGreaterThan(nearby);
+    expect(nearby).toBeGreaterThan(area);
+    expect(area).toBeGreaterThan(state);
+  });
+});
+
+describe("out of range", () => {
+  it("scores a local resource out of range as 0, not county", () => {
+    const far = aResource({ geoScope: "local", geoStates: ["NY"], geoLocalities: ["Saratoga County"] });
+    expect(scoreResource(aVeteran(), far, NOW).geography).toBe(0);
   });
 });

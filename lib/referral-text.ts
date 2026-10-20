@@ -93,6 +93,7 @@ function pluralVerb(word: string): string {
   if (lower === "wasn't") return "weren't";
   if (lower === "hasn't") return "haven't";
   if (/[^aeiou]ies$/.test(lower)) return word.slice(0, -3) + "y";
+  if (lower === "focuses") return word.slice(0, -2);
   if (/(sses|shes|ches|xes|zes|oes)$/.test(lower)) return word.slice(0, -2);
   if (/[^s]s$/.test(lower)) return word.slice(0, -1);
   return word;
@@ -112,8 +113,12 @@ export function neutralizePronouns(text: string): string {
     .replace(/\b(himself|herself)\b/gi, (m) => matchCase(m, "themselves"))
     .replace(/\b(he|she)'s\b/gi, (m) => matchCase(m, "they're"))
     .replace(/\b(he|she)'(ll|d)\b/gi, (m, _p, rest) => matchCase(m, `they'${rest}`))
-    .replace(/\b(he|she)\s+([A-Za-z']+)/gi, (m, p, verb) =>
-      `${matchCase(p, "they")} ${pluralVerb(verb)}`,
+    // An adverb between pronoun and verb stays put; the verb after it agrees:
+    // "he always brings" → "they always bring".
+    .replace(
+      /\b(he|she)\s+((?:[A-Za-z]+ly|always|also|never|often|still|just|only|then|now|sometimes|already|even|usually)\s+)?([A-Za-z']+)/gi,
+      (_m, p: string, adverb: string | undefined, verb: string) =>
+        `${matchCase(p, "they")} ${adverb ?? ""}${pluralVerb(verb)}`,
     )
     .replace(/\b(he|she)\b/gi, (m) => matchCase(m, "they"))
     .replace(/\bhim\b/gi, (m) => matchCase(m, "them"))
@@ -191,7 +196,9 @@ export type PacketResource = {
  * ("1300 Premier Drive") or an instruction ("Dial 211 and ask for…") doesn't.
  */
 export function startsWithPhone(value: string): boolean {
-  return /^((\+?1[\s.-]?)?(\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}|[2-9]11|988)\b/.test(
+  // 211/988 only count on their own or before a note — "411 Broad St" is an
+  // address, not a call.
+  return /^((\+?1[\s.-]?)?(\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}\b|([2-9]11|988)(?=\s*($|[(,;.]|or\s)))/.test(
     value.trim(),
   );
 }

@@ -17,6 +17,14 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      # Every change ships with a higher version, shown in the app header —
+      # patch for fixes, minor for new features. See scripts/check-version.mjs.
+      - name: Version bumped
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --depth=1 origin ${{ github.base_ref }}
+          node scripts/check-version.mjs "origin/${{ github.base_ref }}"
+
       - name: Install dependencies
         run: npm ci
 

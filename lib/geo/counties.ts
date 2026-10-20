@@ -1,224 +1,238 @@
 /**
- * City and ZIP → county, for the region this program serves. Pure data and
- * pure functions, no I/O.
+ * Where a veteran lives and where a resource serves, as places on a map.
+ * Server-only data, pure functions.
  *
- * Resources record their service area as counties ("Walker County"); veterans
- * record a city and state ("Rossville, GA"). Without this table the two never
- * meet, and a resource that names the veteran's county outright gets gated out
- * as "outside their city or county".
- *
- * Deliberately regional, not national: a hand-checked table for the Chattanooga
- * area beats a 40,000-row import nobody reviews. A place missing here falls
- * back to plain text matching, exactly as before — add it when it turns up.
+ * Every US ZIP with its city, county and centre point, from GeoNames
+ * (geonames.org, CC BY 4.0) — see lib/geo/us-zips.json and
+ * scripts/build-zip-data.py. Resources list counties ("Walker County") and
+ * towns ("LaFayette"); veterans give a ZIP or a city. Both resolve here to a
+ * county and a point, so "same county" is exact and "nearby" is a distance —
+ * nationwide, not a hand-kept table for one metro.
  */
 
-/** A county, keyed with its state so Walker County, GA ≠ Walker County, AL. */
-export type County = { state: string; county: string };
+import data from "./us-zips.json";
+import {
+  cityKey,
+  normalizeState,
+  trailingState,
+  type ZipRow,
+} from "@/lib/zip-infer";
 
-/**
- * Counties close enough to cross for help. Rossville sits on the Chattanooga
- * line; a resource in Hamilton County is a ten-minute drive, and the state
- * border between them means nothing to the bus.
- */
-const CHATTANOOGA_METRO = new Set([
-  "TN:hamilton",
-  "TN:marion",
-  "TN:sequatchie",
-  "TN:bradley",
-  "GA:walker",
-  "GA:catoosa",
-  "GA:dade",
-  "GA:whitfield",
-]);
+/** zip → [city, state, county, latitude, longitude] */
+const ZIPS = data as unknown as Record<string, [string, string, string, number, number]>;
 
-/**
- * Counties that share a border, around the metro. One direction is enough —
- * adjacentCounties checks both.
- */
-const BORDERS: [string, string[]][] = [
-  ["GA:walker", ["GA:catoosa", "GA:dade", "GA:chattooga", "GA:whitfield", "TN:hamilton"]],
-  ["GA:catoosa", ["GA:whitfield", "TN:hamilton"]],
-  ["GA:dade", ["TN:hamilton", "TN:marion", "AL:jackson", "AL:dekalb"]],
-  ["GA:whitfield", ["GA:murray", "TN:hamilton", "TN:bradley"]],
-  ["GA:murray", ["TN:bradley", "TN:polk"]],
-  ["GA:chattooga", ["AL:dekalb", "AL:cherokee"]],
-  ["TN:hamilton", ["TN:marion", "TN:sequatchie", "TN:bledsoe", "TN:rhea", "TN:meigs", "TN:bradley"]],
-  ["TN:marion", ["TN:sequatchie", "TN:grundy", "TN:franklin", "AL:jackson"]],
-  ["TN:bradley", ["TN:meigs", "TN:mcminn", "TN:polk"]],
-];
-
-const ADJACENT = new Set(
-  BORDERS.flatMap(([a, bs]) => bs.flatMap((b) => [`${a}|${b}`, `${b}|${a}`])),
-);
-
-const CITY_COUNTY: Record<string, Record<string, string>> = {
-  GA: {
-    rossville: "walker",
-    lafayette: "walker",
-    "la fayette": "walker",
-    chickamauga: "walker",
-    "rock spring": "walker",
-    flintstone: "walker",
-    "lookout mountain": "walker",
-    "fort oglethorpe": "catoosa",
-    "ft oglethorpe": "catoosa",
-    ringgold: "catoosa",
-    trenton: "dade",
-    "rising fawn": "dade",
-    wildwood: "dade",
-    dalton: "whitfield",
-    "tunnel hill": "whitfield",
-    "rocky face": "whitfield",
-    varnell: "whitfield",
-    chatsworth: "murray",
-    eton: "murray",
-    summerville: "chattooga",
-    trion: "chattooga",
-  },
-  TN: {
-    chattanooga: "hamilton",
-    "east ridge": "hamilton",
-    "red bank": "hamilton",
-    "signal mountain": "hamilton",
-    "lookout mountain": "hamilton",
-    "soddy daisy": "hamilton",
-    hixson: "hamilton",
-    ooltewah: "hamilton",
-    collegedale: "hamilton",
-    harrison: "hamilton",
-    "sale creek": "hamilton",
-    apison: "hamilton",
-    cleveland: "bradley",
-    jasper: "marion",
-    "south pittsburg": "marion",
-    kimball: "marion",
-    whitwell: "marion",
-    dunlap: "sequatchie",
-  },
+export type Place = {
+  state: string;
+  /** Lower-case county name without "County" — "walker". */
+  county: string;
+  latitude: number;
+  longitude: number;
 };
 
-const ZIP_COUNTY: Record<string, County> = Object.fromEntries(
-  (
-    [
-      ["GA", "walker", ["30741", "30728", "30707", "30739", "30750", "30725"]],
-      ["GA", "catoosa", ["30742", "30736"]],
-      ["GA", "dade", ["30752", "30738", "30757"]],
-      ["GA", "whitfield", ["30720", "30721", "30755", "30740"]],
-      ["GA", "murray", ["30705"]],
-      ["GA", "chattooga", ["30747"]],
-      [
-        "TN",
-        "hamilton",
-        [
-          "37401", "37402", "37403", "37404", "37405", "37406", "37407",
-          "37408", "37409", "37410", "37411", "37412", "37415", "37416",
-          "37419", "37421", "37343", "37363", "37377", "37379", "37350",
-          "37341", "37373", "37302", "37315",
-        ],
-      ],
-      ["TN", "bradley", ["37311", "37312", "37323"]],
-      ["TN", "marion", ["37347", "37380", "37397"]],
-      ["TN", "sequatchie", ["37327"]],
-    ] as const
-  ).flatMap(([state, county, zips]) =>
-    zips.map((zip) => [zip, { state, county }] as const),
-  ),
-);
+export type Point = { latitude: number; longitude: number };
 
-const STATE_NAMES: Record<string, string> = {
-  georgia: "GA",
-  tennessee: "TN",
-  alabama: "AL",
-};
+/** Every ZIP as a row, for the ZIP-from-city inference. */
+export function zipRows(): ZipRow[] {
+  return Object.entries(ZIPS).map(([zip, [city, state, , latitude, longitude]]) => ({
+    zip,
+    city,
+    state,
+    latitude,
+    longitude,
+  }));
+}
 
-function normalize(value: string): string {
+/**
+ * County as a lookup key: "St. Clair County" = "Saint Clair", and GeoNames'
+ * "City and County of San Francisco" = "San Francisco County".
+ */
+function countyName(value: string): string {
   return value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+    .trim()
+    .replace(/^(city and county of|city and borough of|county of|city of) /, "")
+    .replace(/ (county|co|parish|borough|census area|city and borough|municipality)$/, "")
+    .split(" ")
+    .map((w) => (w === "st" ? "saint" : w === "ste" ? "sainte" : w))
+    .join(" ");
 }
 
-function key(c: County): string {
-  return `${c.state}:${c.county}`;
+function centroid(points: Point[]): Point {
+  return {
+    latitude: points.reduce((s, p) => s + p.latitude, 0) / points.length,
+    longitude: points.reduce((s, p) => s + p.longitude, 0) / points.length,
+  };
 }
 
-export function sameCounty(a: County, b: County): boolean {
-  return key(a) === key(b);
+type Indexes = {
+  counties: Map<string, Place>;
+  cities: Map<string, Place>;
+};
+
+let indexes: Indexes | null = null;
+
+/** state|county and state|city → a centre point, built once per process. */
+function index(): Indexes {
+  if (indexes) return indexes;
+  const countyPoints = new Map<string, { state: string; county: string; points: Point[] }>();
+  const cityPoints = new Map<string, { state: string; counties: Map<string, number>; points: Point[] }>();
+
+  for (const [city, state, countyRaw, latitude, longitude] of Object.values(ZIPS)) {
+    const county = countyName(countyRaw);
+    const point = { latitude, longitude };
+
+    const ck = `${state}|${county}`;
+    const c = countyPoints.get(ck) ?? { state, county, points: [] as Point[] };
+    c.points.push(point);
+    countyPoints.set(ck, c);
+
+    const tk = `${state}|${cityKey(city)}`;
+    const t = cityPoints.get(tk) ?? { state, counties: new Map<string, number>(), points: [] as Point[] };
+    t.points.push(point);
+    t.counties.set(county, (t.counties.get(county) ?? 0) + 1);
+    cityPoints.set(tk, t);
+  }
+
+  const counties = new Map<string, Place>();
+  for (const [k, c] of countyPoints) {
+    counties.set(k, { state: c.state, county: c.county, ...centroid(c.points) });
+  }
+  const cities = new Map<string, Place>();
+  for (const [k, t] of cityPoints) {
+    // A city spanning counties belongs to the one most of its ZIPs are in.
+    const county = [...t.counties.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    cities.set(k, { state: t.state, county, ...centroid(t.points) });
+  }
+  indexes = { counties, cities };
+  return indexes;
 }
 
-/** The two counties share a border, state line or not. */
-export function adjacentCounties(a: County, b: County): boolean {
-  return ADJACENT.has(`${key(a)}|${key(b)}`);
+/** A ZIP's own place. */
+export function placeForZip(zip: string | undefined): Place | null {
+  const row = zip ? ZIPS[zip.trim().slice(0, 5)] : undefined;
+  if (!row) return null;
+  const [, state, county, latitude, longitude] = row;
+  return { state, county: countyName(county), latitude, longitude };
 }
 
-/** Both counties sit in the Chattanooga metro, on either side of the line. */
-export function nearbyCounties(a: County, b: County): boolean {
-  return CHATTANOOGA_METRO.has(key(a)) && CHATTANOOGA_METRO.has(key(b));
+/** A city's place: its county and the middle of its ZIPs. */
+export function placeForCity(city: string, state: string): Place | null {
+  const code = normalizeState(state);
+  return code ? (index().cities.get(`${code}|${cityKey(city)}`) ?? null) : null;
 }
 
 /**
- * The county a veteran lives in, from whatever the record holds. ZIP wins when
- * it's known, since a ZIP can't be misspelled into another town.
+ * Where the veteran lives. ZIP first — it can't be misspelled into another
+ * town — then city and state.
  */
-export function countyForPlace(place: {
-  zip?: string;
-  city?: string;
-  state?: string;
-}): County | null {
-  const zip = place.zip?.trim().slice(0, 5);
-  if (zip && ZIP_COUNTY[zip]) return ZIP_COUNTY[zip];
-
-  const state = place.state?.trim().toUpperCase();
-  const city = place.city ? normalize(place.city) : "";
-  if (!state || !city) return null;
-  const county = CITY_COUNTY[state]?.[city];
-  return county ? { state, county } : null;
+export function placeForVeteran(v: { zip?: string; city?: string; state?: string }): Place | null {
+  return (
+    placeForZip(v.zip) ??
+    (v.city && v.state ? placeForCity(v.city, v.state) : null)
+  );
 }
 
+/** Words that are never the place itself in "Greater Chattanooga area". */
+const FILLER = new Set([
+  "greater", "metro", "area", "region", "regional", "the", "of", "and", "city",
+  "north", "south", "east", "west", "central", "northern", "southern",
+  "eastern", "western", "northwest", "northeast", "southwest", "southeast",
+  "nw", "ne", "sw", "se", "surrounding", "counties", "county", "co",
+]);
+
+const COUNTY_WORDS = new Set(["county", "counties", "co", "parish", "parishes"]);
+
+const cache = new Map<string, Place[]>();
+
 /**
- * Every county a resource's locality string names, read against the states the
- * resource serves.
- *
- * "Walker County", "Walker Co.", "Walker County, GA", "LaFayette",
- * "Greater Chattanooga" — each resolves. A list in one string ("Walker County,
- * Catoosa County") resolves to all of them.
+ * Every county or city a resource's locality string names, read against the
+ * states it serves. "Walker County", "Walker Co., GA", "Serving Walker
+ * County", "Hamilton County area", "LaFayette", "Greater Chattanooga",
+ * "Walker County, Catoosa County" all resolve. Cached: the same few locality
+ * strings are read on every intake.
  */
-export function countiesForLocality(
-  locality: string,
-  resourceStates: string[],
-): County[] {
-  const found: County[] = [];
-  const add = (c: County) => {
-    if (!found.some((f) => sameCounty(f, c))) found.push(c);
+export function placesForLocality(locality: string, resourceStates: string[]): Place[] {
+  const cacheKey = `${resourceStates.join(",")}|${locality}`;
+  const hit = cache.get(cacheKey);
+  if (hit) return hit;
+
+  const { counties, cities } = index();
+  const found: Place[] = [];
+  const add = (p: Place | undefined) => {
+    if (p && !found.includes(p)) found.push(p);
   };
 
-  for (const part of locality.split(/[,;/]| and /i)) {
-    let text = normalize(part);
+  // Parts, each with the states it may be in. A part that is only a state
+  // ("Walker County, GA" → "GA") narrows the part before it.
+  const parts: { text: string; states: string[] }[] = [];
+  for (const raw of locality.split(/[,;/]| and | & /i)) {
+    let text = raw.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
     if (!text) continue;
-
-    // A trailing state ("..., GA" or "Georgia") narrows the lookup.
     let states = resourceStates.map((s) => s.toUpperCase());
-    const words = text.split(" ");
-    const last = words[words.length - 1];
-    const named = STATE_NAMES[last] ?? (last.length === 2 ? last.toUpperCase() : null);
-    if (named && (CITY_COUNTY[named] || Object.values(STATE_NAMES).includes(named))) {
-      states = [named];
-      text = words.slice(0, -1).join(" ");
-    }
-    // A bare state code on its own segment ("Walker County, GA") is not a place.
-    if (!text) continue;
-
-    const county = /^(.*?)\s+(county|co)$/.exec(text)?.[1];
-    for (const state of states) {
-      if (county) {
-        add({ state, county });
+    const tail = trailingState(text);
+    if (tail) {
+      if (!tail.rest) {
+        if (parts.length > 0) parts[parts.length - 1].states = [tail.state];
         continue;
       }
-      const cities = CITY_COUNTY[state] ?? {};
-      for (const [city, c] of Object.entries(cities)) {
-        if (` ${text} `.includes(` ${city} `)) add({ state, county: c });
+      states = [tail.state];
+      text = tail.rest;
+    }
+    parts.push({ text, states });
+  }
+
+  for (const { text, states } of parts) {
+    const words = text.split(" ");
+    const used = new Array<boolean>(words.length).fill(false);
+
+    for (const state of states) {
+      // Counties: the one to three words just before "County", longest that
+      // exists — so "serving walker county" finds Walker, not "serving walker".
+      words.forEach((word, at) => {
+        if (!COUNTY_WORDS.has(word)) return;
+        for (let len = Math.min(3, at); len >= 1; len--) {
+          const place = counties.get(`${state}|${countyName(words.slice(at - len, at).join(" "))}`);
+          if (place) {
+            add(place);
+            for (let j = at - len; j <= at; j++) used[j] = true;
+            return;
+          }
+        }
+      });
+
+      // Cities: the longest run of words that names one — "lookout mountain"
+      // before "mountain", and filler like "greater" or "area" never alone.
+      for (let len = Math.min(4, words.length); len >= 1; len--) {
+        for (let i = 0; i + len <= words.length; i++) {
+          if (used.slice(i, i + len).some(Boolean)) continue;
+          const span = words.slice(i, i + len);
+          if (len === 1 && FILLER.has(span[0])) continue;
+          const place = cities.get(`${state}|${cityKey(span.join(" "))}`);
+          if (place) {
+            add(place);
+            for (let j = i; j < i + len; j++) used[j] = true;
+          }
+        }
       }
     }
   }
+
+  cache.set(cacheKey, found);
   return found;
+}
+
+export function sameCounty(a: Place, b: Place): boolean {
+  return a.state === b.state && a.county === b.county;
+}
+
+/** Straight-line miles between two points. */
+export function milesBetween(a: Point, b: Point): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * rad;
+  const dLon = (b.longitude - a.longitude) * rad;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLon / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.sqrt(h));
 }
