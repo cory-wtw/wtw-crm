@@ -61,6 +61,7 @@ function deserialize(
     requiresValidId: data.requiresValidId ?? false,
     eraRestriction: data.eraRestriction ?? [],
     requiresDependents: data.requiresDependents ?? false,
+    populationRestriction: data.populationRestriction ?? [],
     crisisCapable: data.crisisCapable ?? false,
 
     accessMethod: data.accessMethod ?? "phone",

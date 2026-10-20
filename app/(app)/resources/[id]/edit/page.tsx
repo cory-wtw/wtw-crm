@@ -48,6 +48,7 @@ export default async function EditResourcePage({
             requiresVaEnrollment: resource.requiresVaEnrollment,
             requiresValidId: resource.requiresValidId,
             eraRestriction: resource.eraRestriction,
+            populationRestriction: resource.populationRestriction,
             requiresDependents: resource.requiresDependents,
             crisisCapable: resource.crisisCapable,
 

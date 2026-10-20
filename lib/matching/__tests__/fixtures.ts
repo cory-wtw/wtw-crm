@@ -34,6 +34,7 @@ export function aResource(overrides: Partial<Resource> = {}): Resource {
     requiresValidId: false,
     eraRestriction: [],
     requiresDependents: false,
+    populationRestriction: [],
     crisisCapable: false,
 
     accessMethod: "phone",

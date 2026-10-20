@@ -16,6 +16,8 @@ import {
   GEO_SCOPES,
   MIN_DISCHARGE_LABELS,
   MIN_DISCHARGES,
+  POPULATION_LABELS,
+  POPULATIONS,
   SERVICE_ERA_LABELS,
   SERVICE_ERAS,
   TYPICAL_WAIT_LABELS,
@@ -52,6 +54,7 @@ const formSchema = z.object({
   requiresValidId: z.boolean(),
   eraRestriction: z.array(z.string()),
   requiresDependents: z.boolean(),
+  populationRestriction: z.array(z.string()),
   crisisCapable: z.boolean(),
 
   accessMethod: z.enum(ACCESS_METHODS),
@@ -122,6 +125,7 @@ export function ResourceForm({ initial }: Props) {
       requiresValidId: false,
       eraRestriction: [],
       requiresDependents: false,
+      populationRestriction: [],
       crisisCapable: false,
       accessMethod: "phone",
       accessValue: "",
@@ -167,6 +171,7 @@ export function ResourceForm({ initial }: Props) {
       requiresValidId: values.requiresValidId,
       eraRestriction: values.eraRestriction,
       requiresDependents: values.requiresDependents,
+      populationRestriction: values.populationRestriction,
       crisisCapable: values.crisisCapable,
 
       accessMethod: values.accessMethod,
@@ -359,6 +364,25 @@ export function ResourceForm({ initial }: Props) {
                   className="accent-[color:var(--wtw-brand-gold)]"
                 />
                 {SERVICE_ERA_LABELS[era]}
+              </label>
+            ))}
+          </div>
+        </Field>
+
+        <Field
+          label="Only serves"
+          hint="Check only when the org takes nobody else — an MST line or HUD-VASH. It is offered only when staff marks the veteran as in that group at intake."
+        >
+          <div className="grid gap-2 rounded-md border border-input bg-background p-3">
+            {POPULATIONS.map((population) => (
+              <label key={population} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  value={population}
+                  {...register("populationRestriction")}
+                  className="accent-[color:var(--wtw-brand-gold)]"
+                />
+                {POPULATION_LABELS[population]}
               </label>
             ))}
           </div>

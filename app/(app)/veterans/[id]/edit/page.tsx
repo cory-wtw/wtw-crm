@@ -69,6 +69,7 @@ function veteranToFormValues(v: Veteran): VeteranFormInitial["values"] {
     birthYear: v.birthYear?.toString() ?? "",
     city: v.city ?? "",
     state: v.state ?? "",
+    zip: v.zip ?? "",
     dischargeCharacter: v.dischargeCharacter ?? "",
     serviceEra: v.serviceEra ?? "",
     idStatus: v.idStatus ?? "",

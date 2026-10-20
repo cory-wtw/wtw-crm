@@ -30,6 +30,26 @@ export function findCandidates(
   { limit, now }: { limit?: number; now?: Date } = {},
 ): RankedResource[] {
   const survivors = resources.filter((r) => passesGates(v, r).passes);
-  const ranked = rankResources(v, survivors, now);
+  const ranked = dedupeByName(rankResources(v, survivors, now));
   return limit === undefined ? ranked : ranked.slice(0, limit);
+}
+
+/** Name as a dedupe key: case, punctuation, and spacing don't make a twin. */
+export function organizationKey(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+/**
+ * One entry per organization, keeping the highest-ranked copy. The same food
+ * bank entered twice (an import and a hand entry) would otherwise take two of
+ * the eight places on the short list.
+ */
+function dedupeByName(ranked: RankedResource[]): RankedResource[] {
+  const seen = new Set<string>();
+  return ranked.filter(({ resource }) => {
+    const k = organizationKey(resource.organizationName);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }

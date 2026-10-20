@@ -11,9 +11,11 @@ import { getSession } from "@/lib/firebase/session";
 import {
   findCandidates,
   intakeFlags,
+  organizationKey,
   passesGates,
   resourceFlags,
   type GateFailure,
+  type ScoreBreakdown,
   type MatchFlag,
   type MatchInput,
 } from "@/lib/matching";
@@ -41,6 +43,7 @@ import {
   dependentsAnswerSchema,
   dischargeCharacterSchema,
   idStatusSchema,
+  populationSchema,
   receivingVaBenefitsSchema,
   serviceEraSchema,
   bucketSchema,
@@ -73,12 +76,14 @@ const SHORT_LIST = 8;
  * `safeTonight` is accepted and used, but never written: a crisis answer is
  * true at a moment, not about a person. It routes this call and then goes away.
  * `receivingVaBenefits` is the same — it decides whether the claims lane opens,
- * and claim history is on the "not stored, ever" list.
+ * and claim history is on the "not stored, ever" list. `situations` too: an MST
+ * disclosure opens the doors meant for it on this call and is not filed.
  */
 const intakeInputSchema = z.object({
   safeTonight: z.boolean().optional(),
   receivingVaBenefits: receivingVaBenefitsSchema.optional(),
   needs: z.array(bucketSchema).default([]),
+  situations: z.array(populationSchema).default([]),
   dischargeCharacter: dischargeCharacterSchema.optional(),
   serviceEra: serviceEraSchema.optional(),
   idStatus: idStatusSchema.optional(),
@@ -104,6 +109,8 @@ export type Candidate = {
   verificationStatus: VerificationStatus;
   lastVerified: string | null;
   score: number;
+  /** Where the score came from, signal by signal, so staff can see why. */
+  breakdown: ScoreBreakdown;
   flags: MatchFlag[];
 };
 
@@ -112,6 +119,9 @@ export type ExcludedResource = {
   id: string;
   organizationName: string;
   failures: GateFailure[];
+  /** What it serves — shown beside "doesn't cover what they need" so a
+   *  mis-bucketed record is obvious at a glance. */
+  buckets: Bucket[];
 };
 
 export type IntakeResult = {
@@ -230,6 +240,8 @@ export async function runIntakeAction(
     safeTonight: input.safeTonight,
     state: existing.state ?? undefined,
     city: existing.city ?? undefined,
+    zip: existing.zip ?? undefined,
+    situations: input.situations,
     // Everything we know, not just what was asked today — a question skipped
     // this call still matches on the answer given last week.
     dischargeCharacter: effective.dischargeCharacter,
@@ -251,7 +263,7 @@ export async function runIntakeAction(
   const shortListed = new Set(ranked.map((r) => r.resource.id));
 
   const candidates: Candidate[] = ranked.map(
-    ({ resource, score, matchedBuckets }) => ({
+    ({ resource, score, breakdown, matchedBuckets }) => ({
       id: resource.id,
       organizationName: resource.organizationName,
       description: resource.description ?? null,
@@ -266,6 +278,7 @@ export async function runIntakeAction(
       verificationStatus: resource.verificationStatus,
       lastVerified: resource.lastVerified?.toISOString() ?? null,
       score,
+      breakdown,
       flags: resourceFlags(matchInput, resource),
     }),
   );
@@ -273,12 +286,25 @@ export async function runIntakeAction(
   // Everything the gates dropped, with the reasons. Staff uses this to spot a
   // misconfigured record — and to add something back by hand when they know
   // better than the gate does.
+  //
+  // One row per organization: a duplicate record of something already on the
+  // short list, or already listed here, is noise with a contradictory reason.
+  const seenNames = new Set(
+    ranked.map((r) => organizationKey(r.resource.organizationName)),
+  );
   const excluded: ExcludedResource[] = resources
     .filter((r) => !shortListed.has(r.id))
+    .filter((r) => {
+      const k = organizationKey(r.organizationName);
+      if (seenNames.has(k)) return false;
+      seenNames.add(k);
+      return true;
+    })
     .map((r) => ({
       id: r.id,
       organizationName: r.organizationName,
       failures: passesGates(matchInput, r).failures,
+      buckets: r.buckets,
     }))
     .sort((a, b) => a.organizationName.localeCompare(b.organizationName));
 

@@ -46,6 +46,7 @@ export default async function ClassifyResourcesPage() {
         requiresValidId: r.requiresValidId,
         eraRestriction: r.eraRestriction,
         requiresDependents: r.requiresDependents,
+        populationRestriction: r.populationRestriction,
         crisisCapable: r.crisisCapable,
         accessMethod: r.accessMethod,
         accessValue: r.accessValue,

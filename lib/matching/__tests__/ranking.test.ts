@@ -277,3 +277,29 @@ describe("rankResources", () => {
     expect(input.map((r) => r.id)).toEqual(["a", "b"]);
   });
 });
+
+describe("metro geography", () => {
+  it("scores a neighboring metro county below the veteran's own", () => {
+    const april = aVeteran({ city: "Rossville", state: "GA" });
+    const own = scoreResource(
+      april,
+      aResource({
+        geoScope: "local",
+        geoStates: ["GA"],
+        geoLocalities: ["Walker County"],
+      }),
+      NOW,
+    );
+    const nearby = scoreResource(
+      april,
+      aResource({
+        geoScope: "local",
+        geoStates: ["TN"],
+        geoLocalities: ["Chattanooga"],
+      }),
+      NOW,
+    );
+    expect(own.geography).toBe(RANKING_WEIGHTS.geography.locality);
+    expect(nearby.geography).toBe(RANKING_WEIGHTS.geography.nearby);
+  });
+});

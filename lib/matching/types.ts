@@ -3,6 +3,7 @@ import type {
   DependentsAnswer,
   DischargeCharacter,
   IdStatus,
+  Population,
   ReceivingVaBenefits,
   ServiceEra,
 } from "@/lib/schemas";
@@ -34,12 +35,21 @@ export type MatchInput = {
   /** Two-letter state code, matched against a resource's `geoStates`. */
   state?: string;
   city?: string;
+  /** Five-digit ZIP. Resolves to a county ahead of the city when both exist. */
+  zip?: string;
 
   dischargeCharacter?: DischargeCharacter;
   serviceEra?: ServiceEra;
   idStatus?: IdStatus;
   hasDependents?: DependentsAnswer;
   receivingVaBenefits?: ReceivingVaBenefits;
+
+  /**
+   * Groups the veteran said they're in, this call. Transient like safeTonight:
+   * an MST disclosure is not written to the record by the matcher. Only a
+   * stated membership opens a population-restricted resource.
+   */
+  situations?: Population[];
 
   /** The buckets checked during intake. A resource must serve at least one. */
   needs: Bucket[];

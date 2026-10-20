@@ -95,3 +95,13 @@ describe("findCandidates", () => {
     expect(candidates.map((c) => c.resource.id)).toEqual(["shelter"]);
   });
 });
+
+describe("duplicate records", () => {
+  it("keeps one entry per organization", () => {
+    const ranked = findCandidates(aVeteran(), [
+      aResource({ id: "a", organizationName: "Chattanooga Area Food Bank" }),
+      aResource({ id: "b", organizationName: "Chattanooga Area Food Bank " }),
+    ]);
+    expect(ranked).toHaveLength(1);
+  });
+});

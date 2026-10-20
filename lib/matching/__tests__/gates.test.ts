@@ -3,6 +3,7 @@ import {
   GATE_FAILURES,
   GATE_FAILURE_LABELS,
   filterByGates,
+  localityMatch,
   matchesLocality,
   passesGates,
 } from "../gates";
@@ -113,7 +114,7 @@ describe("geography", () => {
       true,
     );
     expect(
-      passesGates(aVeteran({ city: "Cleveland" }), resource).failures,
+      passesGates(aVeteran({ city: "Knoxville" }), resource).failures,
     ).toContain("locality");
   });
 
@@ -436,5 +437,84 @@ describe("filterByGates", () => {
       alsoEligible,
     ]);
     expect(survivors.map((r) => r.id)).toEqual(["a", "c"]);
+  });
+});
+
+describe("county resolution (Rossville, GA)", () => {
+  const april = (overrides = {}) =>
+    aVeteran({ city: "Rossville", state: "GA", ...overrides });
+  const walkerOnly = aResource({
+    geoScope: "local",
+    geoStates: ["GA"],
+    geoLocalities: ["Walker County", "Catoosa County"],
+  });
+
+  it("matches a city to the county a resource lists", () => {
+    expect(passesGates(april(), walkerOnly).passes).toBe(true);
+    expect(localityMatch(april(), walkerOnly)).toBe("local");
+  });
+
+  it("resolves from ZIP alone", () => {
+    expect(
+      passesGates(april({ city: undefined, zip: "30741" }), walkerOnly).passes,
+    ).toBe(true);
+  });
+
+  it("resolves a resource listed by town to its county", () => {
+    const lafayette = aResource({
+      geoScope: "local",
+      geoStates: ["GA"],
+      geoLocalities: ["LaFayette"],
+    });
+    expect(localityMatch(april(), lafayette)).toBe("local");
+  });
+
+  it("treats the Chattanooga metro as in range across the state line", () => {
+    const chattanooga = aResource({
+      geoScope: "local",
+      geoStates: ["TN"],
+      geoLocalities: ["Chattanooga area"],
+    });
+    expect(localityMatch(april(), chattanooga)).toBe("nearby");
+    expect(passesGates(april(), chattanooga).passes).toBe(true);
+  });
+
+  it("still excludes a county outside the metro", () => {
+    const atlanta = aResource({
+      geoScope: "local",
+      geoStates: ["GA"],
+      geoLocalities: ["Fulton County"],
+    });
+    expect(passesGates(april(), atlanta).failures).toEqual(["locality"]);
+  });
+
+  it("still excludes another state outside the metro", () => {
+    const saratoga = aResource({
+      geoScope: "local",
+      geoStates: ["NY"],
+      geoLocalities: ["Saratoga County"],
+    });
+    expect(passesGates(april(), saratoga).failures).toEqual(["geography"]);
+  });
+});
+
+describe("population restriction", () => {
+  const mstOnly = aResource({ populationRestriction: ["mst"] });
+
+  it("withholds an MST resource unless MST was marked", () => {
+    expect(passesGates(aVeteran(), mstOnly).failures).toEqual(["population"]);
+    expect(
+      passesGates(aVeteran({ situations: ["homeless"] }), mstOnly).passes,
+    ).toBe(false);
+  });
+
+  it("offers it when MST was marked", () => {
+    expect(passesGates(aVeteran({ situations: ["mst"] }), mstOnly).passes).toBe(
+      true,
+    );
+  });
+
+  it("leaves unrestricted resources alone", () => {
+    expect(passesGates(aVeteran(), aResource()).passes).toBe(true);
   });
 });
