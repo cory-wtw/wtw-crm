@@ -19,8 +19,16 @@ import {
 } from "@/lib/finance/bank-import";
 import { parseCsv } from "@/lib/finance/csv";
 import { formatUsdCents } from "@/lib/format";
-import type { Category } from "@/lib/schemas";
-import { importTransactionsAction, type ImportResult } from "../actions";
+import {
+  TRANSACTION_SOURCE_LABELS,
+  type Category,
+  type TransactionSource,
+} from "@/lib/schemas";
+import {
+  importTransactionsAction,
+  type HeldRow,
+  type ImportResult,
+} from "../actions";
 
 type ReviewRow = ParsedRow & {
   key: string;
@@ -34,6 +42,7 @@ type ReviewRow = ParsedRow & {
 
 /** Rows per request; matches the server's limit. */
 const CHUNK = 250;
+
 
 const COLUMN_LABELS: Record<ImportMode, [keyof ColumnMap, string][]> = {
   bank: [
@@ -84,6 +93,10 @@ export function ImportPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+  // Held-back rows go back with the same batch id, so "import anyway" can't
+  // be flagged against rows this same run just wrote.
+  const [batchId, setBatchId] = useState("");
+  const [forcing, setForcing] = useState(false);
 
   const index = useMemo(() => buildVendorIndex(known), [known]);
   const incomeCats = categories.filter((c) => c.type === "income");
@@ -238,12 +251,15 @@ export function ImportPanel({
       reference: r.reference,
       occurrence: occurrence.get(r.key) ?? 0,
     }));
-    const done: ImportResult = { created: 0, duplicates: 0 };
+    const done: ImportResult = { created: 0, duplicates: 0, held: [] };
+    const importBatch = crypto.randomUUID();
+    setBatchId(importBatch);
     try {
       for (let i = 0; i < payload.length; i += CHUNK) {
         const response = await importTransactionsAction({
           mode,
           rows: payload.slice(i, i + CHUNK),
+          importBatch,
         });
         if (!response.ok) {
           setError(
@@ -254,6 +270,7 @@ export function ImportPanel({
         }
         done.created += response.created;
         done.duplicates += response.duplicates;
+        done.held.push(...response.held);
       }
       setResult(done);
       setText("");
@@ -267,6 +284,33 @@ export function ImportPanel({
     }
   }
 
+  /** Staff looked at the held rows and wants them in anyway. */
+  async function importAnyway(held: HeldRow[]) {
+    setForcing(true);
+    setError(null);
+    try {
+      let created = 0;
+      for (let i = 0; i < held.length; i += CHUNK) {
+        const response = await importTransactionsAction({
+          mode,
+          rows: held.slice(i, i + CHUNK).map((h) => h.row),
+          importBatch: batchId,
+          force: true,
+        });
+        if (!response.ok) {
+          setError(response.error);
+          return;
+        }
+        created += response.created;
+      }
+      setResult((r) => (r ? { ...r, created: r.created + created, held: [] } : r));
+    } catch (e) {
+      setError(`The request didn't reach the server: ${e instanceof Error ? e.message : String(e)}.`);
+    } finally {
+      setForcing(false);
+    }
+  }
+
   if (result) {
     return (
       <div className="space-y-4 rounded-lg border border-border bg-card p-6">
@@ -277,6 +321,35 @@ export function ImportPanel({
           <p className="text-xs text-muted-foreground">
             {result.duplicates} already on file from an earlier import — skipped.
           </p>
+        )}
+        {result.held.length > 0 && (
+          <div className="space-y-3 rounded-md border border-[color:var(--wtw-deep-gold)]/40 bg-[color:var(--wtw-deep-gold)]/10 p-4">
+            <p className="text-sm font-bold">
+              {result.held.length} held back — they look like transactions already on file
+            </p>
+            <ul className="space-y-2 text-xs">
+              {result.held.map((h, i) => (
+                <li key={i}>
+                  <span className="font-bold">
+                    {h.row.date} · {formatUsdCents(h.row.amount)} · {h.row.vendor || h.row.description}
+                  </span>
+                  <span className="block text-muted-foreground">
+                    Looks like {h.match.date} · {formatUsdCents(Math.abs(h.match.amount))} ·{" "}
+                    {h.match.vendor || h.match.description || "no payee"} ({TRANSACTION_SOURCE_LABELS[h.match.source as TransactionSource] ?? h.match.source}) — {h.reason}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            <button
+              type="button"
+              onClick={() => importAnyway(result.held)}
+              disabled={forcing}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold hover:bg-secondary disabled:opacity-50"
+            >
+              {forcing ? "Importing…" : `They're different — import ${result.held.length} anyway`}
+            </button>
+          </div>
         )}
         <div className="flex gap-3">
           <Link href="/finances/transactions" className={primary}>

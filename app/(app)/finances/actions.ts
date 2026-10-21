@@ -7,6 +7,11 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { CATEGORIES, TRANSACTIONS, listCategories } from "@/lib/db/finance";
 import { importIdentity } from "@/lib/finance/bank-import";
+import {
+  dateRange,
+  findLikelyDuplicate,
+  type ExistingTransaction,
+} from "@/lib/finance/dedupe";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSession, type Session } from "@/lib/firebase/session";
 import { canManageFinances } from "@/lib/permissions";
@@ -220,9 +225,20 @@ const importSchema = z.object({
   // Kept small so a chunk stays well under the 1 MB server-action body
   // limit even with 500-character descriptions. The client splits files.
   rows: z.array(importRowSchema).min(1).max(IMPORT_CHUNK),
+  /** One id per import run, so its own chunks don't flag each other. */
+  importBatch: z.string().min(1).max(64),
+  /** Staff looked at the held-back rows and said import them anyway. */
+  force: z.boolean().default(false),
 });
 
-export type ImportResult = { created: number; duplicates: number };
+/** A row held back because something on file already looks like it. */
+export type HeldRow = {
+  row: ImportRowInput;
+  match: { date: string; amount: number; vendor: string; description?: string; source: string };
+  reason: string;
+};
+
+export type ImportResult = { created: number; duplicates: number; held: HeldRow[] };
 
 export async function importTransactionsAction(
   raw: unknown,
@@ -235,8 +251,36 @@ export async function importTransactionsAction(
   if (!parsed.success) {
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
-  const { mode, rows } = parsed.data;
+  const { mode, rows, importBatch, force } = parsed.data;
   const categories = new Map((await listCategories()).map((c) => [c.id, c]));
+
+  // Everything on file around these dates, from any source — hand entry,
+  // QuickBooks, an earlier bank or Zeffy import — for the likely-duplicate
+  // check. The exact id check below only catches the same file twice.
+  let onFile: ExistingTransaction[] = [];
+  if (!force) {
+    const { from, to } = dateRange(rows.map((r) => r.date));
+    const snap = await adminDb
+      .collection(TRANSACTIONS)
+      .where("date", ">=", from)
+      .where("date", "<=", to)
+      .get();
+    onFile = snap.docs.map((d) => {
+      const t = d.data();
+      return {
+        id: d.id,
+        date: t.date,
+        amount: t.amount,
+        type: t.type,
+        vendor: t.vendor ?? "",
+        description: t.description,
+        donorName: t.donorName,
+        source: t.source ?? "manual",
+        importBatch: t.importBatch,
+      };
+    });
+  }
+  const held: HeldRow[] = [];
 
   // Deterministic doc IDs make re-importing an overlapping statement a
   // no-op for the rows already on file. Two genuinely identical rows in one
@@ -254,18 +298,52 @@ export async function importTransactionsAction(
     // Money in, filed under an expense category, is a refund: it reduces
     // that expense. Same in reverse for income.
     const signed = category.type === row.type ? row.amount : -row.amount;
+    const rounded = Math.round(signed * 100) / 100;
+
+    if (!force) {
+      const match = findLikelyDuplicate(
+        {
+          date: row.date,
+          amount: rounded,
+          type: category.type,
+          vendor: row.vendor,
+          description: row.description,
+          donorName: category.type === "income" ? row.donorName : undefined,
+        },
+        onFile,
+        importBatch,
+      );
+      // An exact re-import has the same id and is skipped below as before;
+      // only a near-match from somewhere else is held back.
+      if (match && match.existing.id !== id) {
+        held.push({
+          row,
+          match: {
+            date: match.existing.date,
+            amount: match.existing.amount,
+            vendor: match.existing.vendor,
+            description: match.existing.description,
+            source: match.existing.source,
+          },
+          reason: match.reason,
+        });
+        continue;
+      }
+    }
+
     docs.push({
       id,
       data: dropEmpty({
         date: row.date,
         vendor: row.vendor,
         description: row.description,
-        amount: Math.round(signed * 100) / 100,
+        amount: rounded,
         type: category.type,
         categoryId: category.id,
         donorName: category.type === "income" ? row.donorName : undefined,
         campaign: category.type === "income" ? row.campaign : undefined,
         source: mode === "zeffy" ? "zeffy" : "bank_csv",
+        importBatch,
         createdBy: session.uid,
         createdAt: now,
         updatedBy: session.uid,
@@ -275,7 +353,7 @@ export async function importTransactionsAction(
   }
 
   const refs = docs.map((d) => adminDb.collection(TRANSACTIONS).doc(d.id));
-  const existing = await adminDb.getAll(...refs);
+  const existing = refs.length > 0 ? await adminDb.getAll(...refs) : [];
   const batch = adminDb.batch();
   const createdIds: string[] = [];
   existing.forEach((snap, j) => {
@@ -298,7 +376,7 @@ export async function importTransactionsAction(
   const duplicates = docs.length - created;
 
   revalidateFinances();
-  return { ok: true, created, duplicates };
+  return { ok: true, created, duplicates, held };
 }
 
 // ---------------------------------------------------------------------------

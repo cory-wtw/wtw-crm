@@ -19,6 +19,9 @@
 //    deterministic ID, so a second run only adds rows that are new, and
 //    removes earlier QB rows that no longer appear in the ledger (the dry run
 //    lists both first).
+// 7. Rows that look like something already entered another way (by hand, a
+//    bank or Zeffy import) are held back and listed. Add
+//    --include-likely-duplicates once you've checked they're different.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
@@ -27,6 +30,7 @@ import {
   summarizeAccounts,
   type AccountMapping,
 } from "@/lib/finance/qb-ledger";
+import { dateRange, findLikelyDuplicate } from "@/lib/finance/dedupe";
 import { adminDb } from "@/lib/firebase/admin";
 import {
   CATEGORIES_COLLECTION as CATEGORIES,
@@ -128,14 +132,70 @@ async function main() {
   const existingSnap = await adminDb.collection(TRANSACTIONS).where("source", "==", "qb").get();
   const existingIds = new Set(existingSnap.docs.map((d) => d.id));
   const incomingIds = new Set(docs.map((d) => d.id));
-  const added = docs.filter((d) => !existingIds.has(d.id));
+  const newRows = docs.filter((d) => !existingIds.has(d.id));
+
+  // The same money entered some other way — by hand, or from a bank or Zeffy
+  // import — under a different id. Held back unless asked for.
+  const includeLikely = flags.includes("--include-likely-duplicates");
+  const likely: { doc: Doc; reason: string; match: string }[] = [];
+  let added = newRows;
+  if (newRows.length > 0) {
+    const { from, to } = dateRange(newRows.map((d) => String(d.data.date)));
+    const others = (
+      await adminDb.collection(TRANSACTIONS).where("date", ">=", from).where("date", "<=", to).get()
+    ).docs
+      .filter((d) => d.data().source !== "qb")
+      .map((d) => {
+        const t = d.data();
+        return {
+          id: d.id,
+          date: t.date,
+          amount: t.amount,
+          type: t.type,
+          vendor: t.vendor ?? "",
+          description: t.description,
+          donorName: t.donorName,
+          source: t.source ?? "manual",
+        };
+      });
+    added = newRows.filter((d) => {
+      const x = d.data;
+      const m = findLikelyDuplicate(
+        {
+          date: String(x.date),
+          amount: Number(x.amount),
+          type: x.type as "income" | "expense",
+          vendor: String(x.vendor ?? ""),
+          description: x.description as string | undefined,
+          donorName: x.donorName as string | undefined,
+        },
+        others,
+      );
+      if (!m) return true;
+      likely.push({
+        doc: d,
+        reason: m.reason,
+        match: `${m.existing.date} ${m.existing.vendor || m.existing.description || ""} (${m.existing.source})`,
+      });
+      return includeLikely;
+    });
+  }
   const stale = existingSnap.docs.filter((d) => !incomingIds.has(d.id));
   console.log(
-    `\nCompared with the database: ${docs.length - added.length} already imported, ${added.length} new, ${stale.length} no longer in this ledger.`,
+    `\nCompared with the database: ${docs.length - newRows.length} already imported, ${added.length} new, ${likely.length} likely duplicates, ${stale.length} no longer in this ledger.`,
   );
   for (const d of added) {
     const x = d.data;
     console.log(`  + ${x.date}  ${String(x.vendor || x.description || "").slice(0, 36).padEnd(36)} ${usd(Math.round(Number(x.amount) * 100)).padStart(12)}`);
+  }
+  if (likely.length > 0) {
+    console.log(
+      `\n${likely.length} look like transactions already entered another way — ${includeLikely ? "INCLUDED (--include-likely-duplicates)" : "held back; add --include-likely-duplicates to import them"}:`,
+    );
+    for (const l of likely) {
+      const x = l.doc.data;
+      console.log(`  ? ${x.date}  ${String(x.vendor || x.description || "").slice(0, 36).padEnd(36)} ${usd(Math.round(Number(x.amount) * 100)).padStart(12)}  ~ ${l.match} — ${l.reason}`);
+    }
   }
   for (const d of stale) {
     const x = d.data();
