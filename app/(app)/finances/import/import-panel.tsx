@@ -18,9 +18,18 @@ import {
   type ParsedRow,
 } from "@/lib/finance/bank-import";
 import { parseCsv } from "@/lib/finance/csv";
+import { DATE_WINDOW_DAYS } from "@/lib/finance/dedupe";
 import { formatUsdCents } from "@/lib/format";
-import type { Category } from "@/lib/schemas";
-import { importTransactionsAction, type ImportResult } from "../actions";
+import {
+  TRANSACTION_SOURCE_LABELS,
+  type Category,
+  type TransactionSource,
+} from "@/lib/schemas";
+import {
+  importTransactionsAction,
+  type HeldRow,
+  type ImportResult,
+} from "../actions";
 
 type ReviewRow = ParsedRow & {
   key: string;
@@ -34,6 +43,11 @@ type ReviewRow = ParsedRow & {
 
 /** Rows per request; matches the server's limit. */
 const CHUNK = 250;
+
+function shiftDays(date: string, n: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+}
+
 
 const COLUMN_LABELS: Record<ImportMode, [keyof ColumnMap, string][]> = {
   bank: [
@@ -84,6 +98,12 @@ export function ImportPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+  // Held-back rows go back with the same batch id, so "import anyway" can't
+  // be flagged against rows this same run just wrote.
+  const [batchId, setBatchId] = useState("");
+  const [forcing, setForcing] = useState(false);
+  // Held rows staff ticked to import anyway — none by default.
+  const [picked, setPicked] = useState<Set<HeldRow>>(new Set());
 
   const index = useMemo(() => buildVendorIndex(known), [known]);
   const incomeCats = categories.filter((c) => c.type === "income");
@@ -237,33 +257,93 @@ export function ImportPanel({
       campaign: r.campaign,
       reference: r.reference,
       occurrence: occurrence.get(r.key) ?? 0,
-    }));
-    const done: ImportResult = { created: 0, duplicates: 0 };
+    }))
+      // Date order keeps each chunk's window — and the duplicate check's
+      // read of what's on file — to a narrow slice of the calendar.
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const done: ImportResult = { created: 0, duplicates: 0, held: [] };
+    const importBatch = crypto.randomUUID();
+    setBatchId(importBatch);
+    setPicked(new Set());
+    // Stopping partway still shows what got in and what was held back; the
+    // pasted rows stay loaded so "Back" and import again picks up the rest
+    // (rows already written are skipped).
+    const stopped = (message: string) => {
+      if (done.created + done.duplicates + done.held.length === 0) {
+        setError(message);
+        return;
+      }
+      setResult(done);
+      setError(`Stopped partway: ${message} Go back and import again — rows already in are skipped.`);
+    };
     try {
       for (let i = 0; i < payload.length; i += CHUNK) {
+        const chunk = payload.slice(i, i + CHUNK);
+        // Only matches that could pair with this chunk: within the window of
+        // its dates. Keeps the request small however much was held before.
+        const first = shiftDays(chunk[0].date, -DATE_WINDOW_DAYS);
+        const last = shiftDays(chunk[chunk.length - 1].date, DATE_WINDOW_DAYS);
         const response = await importTransactionsAction({
           mode,
-          rows: payload.slice(i, i + CHUNK),
+          rows: chunk,
+          importBatch,
+          claimed: done.held
+            .filter((h) => h.match.date >= first && h.match.date <= last)
+            .map((h) => h.match.id),
         });
         if (!response.ok) {
-          setError(
-            (i > 0 ? `Imported ${done.created} before stopping. Re-running the import is safe. ` : "") +
-              response.error,
-          );
+          stopped(response.error);
           return;
         }
         done.created += response.created;
         done.duplicates += response.duplicates;
+        done.held.push(...response.held);
       }
       setResult(done);
       setText("");
       reset();
     } catch (e) {
-      setError(
-        `The request didn't reach the server: ${e instanceof Error ? e.message : String(e)}. Reload the page and try again.`,
+      stopped(
+        `the request didn't reach the server (${e instanceof Error ? e.message : String(e)}).`,
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Import the held rows staff ticked. Progress is kept chunk by chunk, so a
+   *  failure partway leaves the counts right and only the unsent rows held. */
+  async function importAnyway(rowsToSend: HeldRow[]) {
+    setForcing(true);
+    setError(null);
+    try {
+      for (let i = 0; i < rowsToSend.length; i += CHUNK) {
+        const sent = rowsToSend.slice(i, i + CHUNK);
+        const response = await importTransactionsAction({
+          mode,
+          rows: sent.map((h) => h.row),
+          importBatch: batchId,
+          force: true,
+        });
+        if (!response.ok) {
+          setError(response.error);
+          return;
+        }
+        setResult((r) =>
+          r
+            ? {
+                created: r.created + response.created,
+                duplicates: r.duplicates + response.duplicates,
+                held: r.held.filter((h) => !sent.includes(h)),
+              }
+            : r,
+        );
+        setPicked((p) => new Set([...p].filter((h) => !sent.includes(h))));
+      }
+    } catch (e) {
+      setError(`The request didn't reach the server: ${e instanceof Error ? e.message : String(e)}.`);
+    } finally {
+      setForcing(false);
     }
   }
 
@@ -278,12 +358,69 @@ export function ImportPanel({
             {result.duplicates} already on file from an earlier import — skipped.
           </p>
         )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {result.held.length > 0 && (
+          <div className="space-y-3 rounded-md border border-[color:var(--wtw-deep-gold)]/40 bg-[color:var(--wtw-deep-gold)]/10 p-4">
+            <p className="text-sm font-bold">
+              {result.held.length} held back — they look like transactions already on file
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Tick any that are really different, then import them.
+            </p>
+            <ul className="space-y-2 text-xs">
+              {result.held.map((h, i) => (
+                <li key={i}>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={picked.has(h)}
+                      onChange={() =>
+                        setPicked((p) => {
+                          const next = new Set(p);
+                          if (next.has(h)) next.delete(h);
+                          else next.add(h);
+                          return next;
+                        })
+                      }
+                      className="mt-0.5 accent-[color:var(--wtw-brand-gold)]"
+                    />
+                    <span>
+                      <span className="font-bold">
+                        {h.row.date} · {formatUsdCents(h.amount)} · {h.row.vendor || h.row.description}
+                      </span>
+                      <span className="block text-muted-foreground">
+                        Looks like {h.match.date} · {formatUsdCents(h.match.amount)} ·{" "}
+                        {h.match.vendor || h.match.description || "no payee"} (
+                        {TRANSACTION_SOURCE_LABELS[h.match.source as TransactionSource] ?? h.match.source}) — {h.reason}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => importAnyway(result.held.filter((h) => picked.has(h)))}
+              disabled={forcing || picked.size === 0}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold hover:bg-secondary disabled:opacity-50"
+            >
+              {forcing ? "Importing…" : `Import ${picked.size} ticked anyway`}
+            </button>
+          </div>
+        )}
         <div className="flex gap-3">
           <Link href="/finances/transactions" className={primary}>
             View transactions
           </Link>
-          <button type="button" onClick={() => setResult(null)} className="text-sm font-bold text-muted-foreground hover:text-foreground">
-            Import another
+          <button
+            type="button"
+            onClick={() => {
+              setResult(null);
+              setError(null);
+            }}
+            className="text-sm font-bold text-muted-foreground hover:text-foreground"
+          >
+            {rows ? "Back" : "Import another"}
           </button>
         </div>
       </div>

@@ -7,6 +7,8 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { CATEGORIES, TRANSACTIONS, listCategories } from "@/lib/db/finance";
 import { importIdentity } from "@/lib/finance/bank-import";
+import { findLikelyDuplicate, toIncomingTransaction } from "@/lib/finance/dedupe";
+import { loadDedupeIndex } from "@/lib/finance/dedupe-db";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSession, type Session } from "@/lib/firebase/session";
 import { canManageFinances } from "@/lib/permissions";
@@ -220,9 +222,25 @@ const importSchema = z.object({
   // Kept small so a chunk stays well under the 1 MB server-action body
   // limit even with 500-character descriptions. The client splits files.
   rows: z.array(importRowSchema).min(1).max(IMPORT_CHUNK),
+  /** One id per import run, so its own chunks don't flag each other. */
+  importBatch: z.string().min(1).max(64),
+  /** Staff picked these held-back rows and said import them anyway. */
+  force: z.boolean().default(false),
+  /** Existing transaction ids earlier chunks already matched — one existing
+   *  row explains one incoming row, across the whole file. */
+  claimed: z.array(z.string().max(64)).max(5000).default([]),
 });
 
-export type ImportResult = { created: number; duplicates: number };
+/** A row held back because something on file already looks like it. */
+export type HeldRow = {
+  row: ImportRowInput;
+  /** Signed as it would be stored, to compare like with like on screen. */
+  amount: number;
+  match: { id: string; date: string; amount: number; vendor: string; description?: string; source: string };
+  reason: string;
+};
+
+export type ImportResult = { created: number; duplicates: number; held: HeldRow[] };
 
 export async function importTransactionsAction(
   raw: unknown,
@@ -235,13 +253,14 @@ export async function importTransactionsAction(
   if (!parsed.success) {
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
-  const { mode, rows } = parsed.data;
+  const { mode, rows, importBatch, force, claimed } = parsed.data;
   const categories = new Map((await listCategories()).map((c) => [c.id, c]));
 
   // Deterministic doc IDs make re-importing an overlapping statement a
   // no-op for the rows already on file. Two genuinely identical rows in one
   // file (same day, amount and payee) differ by their occurrence number.
-  const docs: { id: string; data: Record<string, unknown> }[] = [];
+  type Candidate = { row: ImportRowInput; id: string; data: Record<string, unknown> };
+  const candidates: Candidate[] = [];
   const now = new Date();
   for (const row of rows) {
     const category = categories.get(row.categoryId);
@@ -250,11 +269,15 @@ export async function importTransactionsAction(
     }
     const identity = importIdentity(mode, row);
     const id = `${mode}_${createHash("sha1").update(`${identity}#${row.occurrence}`).digest("hex").slice(0, 24)}`;
+    // Shared by a row's twins in the same file; lets a rerun after an
+    // interrupted import tell the file's own rows from real duplicates.
+    const importKey = createHash("sha1").update(identity).digest("hex").slice(0, 24);
 
     // Money in, filed under an expense category, is a refund: it reduces
     // that expense. Same in reverse for income.
     const signed = category.type === row.type ? row.amount : -row.amount;
-    docs.push({
+    candidates.push({
+      row,
       id,
       data: dropEmpty({
         date: row.date,
@@ -266,6 +289,8 @@ export async function importTransactionsAction(
         donorName: category.type === "income" ? row.donorName : undefined,
         campaign: category.type === "income" ? row.campaign : undefined,
         source: mode === "zeffy" ? "zeffy" : "bank_csv",
+        importBatch,
+        importKey,
         createdBy: session.uid,
         createdAt: now,
         updatedBy: session.uid,
@@ -274,16 +299,40 @@ export async function importTransactionsAction(
     });
   }
 
-  const refs = docs.map((d) => adminDb.collection(TRANSACTIONS).doc(d.id));
-  const existing = await adminDb.getAll(...refs);
-  const batch = adminDb.batch();
-  const createdIds: string[] = [];
-  existing.forEach((snap, j) => {
-    if (snap.exists) return;
-    batch.set(refs[j], docs[j].data);
-    createdIds.push(docs[j].id);
-  });
-  if (createdIds.length > 0) {
+  // Exact re-imports first: a row whose own id is on file is skipped, never
+  // held — even when something else on file also resembles it.
+  const refs = candidates.map((c) => adminDb.collection(TRANSACTIONS).doc(c.id));
+  const snaps = await adminDb.getAll(...refs);
+  const fresh = candidates.filter((_, j) => !snaps[j].exists);
+  const duplicates = candidates.length - fresh.length;
+
+  // Then likely duplicates: everything on file around these dates, from any
+  // source — hand entry, QuickBooks, an earlier bank or Zeffy import.
+  const held: HeldRow[] = [];
+  let toWrite = fresh;
+  if (!force && fresh.length > 0) {
+    const index = await loadDedupeIndex(fresh.map((c) => c.row.date));
+    const taken = new Set(claimed);
+    toWrite = fresh.filter((c) => {
+      const match = findLikelyDuplicate(toIncomingTransaction(c.data), index, {
+        importBatch,
+        claimed: taken,
+      });
+      if (!match) return true;
+      const e = match.existing;
+      held.push({
+        row: c.row,
+        amount: c.data.amount as number,
+        match: { id: e.id, date: e.date, amount: e.amount, vendor: e.vendor, description: e.description, source: e.source },
+        reason: match.reason,
+      });
+      return false;
+    });
+  }
+
+  if (toWrite.length > 0) {
+    const batch = adminDb.batch();
+    for (const c of toWrite) batch.set(adminDb.collection(TRANSACTIONS).doc(c.id), c.data);
     await batch.commit();
     // One entry per chunk rather than per row: a year's statement would
     // otherwise be hundreds of audit writes.
@@ -291,14 +340,12 @@ export async function importTransactionsAction(
       action: "create",
       resourceType: "transaction",
       resourceId: `${mode}-import`,
-      diff: { transactionIds: { before: null, after: createdIds } },
+      diff: { transactionIds: { before: null, after: toWrite.map((c) => c.id) } },
     });
   }
-  const created = createdIds.length;
-  const duplicates = docs.length - created;
 
   revalidateFinances();
-  return { ok: true, created, duplicates };
+  return { ok: true, created: toWrite.length, duplicates, held };
 }
 
 // ---------------------------------------------------------------------------
