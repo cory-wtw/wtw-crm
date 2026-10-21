@@ -30,7 +30,13 @@ import {
   summarizeAccounts,
   type AccountMapping,
 } from "@/lib/finance/qb-ledger";
-import { dateRange, findLikelyDuplicate } from "@/lib/finance/dedupe";
+import {
+  buildDedupeIndex,
+  DEDUPE_FIELDS,
+  dateRange,
+  findLikelyDuplicate,
+  toExistingTransaction,
+} from "@/lib/finance/dedupe";
 import { adminDb } from "@/lib/firebase/admin";
 import {
   CATEGORIES_COLLECTION as CATEGORIES,
@@ -138,27 +144,22 @@ async function main() {
   // import — under a different id. Held back unless asked for.
   const includeLikely = flags.includes("--include-likely-duplicates");
   const likely: { doc: Doc; reason: string; match: string }[] = [];
-  let added = newRows;
+  const definite: Doc[] = [];
   if (newRows.length > 0) {
     const { from, to } = dateRange(newRows.map((d) => String(d.data.date)));
     const others = (
-      await adminDb.collection(TRANSACTIONS).where("date", ">=", from).where("date", "<=", to).get()
+      await adminDb
+        .collection(TRANSACTIONS)
+        .where("date", ">=", from)
+        .where("date", "<=", to)
+        .select(...DEDUPE_FIELDS)
+        .get()
     ).docs
       .filter((d) => d.data().source !== "qb")
-      .map((d) => {
-        const t = d.data();
-        return {
-          id: d.id,
-          date: t.date,
-          amount: t.amount,
-          type: t.type,
-          vendor: t.vendor ?? "",
-          description: t.description,
-          donorName: t.donorName,
-          source: t.source ?? "manual",
-        };
-      });
-    added = newRows.filter((d) => {
+      .map((d) => toExistingTransaction(d.id, d.data()));
+    const index = buildDedupeIndex(others);
+    const claimed = new Set<string>();
+    for (const d of newRows) {
       const x = d.data;
       const m = findLikelyDuplicate(
         {
@@ -169,22 +170,27 @@ async function main() {
           description: x.description as string | undefined,
           donorName: x.donorName as string | undefined,
         },
-        others,
+        index,
+        { claimed },
       );
-      if (!m) return true;
+      if (!m) {
+        definite.push(d);
+        continue;
+      }
       likely.push({
         doc: d,
         reason: m.reason,
         match: `${m.existing.date} ${m.existing.vendor || m.existing.description || ""} (${m.existing.source})`,
       });
-      return includeLikely;
-    });
+    }
   }
+  const added = includeLikely ? [...definite, ...likely.map((l) => l.doc)] : definite;
   const stale = existingSnap.docs.filter((d) => !incomingIds.has(d.id));
+
   console.log(
-    `\nCompared with the database: ${docs.length - newRows.length} already imported, ${added.length} new, ${likely.length} likely duplicates, ${stale.length} no longer in this ledger.`,
+    `\nCompared with the database: ${docs.length - newRows.length} already imported, ${definite.length} new, ${likely.length} likely duplicates${includeLikely ? " (included)" : " (held back)"}, ${stale.length} no longer in this ledger.`,
   );
-  for (const d of added) {
+  for (const d of definite) {
     const x = d.data;
     console.log(`  + ${x.date}  ${String(x.vendor || x.description || "").slice(0, 36).padEnd(36)} ${usd(Math.round(Number(x.amount) * 100)).padStart(12)}`);
   }

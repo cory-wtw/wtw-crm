@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { dateRange, findLikelyDuplicate, type ExistingTransaction } from "./dedupe";
+import {
+  buildDedupeIndex,
+  dateRange,
+  findLikelyDuplicate as find,
+  type ExistingTransaction,
+  type IncomingTransaction,
+} from "./dedupe";
+
+const findLikelyDuplicate = (
+  row: IncomingTransaction,
+  existing: ExistingTransaction[],
+  importBatch?: string,
+) => find(row, buildDedupeIndex(existing), { importBatch });
 
 const existing = (o: Partial<ExistingTransaction>): ExistingTransaction => ({
   id: "t1", date: "2026-10-01", amount: 42.5, type: "expense", vendor: "Kroger", source: "manual", ...o,
@@ -61,6 +73,44 @@ describe("not too aggressive", () => {
       findLikelyDuplicate(
         { date: "2026-10-01", amount: 25, type: "income", vendor: "", donorName: "Ann B" },
         [existing({ amount: 25, type: "income", vendor: "", donorName: "Carl D" })],
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("review fixes", () => {
+  it("doesn't treat a shared city as a shared payee", () => {
+    expect(
+      findLikelyDuplicate(
+        { date: "2026-10-03", amount: 40, type: "expense", vendor: "", description: "POS DEBIT SHELL OIL 4411 CHATTANOOGA TN" },
+        [existing({ amount: 40, vendor: "", description: "EXXON 22 CHATTANOOGA TN" })],
+      ),
+    ).toBeNull();
+  });
+
+  it("ignores words common across what's on file", () => {
+    const onFile = Array.from({ length: 6 }, (_, i) =>
+      existing({ id: `c${i}`, amount: 10 + i, vendor: `Shop${i} Chattanooga` }),
+    );
+    onFile.push(existing({ id: "x", amount: 40, vendor: "Exxon Chattanooga" }));
+    expect(
+      find({ date: "2026-10-02", amount: 40, type: "expense", vendor: "Shell Chattanooga" }, buildDedupeIndex(onFile)),
+    ).toBeNull();
+  });
+
+  it("matches one existing row to one incoming row", () => {
+    const index = buildDedupeIndex([existing({ amount: 5, vendor: "", description: "SERVICE FEE BANK" })]);
+    const claimed = new Set<string>();
+    const fee = { date: "2026-10-01", amount: 5, type: "expense" as const, vendor: "", description: "SERVICE FEE BANK" };
+    expect(find(fee, index, { claimed })).not.toBeNull();
+    expect(find(fee, index, { claimed })).toBeNull();
+  });
+
+  it("keeps an anonymous gift apart from a named one on another day", () => {
+    expect(
+      findLikelyDuplicate(
+        { date: "2026-10-03", amount: 25, type: "income", vendor: "", description: "Fall Gala" },
+        [existing({ amount: 25, type: "income", vendor: "", description: "Fall Gala", donorName: "Carl D" })],
       ),
     ).toBeNull();
   });

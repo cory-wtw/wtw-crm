@@ -97,6 +97,8 @@ export function ImportPanel({
   // be flagged against rows this same run just wrote.
   const [batchId, setBatchId] = useState("");
   const [forcing, setForcing] = useState(false);
+  // Held rows staff ticked to import anyway — none by default.
+  const [picked, setPicked] = useState<Set<HeldRow>>(new Set());
 
   const index = useMemo(() => buildVendorIndex(known), [known]);
   const incomeCats = categories.filter((c) => c.type === "income");
@@ -254,18 +256,28 @@ export function ImportPanel({
     const done: ImportResult = { created: 0, duplicates: 0, held: [] };
     const importBatch = crypto.randomUUID();
     setBatchId(importBatch);
+    setPicked(new Set());
+    // Stopping partway still shows what got in and what was held back; the
+    // pasted rows stay loaded so "Back" and import again picks up the rest
+    // (rows already written are skipped).
+    const stopped = (message: string) => {
+      if (done.created + done.duplicates + done.held.length === 0) {
+        setError(message);
+        return;
+      }
+      setResult(done);
+      setError(`Stopped partway: ${message} Go back and import again — rows already in are skipped.`);
+    };
     try {
       for (let i = 0; i < payload.length; i += CHUNK) {
         const response = await importTransactionsAction({
           mode,
           rows: payload.slice(i, i + CHUNK),
           importBatch,
+          claimed: done.held.map((h) => h.match.id),
         });
         if (!response.ok) {
-          setError(
-            (i > 0 ? `Imported ${done.created} before stopping. Re-running the import is safe. ` : "") +
-              response.error,
-          );
+          stopped(response.error);
           return;
         }
         done.created += response.created;
@@ -276,24 +288,25 @@ export function ImportPanel({
       setText("");
       reset();
     } catch (e) {
-      setError(
-        `The request didn't reach the server: ${e instanceof Error ? e.message : String(e)}. Reload the page and try again.`,
+      stopped(
+        `the request didn't reach the server (${e instanceof Error ? e.message : String(e)}).`,
       );
     } finally {
       setSaving(false);
     }
   }
 
-  /** Staff looked at the held rows and wants them in anyway. */
-  async function importAnyway(held: HeldRow[]) {
+  /** Import the held rows staff ticked. Progress is kept chunk by chunk, so a
+   *  failure partway leaves the counts right and only the unsent rows held. */
+  async function importAnyway(rowsToSend: HeldRow[]) {
     setForcing(true);
     setError(null);
     try {
-      let created = 0;
-      for (let i = 0; i < held.length; i += CHUNK) {
+      for (let i = 0; i < rowsToSend.length; i += CHUNK) {
+        const sent = rowsToSend.slice(i, i + CHUNK);
         const response = await importTransactionsAction({
           mode,
-          rows: held.slice(i, i + CHUNK).map((h) => h.row),
+          rows: sent.map((h) => h.row),
           importBatch: batchId,
           force: true,
         });
@@ -301,9 +314,17 @@ export function ImportPanel({
           setError(response.error);
           return;
         }
-        created += response.created;
+        setResult((r) =>
+          r
+            ? {
+                created: r.created + response.created,
+                duplicates: r.duplicates + response.duplicates,
+                held: r.held.filter((h) => !sent.includes(h)),
+              }
+            : r,
+        );
+        setPicked((p) => new Set([...p].filter((h) => !sent.includes(h))));
       }
-      setResult((r) => (r ? { ...r, created: r.created + created, held: [] } : r));
     } catch (e) {
       setError(`The request didn't reach the server: ${e instanceof Error ? e.message : String(e)}.`);
     } finally {
@@ -322,32 +343,53 @@ export function ImportPanel({
             {result.duplicates} already on file from an earlier import — skipped.
           </p>
         )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
         {result.held.length > 0 && (
           <div className="space-y-3 rounded-md border border-[color:var(--wtw-deep-gold)]/40 bg-[color:var(--wtw-deep-gold)]/10 p-4">
             <p className="text-sm font-bold">
               {result.held.length} held back — they look like transactions already on file
             </p>
+            <p className="text-xs text-muted-foreground">
+              Tick any that are really different, then import them.
+            </p>
             <ul className="space-y-2 text-xs">
               {result.held.map((h, i) => (
                 <li key={i}>
-                  <span className="font-bold">
-                    {h.row.date} · {formatUsdCents(h.row.amount)} · {h.row.vendor || h.row.description}
-                  </span>
-                  <span className="block text-muted-foreground">
-                    Looks like {h.match.date} · {formatUsdCents(Math.abs(h.match.amount))} ·{" "}
-                    {h.match.vendor || h.match.description || "no payee"} ({TRANSACTION_SOURCE_LABELS[h.match.source as TransactionSource] ?? h.match.source}) — {h.reason}
-                  </span>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={picked.has(h)}
+                      onChange={() =>
+                        setPicked((p) => {
+                          const next = new Set(p);
+                          if (next.has(h)) next.delete(h);
+                          else next.add(h);
+                          return next;
+                        })
+                      }
+                      className="mt-0.5 accent-[color:var(--wtw-brand-gold)]"
+                    />
+                    <span>
+                      <span className="font-bold">
+                        {h.row.date} · {formatUsdCents(h.row.amount)} · {h.row.vendor || h.row.description}
+                      </span>
+                      <span className="block text-muted-foreground">
+                        Looks like {h.match.date} · {formatUsdCents(Math.abs(h.match.amount))} ·{" "}
+                        {h.match.vendor || h.match.description || "no payee"} (
+                        {TRANSACTION_SOURCE_LABELS[h.match.source as TransactionSource] ?? h.match.source}) — {h.reason}
+                      </span>
+                    </span>
+                  </label>
                 </li>
               ))}
             </ul>
-            {error && <p className="text-xs text-destructive">{error}</p>}
             <button
               type="button"
-              onClick={() => importAnyway(result.held)}
-              disabled={forcing}
+              onClick={() => importAnyway(result.held.filter((h) => picked.has(h)))}
+              disabled={forcing || picked.size === 0}
               className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold hover:bg-secondary disabled:opacity-50"
             >
-              {forcing ? "Importing…" : `They're different — import ${result.held.length} anyway`}
+              {forcing ? "Importing…" : `Import ${picked.size} ticked anyway`}
             </button>
           </div>
         )}
@@ -355,8 +397,15 @@ export function ImportPanel({
           <Link href="/finances/transactions" className={primary}>
             View transactions
           </Link>
-          <button type="button" onClick={() => setResult(null)} className="text-sm font-bold text-muted-foreground hover:text-foreground">
-            Import another
+          <button
+            type="button"
+            onClick={() => {
+              setResult(null);
+              setError(null);
+            }}
+            className="text-sm font-bold text-muted-foreground hover:text-foreground"
+          >
+            {rows ? "Back" : "Import another"}
           </button>
         </div>
       </div>
