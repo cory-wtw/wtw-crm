@@ -6,13 +6,14 @@ import {
   FUNNEL_STAGES,
   benefitTotals,
   cashByMonth,
+  outcomeTotals,
   pipelineFunnel,
   veteransByMonth,
 } from "@/lib/finance/impact";
 import { todayIso } from "@/lib/finance/range";
 import { buildProfitAndLoss } from "@/lib/finance/report";
 import { formatUsd, formatUsdCents } from "@/lib/format";
-import { LIFE_EXPECTANCY_AGE, ASSUMED_ANNUAL_COLA, PIPELINE_DESCRIPTIONS, PIPELINE_LABELS } from "@/lib/schemas";
+import { OUTCOME_KINDS, OUTCOME_KIND_INFO, LIFE_EXPECTANCY_AGE, ASSUMED_ANNUAL_COLA, PIPELINE_DESCRIPTIONS, PIPELINE_LABELS } from "@/lib/schemas";
 import { MonthColumns } from "./impact-charts";
 import { PrintButton } from "./print-button";
 
@@ -36,6 +37,9 @@ export default async function ImpactPage() {
 
   const funnel = pipelineFunnel(veterans);
   const benefits = benefitTotals(veterans);
+  const wins = outcomeTotals(veterans);
+  const winKinds = OUTCOME_KINDS.filter((k) => wins.byKind[k] > 0).sort((a, b) => wins.byKind[b] - wins.byKind[a]);
+  const winMax = Math.max(1, ...winKinds.map((k) => wins.byKind[k]));
   const pnl = buildProfitAndLoss(transactions, categories);
   const spent = pnl.totalExpenses;
   const perDollar = spent > 0 ? benefits.lifetime / spent : 0;
@@ -101,6 +105,47 @@ export default async function ImpactPage() {
             <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
           </div>
         ))}
+      </section>
+
+      {/* Wins beyond VA benefits */}
+      <section className="space-y-3">
+        <SectionTitle
+          title="Beyond VA benefits"
+          note={`${wins.total} ${wins.total === 1 ? "win" : "wins"} for ${wins.veterans} ${wins.veterans === 1 ? "veteran" : "veterans"}.`}
+        />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ["Veterans with a win", String(wins.veterans)],
+            ["Jobs", String(wins.jobs)],
+            ["Housed", String(wins.housed)],
+            ["New income, per year†", formatUsd(wins.annual)],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-border bg-card p-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+              <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
+            </div>
+          ))}
+        </div>
+        {winKinds.length > 0 ? (
+          <div className="space-y-2 rounded-xl border border-border bg-card p-5">
+            {winKinds.map((k) => (
+              <div key={k} className="grid grid-cols-[1fr_6rem_2.5rem] items-center gap-3 sm:grid-cols-[18rem_1fr_3rem]">
+                <p className="text-sm">{OUTCOME_KIND_INFO[k].label}</p>
+                <div className="h-3 rounded-r bg-secondary/60">
+                  <div className="h-full rounded-r" style={{ width: `${(wins.byKind[k] / winMax) * 100}%`, background: "var(--viz-1)" }} />
+                </div>
+                <p className="text-right text-sm font-black tabular-nums">{wins.byKind[k]}</p>
+              </div>
+            ))}
+            {wins.oneTime > 0 && (
+              <p className="pt-2 text-xs text-muted-foreground">
+                Plus {formatUsd(wins.oneTime)} in one-time help — rent, utilities, rides, essentials.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No wins logged yet. Use &ldquo;Log a win&rdquo; on a veteran&apos;s record.</p>
+        )}
       </section>
 
       {/* Funnel */}
@@ -203,6 +248,10 @@ export default async function ImpactPage() {
         {LIFE_EXPECTANCY_AGE} with a {(ASSUMED_ANNUAL_COLA * 100).toFixed(1)}% annual cost-of-living adjustment. &ldquo;Per $1
         spent&rdquo; divides that estimate by all of WTW&apos;s recorded expenses. Claims are filed and won by VA-accredited
         partners; WTW finds veterans and connects them.
+      </p>
+      <p className="max-w-3xl text-xs text-muted-foreground">
+        † New income counts only the monthly amounts staff entered (wages, SNAP, SSI/SSDI and the like), times twelve. Wins
+        logged without an amount still count above but add nothing here, so this is a floor.
       </p>
     </div>
   );

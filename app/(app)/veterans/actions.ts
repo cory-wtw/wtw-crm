@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { tidyVeteran } from "@/lib/tidy";
 import { redirect } from "next/navigation";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
@@ -16,6 +16,9 @@ import {
 } from "@/lib/permissions";
 import {
   encounterInputSchema,
+  outcomeAmounts,
+  outcomeInputSchema,
+  outcomeSummary,
   type PipelineHistoryEntry,
   type PipelineStage,
   pipelineStageSchema,
@@ -373,5 +376,124 @@ export async function deleteVeteranAction(
 
   revalidatePath("/veterans");
   revalidatePath("/");
+  return { ok: true };
+}
+
+/**
+ * Record a win — a job, housing, SNAP — on the veteran and on their timeline.
+ *
+ * The win lives on the veteran doc so the Impact report can count it from the
+ * same read it already makes; the encounter is there so the timeline still
+ * tells the whole story. Both commit together.
+ */
+export async function logOutcomeAction(
+  veteranId: string,
+  rawInput: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
+
+  const parsed = outcomeInputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return { ok: false, error: formatIssues(parsed.error.issues) };
+  }
+  const input = parsed.data;
+  if (Number.isNaN(input.achievedAt.getTime())) {
+    return { ok: false, error: "achievedAt: Invalid date" };
+  }
+
+  const veteranRef = adminDb.collection("veterans").doc(veteranId);
+  const snap = await veteranRef.get();
+  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!canEditVeteran(session, snap.data() as { assigneeUid: string | null }))
+    return { ok: false, error: "Your account can't edit this veteran." };
+
+  let resourceName: string | undefined;
+  if (input.resourceId) {
+    const resource = await adminDb
+      .collection("resources")
+      .doc(input.resourceId)
+      .get();
+    resourceName = resource.data()?.organizationName ?? undefined;
+  }
+
+  const now = new Date();
+  const outcome = dropUndefined({
+    id: crypto.randomUUID(),
+    kind: input.kind,
+    achievedAt: input.achievedAt,
+    ...outcomeAmounts(input.kind, input.amount),
+    resourceId: resourceName ? input.resourceId : undefined,
+    resourceName,
+    note: input.note?.trim() || undefined,
+    loggedBy: session.uid,
+    loggedAt: now,
+  });
+
+  const batch = adminDb.batch();
+  const encounterRef = veteranRef.collection("encounters").doc();
+  batch.set(encounterRef, {
+    type: "outcome",
+    occurredAt: input.achievedAt,
+    loggedBy: session.uid,
+    summary: outcomeSummary({ ...outcome, kind: input.kind }),
+    createdAt: now,
+  });
+  batch.update(veteranRef, {
+    outcomes: FieldValue.arrayUnion(outcome),
+    updatedAt: now,
+    updatedBy: session.uid,
+  });
+  await batch.commit();
+
+  await logAudit({
+    action: "update",
+    resourceType: "veteran",
+    resourceId: veteranId,
+    diff: { outcomes: { before: null, after: `${outcome.id}: ${input.kind}` } },
+  });
+
+  revalidatePath(`/veterans/${veteranId}`);
+  revalidatePath("/finances/impact");
+  return { ok: true };
+}
+
+/** Take back a win logged by mistake. The timeline entry stays as history. */
+export async function removeOutcomeAction(
+  veteranId: string,
+  outcomeId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
+
+  const veteranRef = adminDb.collection("veterans").doc(veteranId);
+  const snap = await veteranRef.get();
+  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  const data = snap.data()!;
+  if (!canEditVeteran(session, data as { assigneeUid: string | null }))
+    return { ok: false, error: "Your account can't edit this veteran." };
+
+  const outcomes = (data.outcomes ?? []) as Array<{ id: string; kind: string }>;
+  const removed = outcomes.find((o) => o.id === outcomeId);
+  if (!removed) return { ok: false, error: "That win is no longer on the record." };
+
+  await veteranRef.update({
+    outcomes: outcomes.filter((o) => o.id !== outcomeId),
+    updatedAt: new Date(),
+    updatedBy: session.uid,
+  });
+  await logAudit({
+    action: "update",
+    resourceType: "veteran",
+    resourceId: veteranId,
+    diff: { outcomes: { before: `${removed.id}: ${removed.kind}`, after: null } },
+  });
+
+  revalidatePath(`/veterans/${veteranId}`);
+  revalidatePath("/finances/impact");
   return { ok: true };
 }

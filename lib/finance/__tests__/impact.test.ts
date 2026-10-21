@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { benefitTotals, cashByMonth, pipelineFunnel, veteransByMonth, type ImpactVeteran } from "../impact";
+import { benefitTotals, cashByMonth, outcomeTotals, pipelineFunnel, veteransByMonth, type ImpactVeteran } from "../impact";
 
 const v = (o: Partial<ImpactVeteran>): ImpactVeteran => ({
   pipelineStage: "found",
@@ -63,5 +63,28 @@ describe("by month", () => {
       { month: "2026-09", income: 0, expenses: 0 },
       { month: "2026-10", income: 0, expenses: 50 },
     ]);
+  });
+});
+
+describe("outcomeTotals", () => {
+  it("counts wins by kind and sums only entered amounts", () => {
+    const t = outcomeTotals([
+      v({
+        outcomes: [
+          { kind: "job", monthlyValue: 2400 },
+          { kind: "housedPermanent" },
+          { kind: "financialAssistance", oneTimeValue: 800 },
+        ],
+      }),
+      v({ outcomes: [{ kind: "snap", monthlyValue: 290 }, { kind: "job" }] }),
+      v({}),
+    ]);
+    expect(t.total).toBe(5);
+    expect(t.veterans).toBe(2);
+    expect(t.jobs).toBe(2);
+    expect(t.housed).toBe(1);
+    expect(t.monthly).toBe(2690);
+    expect(t.annual).toBe(2690 * 12);
+    expect(t.oneTime).toBe(800);
   });
 });

@@ -5,6 +5,7 @@ import type {
   PipelineHistoryEntry,
   PipelineStage,
   Veteran,
+  VeteranOutcome,
 } from "@/lib/schemas";
 
 const COLLECTION = "veterans";
@@ -65,6 +66,13 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     dateLost: tsToDate(data.dateLost),
     monthlyBenefitBefore: data.monthlyBenefitBefore ?? 0,
     monthlyBenefitAfter: data.monthlyBenefitAfter ?? 0,
+    outcomes: ((data.outcomes ?? []) as Array<Record<string, unknown>>).map(
+      (o): VeteranOutcome => ({
+        ...(o as Omit<VeteranOutcome, "achievedAt" | "loggedAt">),
+        achievedAt: tsToDate(o.achievedAt) ?? new Date(0),
+        loggedAt: tsToDate(o.loggedAt) ?? new Date(0),
+      }),
+    ),
     vsoIds: data.vsoIds ?? [],
     eight00ThreadId: data.eight00ThreadId ?? null,
     createdBy: data.createdBy ?? "",

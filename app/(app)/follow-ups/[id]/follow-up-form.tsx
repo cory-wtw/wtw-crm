@@ -7,12 +7,19 @@ import {
   FOLLOW_UP_OUTCOMES,
   FOLLOW_UP_OUTCOME_LABELS,
   type FollowUpOutcome,
+  type OutcomeKind,
 } from "@/lib/schemas";
+import { OutcomeKindPicker } from "../../outcome-kind-picker";
 import { recordFollowUpAction, type FollowUpSummary } from "../actions";
 
 type ReferredResource = { resourceId: string; resourceName: string };
 
-type Answer = { outcome: FollowUpOutcome | ""; note: string };
+type Answer = {
+  outcome: FollowUpOutcome | "";
+  note: string;
+  winKind: OutcomeKind | "";
+  amount: string;
+};
 
 export function FollowUpForm({
   veteranId,
@@ -28,7 +35,7 @@ export function FollowUpForm({
   const router = useRouter();
   const [answers, setAnswers] = useState<Record<string, Answer>>(() =>
     Object.fromEntries(
-      resources.map((r) => [r.resourceId, { outcome: "", note: "" }]),
+      resources.map((r) => [r.resourceId, { outcome: "", note: "", winKind: "", amount: "" }]),
     ),
   );
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +62,8 @@ export function FollowUpForm({
           resourceId: r.resourceId,
           outcome: answers[r.resourceId].outcome as FollowUpOutcome,
           note: answers[r.resourceId].note.trim() || undefined,
+          winKind: answers[r.resourceId].winKind || undefined,
+          amount: Number(answers[r.resourceId].amount) || undefined,
         })),
       });
       if (!response.ok) {
@@ -161,6 +170,15 @@ export function FollowUpForm({
                 </label>
               ))}
             </div>
+
+            {answers[resource.resourceId]?.outcome === "helped" && (
+              <OutcomeKindPicker
+                kind={answers[resource.resourceId].winKind}
+                amount={answers[resource.resourceId].amount}
+                onKind={(winKind) => setAnswer(resource.resourceId, { winKind })}
+                onAmount={(amount) => setAnswer(resource.resourceId, { amount })}
+              />
+            )}
 
             <input
               type="text"

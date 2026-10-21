@@ -5,6 +5,7 @@ export * from "./vso";
 export * from "./bucket";
 export * from "./resource";
 export * from "./verification";
+export * from "./outcome";
 export * from "./veteran";
 export * from "./encounter";
 export * from "./media";
