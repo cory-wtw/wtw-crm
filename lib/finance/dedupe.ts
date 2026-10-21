@@ -24,6 +24,9 @@ export type ExistingTransaction = {
   source: string;
   /** Rows from the import in progress don't count against each other. */
   importBatch?: string;
+  /** importIdentity hash, minus the occurrence number. Twins from the same
+   *  file share it and are told apart by occurrence, not by this check. */
+  importKey?: string;
 };
 
 export type IncomingTransaction = {
@@ -34,11 +37,12 @@ export type IncomingTransaction = {
   vendor: string;
   description?: string;
   donorName?: string;
+  importKey?: string;
 };
 
 /** The fields the check reads — select only these from Firestore. */
 export const DEDUPE_FIELDS = [
-  "date", "amount", "type", "vendor", "description", "donorName", "source", "importBatch",
+  "date", "amount", "type", "vendor", "description", "donorName", "source", "importBatch", "importKey",
 ] as const;
 
 /** A Firestore transaction doc as the check sees it. */
@@ -56,6 +60,21 @@ export function toExistingTransaction(
     donorName: typeof t.donorName === "string" ? t.donorName : undefined,
     source: typeof t.source === "string" ? t.source : "manual",
     importBatch: typeof t.importBatch === "string" ? t.importBatch : undefined,
+    importKey: typeof t.importKey === "string" ? t.importKey : undefined,
+  };
+}
+
+/** A transaction about to be written, as the check sees it. */
+export function toIncomingTransaction(t: Record<string, unknown>): IncomingTransaction {
+  const e = toExistingTransaction("", t);
+  return {
+    date: e.date,
+    amount: e.amount,
+    type: e.type,
+    vendor: e.vendor,
+    description: e.description,
+    donorName: e.donorName,
+    importKey: e.importKey,
   };
 }
 
@@ -74,22 +93,38 @@ const GENERIC = new Set([
   "ZEFFY", "GIFT", "TICKET", "TICKETS", "INC", "LLC", "THE", "AND",
 ]);
 
+/** Whether a run of words is a city in a state — for stripping "… CITY ST". */
+export type IsCity = (words: string, state: string) => boolean;
+
 /**
- * Words that identify who was paid. Card descriptions end "… CITY ST", so the
- * word before a trailing state code is dropped — "SHELL OIL CHATTANOOGA TN"
- * and "EXXON CHATTANOOGA TN" share a city, not a payee.
+ * Words that identify who was paid. Card descriptions end "… CITY ST", so a
+ * known city before a trailing state code is dropped — "SHELL OIL
+ * CHATTANOOGA TN" and "EXXON CHATTANOOGA TN" share a city, not a payee. Only
+ * a real city is dropped ("ACME SUPPLY CO" keeps SUPPLY), and only from the
+ * bank's description, never from a vendor name someone typed.
  */
-function payeeWords(t: { vendor: string; description?: string }): Set<string> {
+function payeeWords(t: { vendor: string; description?: string }, isCity?: IsCity): Set<string> {
   const out = new Set<string>();
-  for (const text of [t.vendor, t.description ?? ""]) {
-    const tokens = text.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim().split(" ");
-    while (tokens.length && /^\d+$/.test(tokens[tokens.length - 1])) tokens.pop();
-    const last = tokens[tokens.length - 1];
-    if (tokens.length > 2 && last?.length === 2 && normalizeState(last)) tokens.splice(-2, 2);
-    for (const w of normalizeVendorText(tokens.join(" ")).split(" ")) {
+  const add = (text: string) => {
+    for (const w of normalizeVendorText(text).split(" ")) {
       if (w.length >= 3 && !GENERIC.has(w)) out.add(w);
     }
+  };
+  add(t.vendor);
+
+  const tokens = (t.description ?? "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim().split(" ");
+  while (tokens.length && /^\d+$/.test(tokens[tokens.length - 1])) tokens.pop();
+  const state = tokens.length > 2 ? normalizeState(tokens[tokens.length - 1]) : null;
+  if (state && isCity && tokens[tokens.length - 1].length === 2) {
+    for (let len = Math.min(3, tokens.length - 2); len >= 1; len--) {
+      const run = tokens.slice(-1 - len, -1).join(" ");
+      if (isCity(run, state)) {
+        tokens.splice(-1 - len, len + 1);
+        break;
+      }
+    }
   }
+  add(tokens.join(" "));
   return out;
 }
 
@@ -97,22 +132,42 @@ type Prepared = ExistingTransaction & { cents: number; words: Set<string> };
 
 /**
  * Existing transactions, normalized once and grouped by amount, plus the
- * words so common on file (the home city in a vendor name, a campaign) that
- * sharing one says nothing about who was paid.
+ * words shared by many *different* payees on file — a city in typed vendor
+ * names ("Exxon Chattanooga", "Shell Chattanooga") — which say nothing about
+ * who was paid. A payee used often (ten Kroger receipts) is one payee and
+ * stays meaningful.
  */
-export type DedupeIndex = { byCents: Map<number, Prepared[]>; common: Set<string> };
+export type DedupeIndex = {
+  byCents: Map<number, Prepared[]>;
+  common: Set<string>;
+  isCity?: IsCity;
+};
 
-export function buildDedupeIndex(existing: readonly ExistingTransaction[]): DedupeIndex {
+/** Different payees sharing a word before it stops identifying anyone. */
+const COMMON_ACROSS_PAYEES = 4;
+
+export function buildDedupeIndex(
+  existing: readonly ExistingTransaction[],
+  isCity?: IsCity,
+): DedupeIndex {
   const byCents = new Map<number, Prepared[]>();
-  const counts = new Map<string, number>();
+  const payeesByWord = new Map<string, Set<string>>();
   for (const e of existing) {
-    const p: Prepared = { ...e, cents: Math.round(e.amount * 100), words: payeeWords(e) };
-    byCents.set(p.cents, [...(byCents.get(p.cents) ?? []), p]);
-    for (const w of p.words) counts.set(w, (counts.get(w) ?? 0) + 1);
+    const p: Prepared = { ...e, cents: Math.round(e.amount * 100), words: payeeWords(e, isCity) };
+    let bucket = byCents.get(p.cents);
+    if (!bucket) byCents.set(p.cents, (bucket = []));
+    bucket.push(p);
+    const payee = [...p.words].sort().join(" ");
+    for (const w of p.words) {
+      let set = payeesByWord.get(w);
+      if (!set) payeesByWord.set(w, (set = new Set()));
+      set.add(payee);
+    }
   }
-  const threshold = Math.max(5, existing.length * 0.2);
-  const common = new Set([...counts].filter(([, n]) => n >= threshold).map(([w]) => w));
-  return { byCents, common };
+  const common = new Set(
+    [...payeesByWord].filter(([, payees]) => payees.size >= COMMON_ACROSS_PAYEES).map(([w]) => w),
+  );
+  return { byCents, common, isCity };
 }
 
 export type DuplicateMatch = { existing: ExistingTransaction; reason: string };
@@ -136,16 +191,20 @@ export function findLikelyDuplicate(
   options: { importBatch?: string; claimed?: Set<string> } = {},
 ): DuplicateMatch | null {
   const cents = Math.round(row.amount * 100);
-  const mine = payeeWords(row);
+  const mine = payeeWords(row, index.isCity);
   let best: DuplicateMatch | null = null;
   let bestDays = Infinity;
+  let bestStrong = false;
 
   for (const e of index.byCents.get(cents) ?? []) {
     if (options.importBatch && e.importBatch === options.importBatch) continue;
     if (options.claimed?.has(e.id)) continue;
+    // The file's own twin from an earlier, interrupted run of the same import.
+    if (row.importKey && e.importKey === row.importKey) continue;
     if (e.type !== row.type) continue;
     const apart = days(row.date, e.date);
-    if (apart > DATE_WINDOW_DAYS || apart >= bestDays) continue;
+    // Nearest wins; at the same distance a shared payee beats no wording.
+    if (apart > DATE_WINDOW_DAYS || apart > bestDays || (apart === bestDays && bestStrong)) continue;
 
     if (row.type === "income") {
       const a = row.donorName?.trim().toLowerCase();
@@ -163,7 +222,8 @@ export function findLikelyDuplicate(
         reason: apart === 0 ? "same day, amount and payee" : `same amount and payee, ${apart} day${apart === 1 ? "" : "s"} apart`,
       };
       bestDays = apart;
-    } else if (apart <= 1 && (mine.size === 0 || e.words.size === 0)) {
+      bestStrong = true;
+    } else if (apart < bestDays && apart <= 1 && (mine.size === 0 || e.words.size === 0)) {
       best = { existing: e, reason: apart === 0 ? "same day and amount" : "same amount, a day apart" };
       bestDays = apart;
     }

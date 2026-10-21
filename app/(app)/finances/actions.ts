@@ -7,13 +7,8 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { CATEGORIES, TRANSACTIONS, listCategories } from "@/lib/db/finance";
 import { importIdentity } from "@/lib/finance/bank-import";
-import {
-  buildDedupeIndex,
-  DEDUPE_FIELDS,
-  dateRange,
-  findLikelyDuplicate,
-  toExistingTransaction,
-} from "@/lib/finance/dedupe";
+import { findLikelyDuplicate, toIncomingTransaction } from "@/lib/finance/dedupe";
+import { loadDedupeIndex } from "@/lib/finance/dedupe-db";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSession, type Session } from "@/lib/firebase/session";
 import { canManageFinances } from "@/lib/permissions";
@@ -239,6 +234,8 @@ const importSchema = z.object({
 /** A row held back because something on file already looks like it. */
 export type HeldRow = {
   row: ImportRowInput;
+  /** Signed as it would be stored, to compare like with like on screen. */
+  amount: number;
   match: { id: string; date: string; amount: number; vendor: string; description?: string; source: string };
   reason: string;
 };
@@ -272,6 +269,9 @@ export async function importTransactionsAction(
     }
     const identity = importIdentity(mode, row);
     const id = `${mode}_${createHash("sha1").update(`${identity}#${row.occurrence}`).digest("hex").slice(0, 24)}`;
+    // Shared by a row's twins in the same file; lets a rerun after an
+    // interrupted import tell the file's own rows from real duplicates.
+    const importKey = createHash("sha1").update(identity).digest("hex").slice(0, 24);
 
     // Money in, filed under an expense category, is a refund: it reduces
     // that expense. Same in reverse for income.
@@ -290,6 +290,7 @@ export async function importTransactionsAction(
         campaign: category.type === "income" ? row.campaign : undefined,
         source: mode === "zeffy" ? "zeffy" : "bank_csv",
         importBatch,
+        importKey,
         createdBy: session.uid,
         createdAt: now,
         updatedBy: session.uid,
@@ -310,33 +311,18 @@ export async function importTransactionsAction(
   const held: HeldRow[] = [];
   let toWrite = fresh;
   if (!force && fresh.length > 0) {
-    const { from, to } = dateRange(fresh.map((c) => c.row.date));
-    const snap = await adminDb
-      .collection(TRANSACTIONS)
-      .where("date", ">=", from)
-      .where("date", "<=", to)
-      .select(...DEDUPE_FIELDS)
-      .get();
-    const index = buildDedupeIndex(snap.docs.map((d) => toExistingTransaction(d.id, d.data())));
+    const index = await loadDedupeIndex(fresh.map((c) => c.row.date));
     const taken = new Set(claimed);
     toWrite = fresh.filter((c) => {
-      const d = c.data;
-      const match = findLikelyDuplicate(
-        {
-          date: c.row.date,
-          amount: d.amount as number,
-          type: d.type as "income" | "expense",
-          vendor: c.row.vendor,
-          description: c.row.description,
-          donorName: d.donorName as string | undefined,
-        },
-        index,
-        { importBatch, claimed: taken },
-      );
+      const match = findLikelyDuplicate(toIncomingTransaction(c.data), index, {
+        importBatch,
+        claimed: taken,
+      });
       if (!match) return true;
       const e = match.existing;
       held.push({
         row: c.row,
+        amount: c.data.amount as number,
         match: { id: e.id, date: e.date, amount: e.amount, vendor: e.vendor, description: e.description, source: e.source },
         reason: match.reason,
       });

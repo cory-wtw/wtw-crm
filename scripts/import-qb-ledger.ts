@@ -30,13 +30,8 @@ import {
   summarizeAccounts,
   type AccountMapping,
 } from "@/lib/finance/qb-ledger";
-import {
-  buildDedupeIndex,
-  DEDUPE_FIELDS,
-  dateRange,
-  findLikelyDuplicate,
-  toExistingTransaction,
-} from "@/lib/finance/dedupe";
+import { findLikelyDuplicate, toIncomingTransaction } from "@/lib/finance/dedupe";
+import { loadDedupeIndex } from "@/lib/finance/dedupe-db";
 import { adminDb } from "@/lib/firebase/admin";
 import {
   CATEGORIES_COLLECTION as CATEGORIES,
@@ -146,33 +141,13 @@ async function main() {
   const likely: { doc: Doc; reason: string; match: string }[] = [];
   const definite: Doc[] = [];
   if (newRows.length > 0) {
-    const { from, to } = dateRange(newRows.map((d) => String(d.data.date)));
-    const others = (
-      await adminDb
-        .collection(TRANSACTIONS)
-        .where("date", ">=", from)
-        .where("date", "<=", to)
-        .select(...DEDUPE_FIELDS)
-        .get()
-    ).docs
-      .filter((d) => d.data().source !== "qb")
-      .map((d) => toExistingTransaction(d.id, d.data()));
-    const index = buildDedupeIndex(others);
+    const index = await loadDedupeIndex(
+      newRows.map((d) => String(d.data.date)),
+      { excludeSource: "qb" },
+    );
     const claimed = new Set<string>();
     for (const d of newRows) {
-      const x = d.data;
-      const m = findLikelyDuplicate(
-        {
-          date: String(x.date),
-          amount: Number(x.amount),
-          type: x.type as "income" | "expense",
-          vendor: String(x.vendor ?? ""),
-          description: x.description as string | undefined,
-          donorName: x.donorName as string | undefined,
-        },
-        index,
-        { claimed },
-      );
+      const m = findLikelyDuplicate(toIncomingTransaction(d.data), index, { claimed });
       if (!m) {
         definite.push(d);
         continue;

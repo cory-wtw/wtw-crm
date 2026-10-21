@@ -18,6 +18,7 @@ import {
   type ParsedRow,
 } from "@/lib/finance/bank-import";
 import { parseCsv } from "@/lib/finance/csv";
+import { DATE_WINDOW_DAYS } from "@/lib/finance/dedupe";
 import { formatUsdCents } from "@/lib/format";
 import {
   TRANSACTION_SOURCE_LABELS,
@@ -42,6 +43,10 @@ type ReviewRow = ParsedRow & {
 
 /** Rows per request; matches the server's limit. */
 const CHUNK = 250;
+
+function shiftDays(date: string, n: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+}
 
 
 const COLUMN_LABELS: Record<ImportMode, [keyof ColumnMap, string][]> = {
@@ -252,7 +257,10 @@ export function ImportPanel({
       campaign: r.campaign,
       reference: r.reference,
       occurrence: occurrence.get(r.key) ?? 0,
-    }));
+    }))
+      // Date order keeps each chunk's window — and the duplicate check's
+      // read of what's on file — to a narrow slice of the calendar.
+      .sort((a, b) => a.date.localeCompare(b.date));
     const done: ImportResult = { created: 0, duplicates: 0, held: [] };
     const importBatch = crypto.randomUUID();
     setBatchId(importBatch);
@@ -270,11 +278,18 @@ export function ImportPanel({
     };
     try {
       for (let i = 0; i < payload.length; i += CHUNK) {
+        const chunk = payload.slice(i, i + CHUNK);
+        // Only matches that could pair with this chunk: within the window of
+        // its dates. Keeps the request small however much was held before.
+        const first = shiftDays(chunk[0].date, -DATE_WINDOW_DAYS);
+        const last = shiftDays(chunk[chunk.length - 1].date, DATE_WINDOW_DAYS);
         const response = await importTransactionsAction({
           mode,
-          rows: payload.slice(i, i + CHUNK),
+          rows: chunk,
           importBatch,
-          claimed: done.held.map((h) => h.match.id),
+          claimed: done.held
+            .filter((h) => h.match.date >= first && h.match.date <= last)
+            .map((h) => h.match.id),
         });
         if (!response.ok) {
           stopped(response.error);
@@ -371,10 +386,10 @@ export function ImportPanel({
                     />
                     <span>
                       <span className="font-bold">
-                        {h.row.date} · {formatUsdCents(h.row.amount)} · {h.row.vendor || h.row.description}
+                        {h.row.date} · {formatUsdCents(h.amount)} · {h.row.vendor || h.row.description}
                       </span>
                       <span className="block text-muted-foreground">
-                        Looks like {h.match.date} · {formatUsdCents(Math.abs(h.match.amount))} ·{" "}
+                        Looks like {h.match.date} · {formatUsdCents(h.match.amount)} ·{" "}
                         {h.match.vendor || h.match.description || "no payee"} (
                         {TRANSACTION_SOURCE_LABELS[h.match.source as TransactionSource] ?? h.match.source}) — {h.reason}
                       </span>

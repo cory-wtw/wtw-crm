@@ -11,7 +11,8 @@ const findLikelyDuplicate = (
   row: IncomingTransaction,
   existing: ExistingTransaction[],
   importBatch?: string,
-) => find(row, buildDedupeIndex(existing), { importBatch });
+) =>
+  find(row, buildDedupeIndex(existing, (w, st) => st === "TN" && w === "CHATTANOOGA"), { importBatch });
 
 const existing = (o: Partial<ExistingTransaction>): ExistingTransaction => ({
   id: "t1", date: "2026-10-01", amount: 42.5, type: "expense", vendor: "Kroger", source: "manual", ...o,
@@ -90,7 +91,7 @@ describe("review fixes", () => {
 
   it("ignores words common across what's on file", () => {
     const onFile = Array.from({ length: 6 }, (_, i) =>
-      existing({ id: `c${i}`, amount: 10 + i, vendor: `Shop${i} Chattanooga` }),
+      existing({ id: `c${i}`, amount: 10 + i, vendor: `${"ABCDEF"[i]}store Chattanooga` }),
     );
     onFile.push(existing({ id: "x", amount: 40, vendor: "Exxon Chattanooga" }));
     expect(
@@ -112,6 +113,46 @@ describe("review fixes", () => {
         { date: "2026-10-03", amount: 25, type: "income", vendor: "", description: "Fall Gala" },
         [existing({ amount: 25, type: "income", vendor: "", description: "Fall Gala", donorName: "Carl D" })],
       ),
+    ).toBeNull();
+  });
+});
+
+describe("second review fixes", () => {
+  const isCity = (words: string, state: string) => state === "TN" && words === "CHATTANOOGA";
+
+  it("still catches a frequent payee", () => {
+    const onFile = Array.from({ length: 10 }, (_, i) =>
+      existing({ id: `k${i}`, amount: 10 + i, vendor: "Kroger", date: "2026-10-01" }),
+    );
+    onFile.push(existing({ id: "hand", amount: 42.5, vendor: "Kroger" }));
+    const m = find(
+      { date: "2026-10-03", amount: 42.5, type: "expense", vendor: "", description: "POS DEBIT KROGER #567 CHATTANOOGA TN" },
+      buildDedupeIndex(onFile, isCity),
+    );
+    expect(m?.existing.id).toBe("hand");
+  });
+
+  it("only strips a real city, and never from a typed vendor", () => {
+    const index = buildDedupeIndex([existing({ amount: 9, vendor: "Acme Supply Co", date: "2026-10-01" })], isCity);
+    expect(
+      find({ date: "2026-10-03", amount: 9, type: "expense", vendor: "", description: "SUPPLY ORDER 55 CO" }, index),
+    ).not.toBeNull();
+  });
+
+  it("prefers a shared payee over a blank one at the same distance", () => {
+    const m = findLikelyDuplicate(
+      { date: "2026-10-02", amount: 20, type: "expense", vendor: "", description: "POS SHELL OIL" },
+      [
+        existing({ id: "blank", amount: 20, vendor: "", date: "2026-10-01" }),
+        existing({ id: "shell", amount: 20, vendor: "Shell", date: "2026-10-01" }),
+      ],
+    );
+    expect(m?.existing.id).toBe("shell");
+  });
+
+  it("ignores the file's own twin from an interrupted run", () => {
+    expect(
+      findLikelyDuplicate({ ...row, importKey: "k1" }, [existing({ importKey: "k1" })]),
     ).toBeNull();
   });
 });
