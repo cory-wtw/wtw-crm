@@ -14,7 +14,7 @@ export * from "./flags";
 
 import type { Resource } from "@/lib/schemas";
 import { passesGates, type LocalityTier } from "./gates";
-import { rankResources, type RankedResource } from "./ranking";
+import { diversify, rankResources, type RankedResource } from "./ranking";
 import type { MatchInput } from "./types";
 
 /**
@@ -35,7 +35,9 @@ export function findCandidates(
     localities.set(r, result.locality);
     return result.passes;
   });
-  const ranked = dedupeByName(rankResources(v, survivors, now, localities));
+  // Ranking order is stable (ties by name), and diversify takes the first of
+  // equals, so the same intake still gives the same list.
+  const ranked = diversify(dedupeByName(rankResources(v, survivors, now, localities)));
   return limit === undefined ? ranked : ranked.slice(0, limit);
 }
 

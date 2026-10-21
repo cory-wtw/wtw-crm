@@ -210,25 +210,33 @@ function asSentence(value: string): string {
   return /[.!?)]$/.test(capped) ? capped : `${capped}.`;
 }
 
+/** "Call X." without "Call X.." when X already ends a sentence. */
+function ended(text: string): string {
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}
+
 /** How to start, phrased as an instruction the veteran can act on. */
 export function startLine(resource: PacketResource): string {
-  const raw = resource.accessValue?.trim();
+  // "Physical address: 1601 Prater Road" — the label is ours to say.
+  const raw = resource.accessValue
+    ?.trim()
+    .replace(/^(physical |street |mailing )?address\s*:\s*/i, "");
   const value = raw ? neutralizePronouns(raw) : raw;
   switch (resource.accessMethod) {
     case "phone":
       // "Call" only goes in front of a number. A field that already holds
       // an instruction ("Dial 211 and ask for…") reads as-is.
       if (!value) return "Call them.";
-      return startsWithPhone(value) ? `Call ${value}.` : asSentence(value);
+      return startsWithPhone(value) ? ended(`Call ${value}`) : asSentence(value);
     case "web":
       if (!value) return "Apply on their website.";
       return /^(https?:\/\/|www\.|[\w-]+\.[a-z]{2,}(\/|$))/i.test(value)
-        ? `Apply online at ${value}.`
+        ? ended(`Apply online at ${value}`)
         : asSentence(value);
     case "walkin":
       if (!value) return "Walk in during opening hours.";
-      if (startsWithPhone(value)) return `Walk in, or call ${value}.`;
-      return /^\d/.test(value) ? `Walk in at ${value}.` : asSentence(value);
+      if (startsWithPhone(value)) return ended(`Walk in, or call ${value}`);
+      return /^\d/.test(value) ? ended(`Walk in at ${value}`) : asSentence(value);
     case "referral":
       return value
         ? `Ask ${value} to refer you — they take referrals only.`

@@ -31,6 +31,7 @@ const BREAKDOWN_PARTS: [Exclude<keyof Candidate["breakdown"], "total">, string][
   ["access", "access"],
   ["wait", "wait"],
   ["freshness", "freshness"],
+  ["repeatNeed", "repeat need"],
 ];
 
 /** A gate reason, with what the record serves when the reason is coverage —
@@ -503,7 +504,7 @@ function CandidateCard({
           </div>
 
           <p className="text-[11px] text-muted-foreground">
-            {BREAKDOWN_PARTS.filter(([key]) => candidate.breakdown[key] > 0)
+            {BREAKDOWN_PARTS.filter(([key]) => candidate.breakdown[key] !== 0)
               .map(([key, label]) => `${label} ${candidate.breakdown[key]}`)
               .join(" · ")}
           </p>

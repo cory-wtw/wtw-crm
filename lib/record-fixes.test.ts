@@ -42,3 +42,56 @@ describe("planRecordFixes", () => {
     expect(f.changes.whatToBring).toEqual({ before: "His DD-214", after: "Their DD-214" });
   });
 });
+
+it("retires a realtor listing", () => {
+  const [f] = planRecordFixes([aResource({ organizationName: "Jeff Morrow Keller Williams" })]);
+  expect(f.changes.verificationStatus.after).toBe("retired");
+});
+
+describe("research corrections", () => {
+  it("makes Chattanooga walk-in places local instead of Tennessee-only", () => {
+    const [f] = planRecordFixes([
+      aResource({ organizationName: "Chattanooga Free Store", geoScope: "state", geoStates: ["TN"] }),
+    ]);
+    expect(f.changes.geoScope.after).toBe("local");
+    expect(f.changes.geoLocalities.after).toEqual(["Chattanooga"]);
+  });
+
+  it("corrects Bridge Health to adults too, once", () => {
+    const bridge = aResource({
+      organizationName: "Bridge Health (formerly Lookout Mountain Community Services)",
+      eligibilityNotes: "Serves children and adolescents.",
+      whatToBring: "Child's insurance card",
+    });
+    const [f] = planRecordFixes([bridge]);
+    expect(String(f.changes.eligibilityNotes.after)).toMatch(/^Adults/);
+    expect(
+      planRecordFixes([{ ...bridge, eligibilityNotes: String(f.changes.eligibilityNotes.after), whatToBring: String(f.changes.whatToBring.after) }]),
+    ).toEqual([]);
+  });
+
+  it("widens the Vet Center wording and keeps the rest of the description", () => {
+    const [f] = planRecordFixes([
+      aResource({
+        organizationName: "Chattanooga Vet Center",
+        description: "Counseling center. Serves combat veterans and MST survivors. Records kept separate.",
+        eligibilityNotes: "Combat veterans and MST survivors. No VA enrollment needed.",
+      }),
+    ]);
+    expect(f.changes.description.after).toBe(
+      "Counseling center. Serves combat veterans, MST survivors, some other veterans, and their families. Records kept separate.",
+    );
+  });
+
+  it("neutral wording builds on a correction instead of undoing it", () => {
+    const [f] = planRecordFixes([
+      aResource({
+        organizationName: "Chattanooga Vet Center",
+        description: "He can call. Serves combat veterans and MST survivors.",
+      }),
+    ]);
+    expect(f.changes.description.after).toBe(
+      "They can call. Serves combat veterans, MST survivors, some other veterans, and their families.",
+    );
+  });
+});

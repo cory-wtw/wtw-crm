@@ -21,8 +21,10 @@ export default async function RecordFixesPage() {
         </h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Changes that would otherwise be done one record at a time: who a
-          program only serves (MST, SSVF, HUD-VASH), retiring lender listings
-          and duplicate records, and rewriting he/him in record text. Each
+          program only serves (MST, SSVF, HUD-VASH), retiring lender and
+          realtor listings and duplicate records, corrections from research
+          (who Bridge Health and Vet Centers serve, Chattanooga places open to
+          anyone nearby), and rewriting he/him in record text. Each
           record&rsquo;s change is listed below with why. Nothing is written
           until you tap the button.
         </p>

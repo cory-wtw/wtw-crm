@@ -4,6 +4,7 @@ import {
   RANKING_WEIGHTS,
   freshnessScore,
   matchedBuckets,
+  diversify,
   rankResources,
   scoreResource,
 } from "../ranking";
@@ -76,6 +77,7 @@ describe("scoreResource", () => {
       wait: RANKING_WEIGHTS.wait.unknown,
       freshness: RANKING_WEIGHTS.freshness.fresh,
       bucketCoverage: RANKING_WEIGHTS.bucketCoverage,
+      repeatNeed: 0,
       total: 40 + 60 + 0 + 60 + 25,
     });
   });
@@ -321,5 +323,40 @@ describe("out of range", () => {
   it("scores a local resource out of range as 0, not county", () => {
     const far = aResource({ geoScope: "local", geoStates: ["NY"], geoLocalities: ["Saratoga County"] });
     expect(scoreResource(aVeteran(), far, NOW).geography).toBe(0);
+  });
+});
+
+describe("diversify", () => {
+  it("spreads the list across needs instead of stacking one", () => {
+    const v = aVeteran({ needs: ["essentials", "housing", "work"] });
+    const pantry = (id: string) =>
+      aResource({ id, organizationName: `Pantry ${id}`, buckets: ["essentials"], accessMethod: "walkin" });
+    const ranked = rankResources(
+      v,
+      [
+        pantry("a"),
+        pantry("b"),
+        pantry("c"),
+        aResource({ id: "h", organizationName: "Housing", buckets: ["housing"], accessMethod: "phone" }),
+        aResource({ id: "w", organizationName: "Work", buckets: ["work"], accessMethod: "phone" }),
+      ],
+      NOW,
+    );
+    // Undiversified: three walk-in pantries outrank the phone-only others.
+    expect(ranked.slice(0, 3).map((r) => r.resource.id)).toEqual(["a", "b", "c"]);
+    const spread = diversify(ranked).map((r) => r.resource.id);
+    expect(spread.slice(0, 3)).toEqual(["a", "h", "w"]);
+    const second = diversify(ranked).find((r) => r.resource.id === "b")!;
+    expect(second.breakdown.repeatNeed).toBe(-RANKING_WEIGHTS.repeatNeed);
+    expect(second.score).toBe(second.breakdown.total);
+  });
+
+  it("doesn't touch a resource that covers a new need", () => {
+    const v = aVeteran({ needs: ["essentials", "housing"] });
+    const both = aResource({ id: "both", buckets: ["essentials", "housing"] });
+    const [first, second] = diversify(
+      rankResources(v, [aResource({ id: "p", buckets: ["essentials"], accessMethod: "walkin" }), both], NOW),
+    );
+    expect(first.breakdown.repeatNeed + second.breakdown.repeatNeed).toBe(0);
   });
 });

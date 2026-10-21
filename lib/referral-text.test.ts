@@ -470,3 +470,17 @@ describe("review fixes", () => {
     );
   });
 });
+
+describe("third pass", () => {
+  it("doesn't double the period after a sentence", () => {
+    expect(
+      startLine(aPacketResource({ accessMethod: "phone", accessValue: "423-486-5278 (SSVF intake). Other services: 877-567-6051." })),
+    ).toBe("Call 423-486-5278 (SSVF intake). Other services: 877-567-6051.");
+  });
+
+  it("drops an 'address:' label in front of a walk-in address", () => {
+    expect(
+      startLine(aPacketResource({ accessMethod: "walkin", accessValue: "Physical address: 1601 Prater Road, Chattanooga, TN 37412" })),
+    ).toBe("Walk in at 1601 Prater Road, Chattanooga, TN 37412.");
+  });
+});

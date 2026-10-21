@@ -43,6 +43,58 @@ const POPULATION_RULES: { match: RegExp; groups: Population[]; why: string }[] =
 /** Listings that aren't free help and shouldn't be offered. */
 const RETIRE_RULES: { match: RegExp; why: string }[] = [
   { match: /\bsailors\b.*home loan|home loan.*\bsailors\b/i, why: "Mortgage lender, not a free service" },
+  { match: /keller williams|\bre\/max\b|\brealty\b|\brealtor\b/i, why: "Real estate agent, not a free service" },
+];
+
+/**
+ * Corrections to specific records, from research — each applies only while
+ * the record still says what was found wrong, so a later hand edit wins.
+ */
+const CORRECTIONS: {
+  match: RegExp;
+  why: string;
+  when: (r: Resource) => boolean;
+  set: (r: Resource) => Partial<Resource>;
+}[] = [
+  {
+    // Chattanooga places that take anyone who comes in, entered as statewide
+    // Tennessee — which hid them from Rossville, six miles away.
+    match: /^(chattanooga free store|showerup|chattanooga va clinic)\b/i,
+    why: "Serves anyone who can get to Chattanooga — local, not Tennessee-only",
+    when: (r) => r.geoScope !== "local",
+    set: (r) => ({
+      geoScope: "local",
+      geoStates: r.geoStates.length > 0 ? r.geoStates : ["TN"],
+      geoLocalities: ["Chattanooga"],
+    }),
+  },
+  {
+    match: /^bridge health\b/i,
+    why: "Serves adults too — mental health, addiction and developmental disabilities (Georgia DBHDD)",
+    when: (r) => /children and adolescents/i.test(r.eligibilityNotes ?? "") || /child's insurance/i.test(r.whatToBring ?? ""),
+    set: () => ({
+      eligibilityNotes:
+        "Adults, children and families: mental health, substance use, and developmental disability services. The Fort Oglethorpe clinic is closest to Rossville. Takes Medicaid, Medicare, TRICARE and private insurance; sliding scale for the uninsured.",
+      whatToBring: "Insurance card if they have one (Medicaid, Medicare, TRICARE or private), and photo ID.",
+    }),
+  },
+  {
+    match: /vet center/i,
+    why: "Vet Centers serve more than combat veterans and MST survivors (VA eligibility page)",
+    when: (r) => /combat veterans and MST survivors/i.test(`${r.eligibilityNotes ?? ""} ${r.description ?? ""}`),
+    set: (r) => ({
+      eligibilityNotes:
+        "Veterans and service members who served in a combat zone or area of hostility, MST survivors, and some others (certain mortuary, medical and emergency-response duty), plus their families. No VA enrollment or rating needed. Counseling records stay separate from VA medical records.",
+      ...(r.description
+        ? {
+            description: r.description.replace(
+              /Serves combat veterans and MST survivors\./i,
+              "Serves combat veterans, MST survivors, some other veterans, and their families.",
+            ),
+          }
+        : {}),
+    }),
+  },
 ];
 
 /** Free-text fields a veteran may read. */
@@ -94,11 +146,21 @@ export function planRecordFixes(resources: Resource[]): RecordFix[] {
       }
     }
 
+    for (const c of CORRECTIONS) {
+      if (!c.match.test(r.organizationName) || !c.when(r)) continue;
+      for (const [field, value] of Object.entries(c.set(r))) {
+        const before = r[field as keyof Resource];
+        if (JSON.stringify(before ?? null) !== JSON.stringify(value)) fix(r, field, before ?? null, value, c.why);
+      }
+    }
+
     for (const field of TEXT_FIELDS) {
-      const value = r[field];
+      // Build on a correction made above, never undo it.
+      const corrected = fixes.get(r.id)?.changes[field];
+      const value = corrected ? corrected.after : r[field];
       if (typeof value !== "string" || !value) continue;
       const neutral = neutralizePronouns(value);
-      if (neutral !== value) fix(r, field, value, neutral, "Gender-neutral wording");
+      if (neutral !== value) fix(r, field, r[field] ?? null, neutral, "Gender-neutral wording");
     }
   }
 
