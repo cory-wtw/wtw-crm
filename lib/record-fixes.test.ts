@@ -42,3 +42,8 @@ describe("planRecordFixes", () => {
     expect(f.changes.whatToBring).toEqual({ before: "His DD-214", after: "Their DD-214" });
   });
 });
+
+it("retires a realtor listing", () => {
+  const [f] = planRecordFixes([aResource({ organizationName: "Jeff Morrow Keller Williams" })]);
+  expect(f.changes.verificationStatus.after).toBe("retired");
+});

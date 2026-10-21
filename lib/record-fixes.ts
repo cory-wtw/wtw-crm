@@ -43,6 +43,7 @@ const POPULATION_RULES: { match: RegExp; groups: Population[]; why: string }[] =
 /** Listings that aren't free help and shouldn't be offered. */
 const RETIRE_RULES: { match: RegExp; why: string }[] = [
   { match: /\bsailors\b.*home loan|home loan.*\bsailors\b/i, why: "Mortgage lender, not a free service" },
+  { match: /keller williams|\bre\/max\b|\brealty\b|\brealtor\b/i, why: "Real estate agent, not a free service" },
 ];
 
 /** Free-text fields a veteran may read. */

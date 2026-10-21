@@ -58,6 +58,12 @@ export const RANKING_WEIGHTS = {
     stale: 0,
   },
   bucketCoverage: 25,
+  /**
+   * Taken off for each resource already above it on the list covering the
+   * same need — a fourth food pantry is worth less than a first answer to
+   * housing. Only when every need it covers is already covered.
+   */
+  repeatNeed: 50,
 } as const;
 
 /** Per-signal contributions, kept so the review screen can explain a score. */
@@ -69,6 +75,8 @@ export type ScoreBreakdown = {
   wait: number;
   freshness: number;
   bucketCoverage: number;
+  /** Zero or negative: set by diversify, not scoreResource. */
+  repeatNeed: number;
   total: number;
 };
 
@@ -150,6 +158,7 @@ export function scoreResource(
     wait,
     freshness,
     bucketCoverage,
+    repeatNeed: 0,
     total:
       crisis +
       legalUnlock +
@@ -191,4 +200,43 @@ export function rankResources(
         b.score - a.score ||
         a.resource.organizationName.localeCompare(b.resource.organizationName),
     );
+}
+
+/**
+ * Re-order a ranked list so it spreads across the veteran's needs.
+ *
+ * Picks greedily: at each step, every remaining resource whose needs are all
+ * already covered above it loses repeatNeed for each time its least-covered
+ * need has been covered. Someone who asked about food, housing and work sees
+ * one or two pantries, then housing and work — not four pantries first.
+ * Resources that answer an uncovered need keep their full score.
+ */
+export function diversify(ranked: RankedResource[]): RankedResource[] {
+  const remaining = [...ranked];
+  const covered = new Map<string, number>();
+  const out: RankedResource[] = [];
+
+  const penalty = (r: RankedResource) => {
+    if (r.matchedBuckets.length === 0) return 0;
+    const times = Math.min(...r.matchedBuckets.map((b) => covered.get(b) ?? 0));
+    return times === 0 ? 0 : -RANKING_WEIGHTS.repeatNeed * times;
+  };
+
+  while (remaining.length > 0) {
+    let bestAt = 0;
+    let bestScore = -Infinity;
+    remaining.forEach((r, i) => {
+      const s = r.breakdown.total - r.breakdown.repeatNeed + penalty(r);
+      if (s > bestScore) {
+        bestScore = s;
+        bestAt = i;
+      }
+    });
+    const [pick] = remaining.splice(bestAt, 1);
+    const repeatNeed = penalty(pick);
+    const total = pick.breakdown.total - pick.breakdown.repeatNeed + repeatNeed;
+    out.push({ ...pick, score: total, breakdown: { ...pick.breakdown, repeatNeed, total } });
+    for (const b of pick.matchedBuckets) covered.set(b, (covered.get(b) ?? 0) + 1);
+  }
+  return out;
 }
