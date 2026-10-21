@@ -137,4 +137,10 @@ body {
     @apply bg-background text-foreground;
     font-family: var(--font-source-sans-3), Arial, sans-serif;
   }
+  /* A fixed-height button can't grow to fit a second line, so its label must
+     never wrap — on a phone that turned "Add Resource" into two lines spilling
+     out of the button. The row around it wraps instead. */
+  :is(a, button).inline-flex:is(.h-8, .h-9, .h-10, .h-11, .h-12) {
+    white-space: nowrap;
+  }
 }

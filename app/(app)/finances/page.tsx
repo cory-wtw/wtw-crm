@@ -178,7 +178,7 @@ export default async function FinancesPage({
 
 function Header() {
   return (
-    <div className="flex items-baseline justify-between gap-4">
+    <div className="flex flex-wrap items-baseline justify-between gap-4">
       <div>
         <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Finances</h1>
         <p className="text-sm text-muted-foreground">
