@@ -77,12 +77,17 @@ describe("outcomeTotals", () => {
         ],
       }),
       v({ outcomes: [{ kind: "snap", monthlyValue: 290 }, { kind: "job" }] }),
+      // Shelter then an apartment: one person housed.
+      v({ outcomes: [{ kind: "housedTemporary" }, { kind: "housedPermanent" }] }),
+      // A retired kind is skipped, not counted as NaN.
+      v({ outcomes: [{ kind: "retiredKind" as never }] }),
       v({}),
     ]);
-    expect(t.total).toBe(5);
-    expect(t.veterans).toBe(2);
+    expect(t.total).toBe(7);
+    expect(t.veterans).toBe(3);
     expect(t.jobs).toBe(2);
-    expect(t.housed).toBe(1);
+    expect(t.housed).toBe(2);
+    expect(Object.values(t.byKind).every(Number.isFinite)).toBe(true);
     expect(t.monthly).toBe(2690);
     expect(t.annual).toBe(2690 * 12);
     expect(t.oneTime).toBe(800);

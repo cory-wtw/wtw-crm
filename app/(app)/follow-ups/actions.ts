@@ -235,7 +235,8 @@ export async function recordFollowUpAction(
         ...outcomeAmounts(o.winKind, o.amount),
         resourceId: o.resourceId,
         ...(name ? { resourceName: name } : {}),
-        ...(o.note ? { note: o.note } : {}),
+        // Same cap as a win logged by hand.
+        ...(o.note ? { note: o.note.slice(0, 500) } : {}),
         loggedBy: session.uid,
         loggedAt: now,
       },

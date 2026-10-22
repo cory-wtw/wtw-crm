@@ -7,6 +7,7 @@ import {
   outcomeSummary,
   type OutcomeKind,
 } from "@/lib/schemas";
+import { localTodayIso as todayIso, positiveAmount } from "@/lib/utils";
 import { OutcomeKindPicker } from "../../outcome-kind-picker";
 import { logOutcomeAction, removeOutcomeAction } from "../actions";
 
@@ -41,6 +42,7 @@ export function Outcomes({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function close() {
@@ -64,7 +66,7 @@ export function Outcomes({
       const result = await logOutcomeAction(veteranId, {
         kind,
         achievedAt: `${date}T12:00:00`,
-        amount: Number(amount) || undefined,
+        amount: positiveAmount(amount),
         note: note.trim() || undefined,
       });
       if (!result.ok) {
@@ -73,19 +75,29 @@ export function Outcomes({
       }
       close();
       startTransition(() => router.refresh());
+    } catch {
+      setError("Couldn't save — check your connection, then refresh to see whether it went through.");
     } finally {
       setSaving(false);
     }
   }
 
   async function remove(item: OutcomeItem) {
+    if (removing) return;
     if (!confirm(`Remove "${OUTCOME_KIND_INFO[item.kind].label}"?`)) return;
-    const result = await removeOutcomeAction(veteranId, item.id);
-    if (!result.ok) {
-      alert(result.error);
-      return;
+    setRemoving(item.id);
+    try {
+      const result = await removeOutcomeAction(veteranId, item.id);
+      if (!result.ok) {
+        alert(result.error);
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      alert("Couldn't remove it — check your connection and try again.");
+    } finally {
+      setRemoving(null);
     }
-    startTransition(() => router.refresh());
   }
 
   const sorted = [...items].sort((a, b) =>
@@ -195,9 +207,10 @@ export function Outcomes({
                 <button
                   type="button"
                   onClick={() => remove(item)}
-                  className="shrink-0 text-xs font-bold text-muted-foreground hover:text-destructive"
+                  disabled={removing !== null}
+                  className="shrink-0 disabled:opacity-50 text-xs font-bold text-muted-foreground hover:text-destructive"
                 >
-                  Remove
+                  {removing === item.id ? "Removing…" : "Remove"}
                 </button>
               )}
             </li>
@@ -206,12 +219,4 @@ export function Outcomes({
       )}
     </section>
   );
-}
-
-function todayIso(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }

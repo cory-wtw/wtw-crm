@@ -400,9 +400,6 @@ export async function logOutcomeAction(
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
   const input = parsed.data;
-  if (Number.isNaN(input.achievedAt.getTime())) {
-    return { ok: false, error: "achievedAt: Invalid date" };
-  }
 
   const veteranRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await veteranRef.get();
@@ -471,21 +468,30 @@ export async function removeOutcomeAction(
     return { ok: false, error: "Your account doesn't have access to this." };
 
   const veteranRef = adminDb.collection("veterans").doc(veteranId);
-  const snap = await veteranRef.get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
-  const data = snap.data()!;
-  if (!canEditVeteran(session, data as { assigneeUid: string | null }))
-    return { ok: false, error: "Your account can't edit this veteran." };
+  // A transaction, so a win added by someone else between the read and the
+  // write isn't dropped by writing back a stale list.
+  const result = await adminDb.runTransaction<
+    { error: string } | { removed: { id: string; kind: string } }
+  >(async (tx) => {
+    const snap = await tx.get(veteranRef);
+    if (!snap.exists) return { error: "Veteran not found." };
+    const data = snap.data()!;
+    if (!canEditVeteran(session, data as { assigneeUid: string | null }))
+      return { error: "Your account can't edit this veteran." };
 
-  const outcomes = (data.outcomes ?? []) as Array<{ id: string; kind: string }>;
-  const removed = outcomes.find((o) => o.id === outcomeId);
-  if (!removed) return { ok: false, error: "That win is no longer on the record." };
+    const outcomes = (data.outcomes ?? []) as Array<{ id: string; kind: string }>;
+    const removed = outcomes.find((o) => o.id === outcomeId);
+    if (!removed) return { error: "That win is no longer on the record." };
 
-  await veteranRef.update({
-    outcomes: outcomes.filter((o) => o.id !== outcomeId),
-    updatedAt: new Date(),
-    updatedBy: session.uid,
+    tx.update(veteranRef, {
+      outcomes: outcomes.filter((o) => o.id !== outcomeId),
+      updatedAt: new Date(),
+      updatedBy: session.uid,
+    });
+    return { removed };
   });
+  if ("error" in result) return { ok: false, error: result.error };
+  const { removed } = result;
   await logAudit({
     action: "update",
     resourceType: "veteran",

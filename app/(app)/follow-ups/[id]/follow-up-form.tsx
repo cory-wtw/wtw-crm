@@ -9,6 +9,7 @@ import {
   type FollowUpOutcome,
   type OutcomeKind,
 } from "@/lib/schemas";
+import { positiveAmount } from "@/lib/utils";
 import { OutcomeKindPicker } from "../../outcome-kind-picker";
 import { recordFollowUpAction, type FollowUpSummary } from "../actions";
 
@@ -63,7 +64,7 @@ export function FollowUpForm({
           outcome: answers[r.resourceId].outcome as FollowUpOutcome,
           note: answers[r.resourceId].note.trim() || undefined,
           winKind: answers[r.resourceId].winKind || undefined,
-          amount: Number(answers[r.resourceId].amount) || undefined,
+          amount: positiveAmount(answers[r.resourceId].amount),
         })),
       });
       if (!response.ok) {

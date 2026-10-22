@@ -65,19 +65,23 @@ export function benefitTotals(veterans: readonly ImpactVeteran[]) {
 
 /**
  * Wins beyond VA benefits. Counts are of wins, not veterans — someone who got
- * a job and an apartment counts once in each — except `veterans`, which is
- * how many people have at least one. Dollar figures are only what staff
+ * a job and an apartment counts once in each — except `veterans` and
+ * `housed`, which count people. Dollar figures are only what staff
  * entered, so they're a floor, not an estimate.
  */
 export function outcomeTotals(veterans: readonly ImpactVeteran[]) {
   const byKind = Object.fromEntries(OUTCOME_KINDS.map((k) => [k, 0])) as Record<OutcomeKind, number>;
   let total = 0;
   let withWins = 0;
+  let housed = 0;
   let monthly = 0;
   let oneTime = 0;
   for (const v of veterans) {
-    const outcomes = v.outcomes ?? [];
+    // A kind no longer in the list (renamed or retired) is skipped rather
+    // than counted somewhere the report can't show it.
+    const outcomes = (v.outcomes ?? []).filter((o) => o.kind in byKind);
     if (outcomes.length > 0) withWins += 1;
+    if (outcomes.some((o) => o.kind === "housedPermanent" || o.kind === "housedTemporary")) housed += 1;
     for (const o of outcomes) {
       byKind[o.kind] += 1;
       total += 1;
@@ -90,7 +94,8 @@ export function outcomeTotals(veterans: readonly ImpactVeteran[]) {
     veterans: withWins,
     byKind,
     jobs: byKind.job,
-    housed: byKind.housedPermanent + byKind.housedTemporary,
+    /** Veterans, not wins: shelter then an apartment is one person housed. */
+    housed,
     monthly,
     annual: monthly * 12,
     oneTime,
