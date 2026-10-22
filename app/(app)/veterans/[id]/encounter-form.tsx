@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { localTodayIso as todayIso } from "@/lib/utils";
 import { addEncounterAction } from "../actions";
 
 const formSchema = z.object({
@@ -145,14 +146,6 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
       </div>
     </form>
   );
-}
-
-function todayIso(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 function Field({

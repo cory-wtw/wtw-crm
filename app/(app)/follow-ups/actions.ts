@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { getResourcesByIds } from "@/lib/db/resources";
@@ -18,7 +18,10 @@ import {
   derivedVerificationStatus,
   followUpOutcomeSchema,
   FOLLOW_UP_OUTCOME_LABELS,
+  outcomeAmounts,
+  outcomeKindSchema,
   type FollowUpResult,
+  type VeteranOutcome,
 } from "@/lib/schemas";
 import { stageVerification } from "@/lib/verifications";
 
@@ -43,6 +46,9 @@ const followUpInputSchema = z.object({
         resourceId: z.string().min(1),
         outcome: followUpOutcomeSchema,
         note: z.string().optional(),
+        // What they got, only meaningful with outcome "helped".
+        winKind: outcomeKindSchema.optional(),
+        amount: z.number().nonnegative().optional(),
       }),
     )
     .min(1, "Record an outcome for at least one resource."),
@@ -214,7 +220,28 @@ export async function recordFollowUpAction(
     resourceId: o.resourceId,
     outcome: o.outcome,
     ...(o.note ? { note: o.note } : {}),
+    ...(o.outcome === "helped" && o.winKind ? { winKind: o.winKind } : {}),
   }));
+
+  // Wins land on the veteran too, where the Impact report counts them.
+  const wins: VeteranOutcome[] = input.outcomes.flatMap((o) => {
+    if (o.outcome !== "helped" || !o.winKind) return [];
+    const name = byId.get(o.resourceId)?.organizationName;
+    return [
+      {
+        id: crypto.randomUUID(),
+        kind: o.winKind,
+        achievedAt: now,
+        ...outcomeAmounts(o.winKind, o.amount),
+        resourceId: o.resourceId,
+        ...(name ? { resourceName: name } : {}),
+        // Same cap as a win logged by hand.
+        ...(o.note ? { note: o.note.slice(0, 500) } : {}),
+        loggedBy: session.uid,
+        loggedAt: now,
+      },
+    ];
+  });
 
   batch.set(encounterRef, {
     type: "followUp",
@@ -236,6 +263,7 @@ export async function recordFollowUpAction(
     conciergeStatus: "closed",
     followUpDue: null,
     lastContactedAt: maxDate(tsToDate(existing.lastContactedAt), now),
+    ...(wins.length ? { outcomes: FieldValue.arrayUnion(...wins) } : {}),
     updatedBy: session.uid,
     updatedAt: now,
   });
@@ -257,6 +285,7 @@ export async function recordFollowUpAction(
   revalidatePath("/outreach");
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath("/veterans");
+  if (wins.length) revalidatePath("/finances/impact");
 
   return { ok: true, summary: { flagged } };
 }

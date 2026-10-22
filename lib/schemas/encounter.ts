@@ -4,6 +4,7 @@ import {
   dischargeCharacterSchema,
   serviceEraSchema,
 } from "./bucket";
+import { outcomeKindSchema } from "./outcome";
 import { dependentsAnswerSchema, idStatusSchema } from "./veteran";
 
 /**
@@ -21,6 +22,7 @@ export const ENCOUNTER_TYPES = [
   "intake",
   "referral",
   "followUp",
+  "outcome",
 ] as const;
 export const encounterTypeSchema = z.enum(ENCOUNTER_TYPES);
 export type EncounterType = z.infer<typeof encounterTypeSchema>;
@@ -30,6 +32,7 @@ export const ENCOUNTER_TYPE_LABELS: Record<EncounterType, string> = {
   intake: "Intake",
   referral: "Referral",
   followUp: "Follow-up",
+  outcome: "Win",
 };
 
 /**
@@ -97,6 +100,9 @@ export const followUpResultSchema = z.object({
   resourceId: z.string().min(1),
   outcome: followUpOutcomeSchema,
   note: z.string().optional(),
+  /** What they got, when the outcome was "helped" and staff said. Also lands
+   *  on the veteran's outcomes, which is what the Impact report counts. */
+  winKind: outcomeKindSchema.optional(),
 });
 export type FollowUpResult = z.infer<typeof followUpResultSchema>;
 

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { dischargeCharacterSchema, serviceEraSchema } from "./bucket";
+import { veteranOutcomeSchema } from "./outcome";
 import {
   pipelineHistoryEntrySchema,
   pipelineStageSchema,
@@ -175,6 +176,10 @@ export const veteranSchema = z.object({
   monthlyBenefitBefore: z.number().nonnegative().default(0),
   monthlyBenefitAfter: z.number().nonnegative().default(0),
 
+  // Everything else they walked away with — a job, housing, SNAP. Written by
+  // logOutcomeAction and the follow-up form, never by the edit form.
+  outcomes: z.array(veteranOutcomeSchema).default([]),
+
   // Links
   vsoIds: z.array(z.string()).default([]),
   // The numeric id from an 800.com inbox thread URL
@@ -221,6 +226,7 @@ export const veteranInputSchema = veteranSchema
     followUpDue: true,
     lastContactedAt: true,
     pipelineHistory: true,
+    outcomes: true,
     dateFound: true,
     dateConnected: true,
     dateFiled: true,

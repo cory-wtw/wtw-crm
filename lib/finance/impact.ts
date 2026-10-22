@@ -1,7 +1,10 @@
 import {
   lifetimeBenefitsUnlocked,
   monthlyBenefitLift,
+  OUTCOME_KINDS,
+  type OutcomeKind,
   type PipelineStage,
+  type VeteranOutcome,
 } from "@/lib/schemas";
 
 /**
@@ -20,6 +23,7 @@ export type ImpactVeteran = {
   dateFiled?: Date | null;
   dateWon?: Date | null;
   createdAt: Date;
+  outcomes?: readonly Pick<VeteranOutcome, "kind" | "monthlyValue" | "oneTimeValue">[];
 };
 
 export const FUNNEL_STAGES = ["found", "connected", "filed", "won"] as const;
@@ -57,6 +61,45 @@ export function benefitTotals(veterans: readonly ImpactVeteran[]) {
     lifetime += lifetimeBenefitsUnlocked(v.monthlyBenefitBefore, v.monthlyBenefitAfter, v.birthYear) ?? 0;
   }
   return { monthly, lifetime, withBenefits };
+}
+
+/**
+ * Wins beyond VA benefits. Counts are of wins, not veterans — someone who got
+ * a job and an apartment counts once in each — except `veterans` and
+ * `housed`, which count people. Dollar figures are only what staff
+ * entered, so they're a floor, not an estimate.
+ */
+export function outcomeTotals(veterans: readonly ImpactVeteran[]) {
+  const byKind = Object.fromEntries(OUTCOME_KINDS.map((k) => [k, 0])) as Record<OutcomeKind, number>;
+  let total = 0;
+  let withWins = 0;
+  let housed = 0;
+  let monthly = 0;
+  let oneTime = 0;
+  for (const v of veterans) {
+    // A kind no longer in the list (renamed or retired) is skipped rather
+    // than counted somewhere the report can't show it.
+    const outcomes = (v.outcomes ?? []).filter((o) => o.kind in byKind);
+    if (outcomes.length > 0) withWins += 1;
+    if (outcomes.some((o) => o.kind === "housedPermanent" || o.kind === "housedTemporary")) housed += 1;
+    for (const o of outcomes) {
+      byKind[o.kind] += 1;
+      total += 1;
+      monthly += o.monthlyValue ?? 0;
+      oneTime += o.oneTimeValue ?? 0;
+    }
+  }
+  return {
+    total,
+    veterans: withWins,
+    byKind,
+    jobs: byKind.job,
+    /** Veterans, not wins: shelter then an apartment is one person housed. */
+    housed,
+    monthly,
+    annual: monthly * 12,
+    oneTime,
+  };
 }
 
 /** Veterans found per calendar month (date found, else date added), oldest first. */

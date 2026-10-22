@@ -33,6 +33,7 @@ import {
   SERVICE_ERA_LABELS,
 } from "@/lib/schemas";
 import { EncounterForm } from "./encounter-form";
+import { Outcomes } from "./outcomes";
 import { StageChanger } from "./stage-changer";
 
 export const dynamic = "force-dynamic";
@@ -288,6 +289,20 @@ export default async function VeteranDetailPage({
           </ol>
         )}
       </Details>
+
+      <Outcomes
+        veteranId={veteran.id}
+        canManage={canEdit}
+        items={veteran.outcomes.map((o) => ({
+          id: o.id,
+          kind: o.kind,
+          achievedAtIso: o.achievedAt.toISOString(),
+          monthlyValue: o.monthlyValue,
+          oneTimeValue: o.oneTimeValue,
+          resourceName: o.resourceName,
+          note: o.note,
+        }))}
+      />
 
       <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="mb-4 flex items-baseline justify-between gap-3">
