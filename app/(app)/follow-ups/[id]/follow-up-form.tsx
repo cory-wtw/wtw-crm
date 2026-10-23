@@ -158,7 +158,7 @@ export function FollowUpForm({
               {FOLLOW_UP_OUTCOMES.map((outcome) => (
                 <label
                   key={outcome}
-                  className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm has-checked:border-[color:var(--wtw-brand-gold)] has-checked:bg-primary/15 has-checked:font-bold"
                 >
                   <input
                     type="radio"
@@ -220,6 +220,11 @@ export function FollowUpForm({
         >
           Cancel
         </Link>
+        {answered.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Pick an answer for at least one program first.
+          </p>
+        )}
       </div>
     </form>
   );

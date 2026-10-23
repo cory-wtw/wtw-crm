@@ -433,6 +433,12 @@ export function IntakeResults({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm">
             <span className="font-bold">{selected.length}</span> selected
+            {selected.length === 0 && (
+              <span className="text-muted-foreground">
+                {" "}
+                · tick &ldquo;Send&rdquo; on at least one program
+              </span>
+            )}
             {selected.length > PACKET_SIZE && (
               <span className="text-muted-foreground">
                 {" "}
@@ -478,15 +484,24 @@ function CandidateCard({
   const oneLiner = candidate.description ?? candidate.services;
 
   return (
-    <li className="rounded-lg border border-border bg-card p-4 shadow-sm">
+    <li
+      className={`rounded-lg border bg-card p-4 shadow-sm ${
+        checked
+          ? "border-[color:var(--wtw-brand-gold)] bg-primary/10"
+          : "border-border"
+      }`}
+    >
       <div className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onToggle}
-          aria-label={`Include ${candidate.organizationName}`}
-          className="mt-1 accent-[color:var(--wtw-brand-gold)]"
-        />
+        <label className="flex shrink-0 cursor-pointer flex-col items-center gap-1 text-[11px] font-bold">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={onToggle}
+            aria-label={`Send ${candidate.organizationName}`}
+            className="mt-1 accent-[color:var(--wtw-brand-gold)]"
+          />
+          Send
+        </label>
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="font-bold">
@@ -498,16 +513,7 @@ function CandidateCard({
                 {candidate.organizationName}
               </Link>
             </p>
-            <span className="text-[11px] text-muted-foreground">
-              score {candidate.score}
-            </span>
           </div>
-
-          <p className="text-[11px] text-muted-foreground">
-            {BREAKDOWN_PARTS.filter(([key]) => candidate.breakdown[key] !== 0)
-              .map(([key, label]) => `${label} ${candidate.breakdown[key]}`)
-              .join(" · ")}
-          </p>
 
           {oneLiner && (
             <p className="line-clamp-2 text-sm text-muted-foreground">
@@ -549,6 +555,18 @@ function CandidateCard({
               Verified {formatDate(candidate.lastVerified)}
             </span>
           </div>
+
+          {/* The score is for checking the matcher, not for the call — keep
+              it out of the way. */}
+          <details className="text-[11px] text-muted-foreground">
+            <summary className="cursor-pointer">Why this rank?</summary>
+            <p className="mt-1">
+              Score {candidate.score}:{" "}
+              {BREAKDOWN_PARTS.filter(([key]) => candidate.breakdown[key] !== 0)
+                .map(([key, label]) => `${label} ${candidate.breakdown[key]}`)
+                .join(" · ")}
+            </p>
+          </details>
 
           {candidate.flags.length > 0 && (
             <ul className="flex flex-wrap gap-2">

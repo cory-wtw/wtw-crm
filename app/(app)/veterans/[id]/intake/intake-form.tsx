@@ -236,7 +236,7 @@ export function IntakeForm({
               {BUCKET_CODES.map((code) => (
                 <label
                   key={code}
-                  className="flex items-start gap-3 rounded-md border border-input bg-background p-3 text-sm"
+                  className="flex cursor-pointer items-start gap-3 rounded-md border border-input bg-background p-3 text-sm has-checked:border-[color:var(--wtw-brand-gold)] has-checked:bg-primary/15"
                 >
                   <input
                     type="checkbox"
@@ -278,7 +278,7 @@ export function IntakeForm({
                 could lose their home soon or have no home.
               </p>
             </Question>
-            <label className="flex items-start gap-3 rounded-md border border-input bg-background p-3 text-sm md:col-span-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border border-input bg-background p-3 text-sm has-checked:border-[color:var(--wtw-brand-gold)] has-checked:bg-primary/15 md:col-span-2">
               <input
                 type="checkbox"
                 value="mst"
@@ -482,7 +482,7 @@ function Radios({
       {options.map((option) => (
         <label
           key={option.value}
-          className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm has-checked:border-[color:var(--wtw-brand-gold)] has-checked:bg-primary/15 has-checked:font-bold"
         >
           <input
             type="radio"
