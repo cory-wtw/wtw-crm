@@ -226,7 +226,7 @@ export function VeteranForm({
         />
       </Section>
 
-      <Section title="Eligibility keys">
+      <Section title="Basic details">
         <Field
           label="Discharge"
           hint="Normally captured during intake. Blank clears whatever is on file."

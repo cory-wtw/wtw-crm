@@ -56,7 +56,7 @@ type Props = {
 };
 
 const NEEDS_LEAD_IN =
-  "I'm going to run through a short list of things we help with. Some won't apply. Just say yes or no as I go, and if you're not sure, say that and we'll come back to it.";
+  "Say: \"I will read a short list of things we help with. Some will not fit you. Just say yes or no. If you are not sure, tell me and we will come back to it.\"";
 
 /** The rule for the boxes, shown above them so nobody has to infer it. */
 const NEEDS_RULE =
@@ -173,29 +173,27 @@ export function IntakeForm({
             the record
           </span>{" "}
           <span className="text-muted-foreground">
-            — marked below. Leave anything you don&rsquo;t ask about alone and
-            it stays as it is; nothing here is erased by skipping it. If an
-            answer is genuinely unknown, say so with &ldquo;Not sure&rdquo;.
+            — marked below. If you skip a question, the old answer stays.
+            If they don&rsquo;t know, pick &ldquo;Not sure&rdquo;.
           </span>
         </p>
       )}
 
       <Section
-        title="Triage"
+        title="First: are they safe?"
         blurb="Ask this first, every time."
       >
-        <Question prompt="Is tonight the problem? Nowhere safe to sleep, or you're in danger, or you're in a bad place mentally right now.">
+        <Question prompt="Do you have a safe place to sleep tonight? Are you safe right now, and feeling OK?">
           <Radios
             name="safeTonight"
             register={register}
             options={[
-              { value: "yes", label: "They're safe tonight" },
-              { value: "no", label: "No — tonight is the problem" },
+              { value: "yes", label: "Yes, safe tonight" },
+              { value: "no", label: "No, not safe tonight" },
             ]}
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Not saved to their record. It&rsquo;s true right now, not about
-            them.
+            Not saved to their record. It is only about tonight.
           </p>
         </Question>
 
@@ -217,9 +215,8 @@ export function IntakeForm({
         <div className="rounded-lg border border-dashed border-border p-6">
           <p className="text-sm font-bold">The rest of the call waits.</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Get them somewhere safe tonight. Run the full intake once that
-            &rsquo;s handled — the record keeps whatever you&rsquo;ve already
-            entered.
+            First, help them get somewhere safe tonight. Do the rest of the
+            intake later. Answers you already gave are kept.
           </p>
         </div>
       ) : (
@@ -227,10 +224,9 @@ export function IntakeForm({
           <Section title="Needs" blurb={NEEDS_LEAD_IN}>
             {lastIntake && (
               <p className="rounded-md border border-border bg-secondary/30 p-3 text-sm text-muted-foreground md:col-span-2">
-                Ticked from the intake on{" "}
-                <span className="font-bold">{lastIntake.on}</span>. Change
-                whatever this call changes — the boxes here are this call&rsquo;s
-                answers, and the earlier run stays on the record as it was.
+                These boxes are ticked from the intake on{" "}
+                <span className="font-bold">{lastIntake.on}</span>. Ask again
+                and change any that are different now.
               </p>
             )}
             <p className="rounded-md border-l-4 border-[color:var(--wtw-brand-gold)] bg-primary/10 p-3 text-sm font-bold md:col-span-2">
@@ -266,9 +262,9 @@ export function IntakeForm({
 
           <Section
             title="Programs for specific groups"
-            blurb="Some programs only take one group. Not saved to their record."
+            blurb="Some programs only help one group of people. Not saved to their record."
           >
-            <Question prompt="Where are you living right now — is it stable, are you about to lose it, or are you without a place?">
+            <Question prompt="Where are you living now? Is it safe to stay, could you lose it soon, or do you have no place?">
               <Radios
                 name="housingStatus"
                 register={register}
@@ -278,7 +274,8 @@ export function IntakeForm({
                 }))}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                SSVF and HUD-VASH only show up for at risk or homeless.
+                Some housing programs (SSVF, HUD-VASH) only show up if they
+                could lose their home soon or have no home.
               </p>
             </Question>
             <label className="flex items-start gap-3 rounded-md border border-input bg-background p-3 text-sm md:col-span-2">
@@ -289,18 +286,18 @@ export function IntakeForm({
                 className="mt-0.5 accent-[color:var(--wtw-brand-gold)]"
               />
               <span>
-                They&rsquo;ve told us they experienced military sexual trauma.
-                Tick only if they raised it &mdash; never ask to fill this in.
+                They told us they experienced military sexual trauma (MST).
+                Tick only if they said it first. Never ask about this.
               </span>
             </label>
           </Section>
 
           <Section
-            title="Eligibility keys"
-            blurb="Four answers that decide which doors open."
+            title="Basic details"
+            blurb="These four answers decide which programs they can use."
           >
             <Question
-              prompt="Do you have a current state ID or driver's license on you? Expired counts, just tell me it's expired."
+              prompt="Do you have a state ID or driver's license? Tell me if it is expired."
               provenance={provenance("idStatus")}
             >
               <Radios
@@ -314,7 +311,7 @@ export function IntakeForm({
             </Question>
 
             <Question
-              prompt="What's on your discharge paperwork? Honorable, general, something else, or you're not sure."
+              prompt="What type of discharge is on your papers (DD-214)? Honorable, general, something else, or not sure?"
               provenance={provenance("dischargeCharacter")}
             >
               <Radios
@@ -326,8 +323,8 @@ export function IntakeForm({
                 }))}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Say this out loud: &ldquo;Doesn&rsquo;t disqualify you either
-                way, I just need to know which doors open.&rdquo;
+                Say: &ldquo;This does not stop us from helping you. It only
+                tells me which programs you can use.&rdquo;
               </p>
             </Question>
 
@@ -346,7 +343,7 @@ export function IntakeForm({
             </Question>
 
             <Question
-              prompt="Anybody depending on you? Kids, a spouse, an aging parent."
+              prompt="Does anyone depend on you? For example kids, a spouse, or an older parent."
               provenance={provenance("hasDependents")}
             >
               <Radios
@@ -363,9 +360,10 @@ export function IntakeForm({
       )}
 
       <div className="rounded-lg border border-border bg-secondary/30 p-4 text-xs text-muted-foreground">
-        Matching on {[knownCity, knownState].filter(Boolean).join(", ") ||
+        Searching near{" "}
+        {[knownCity, knownState].filter(Boolean).join(", ") ||
           "no location on file"}
-        . Location comes from the veteran record —{" "}
+        . This comes from the veteran&rsquo;s record —{" "}
         <Link
           href={`/veterans/${veteranId}/edit`}
           className="font-bold underline-offset-4 hover:underline"

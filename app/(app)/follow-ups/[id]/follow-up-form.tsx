@@ -84,8 +84,8 @@ export function FollowUpForm({
         <div className="rounded-lg border border-border bg-card p-6">
           <p className="font-bold">Recorded for {veteranName}.</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            They&rsquo;re closed out of the follow-up queue, and what they told
-            you is on each resource&rsquo;s record.
+            They are off the follow-up list now. Their answers are saved on
+            each program&rsquo;s page.
           </p>
         </div>
 
@@ -93,13 +93,12 @@ export function FollowUpForm({
           <div className="rounded-lg border border-[color:var(--wtw-deep-gold)]/40 bg-[color:var(--wtw-deep-gold)]/10 p-4 text-sm">
             <p className="font-bold">
               {summary.flagged.length === 1
-                ? "One resource was flagged"
-                : `${summary.flagged.length} resources were flagged`}
+                ? "One program was paused"
+                : `${summary.flagged.length} programs were paused`}
             </p>
             <p className="mt-1 text-muted-foreground">
-              A second veteran couldn&rsquo;t reach them inside two months.
-              They&rsquo;re held back from matching until somebody confirms
-              they&rsquo;re still running.
+              Two veterans could not reach them in two months. We stop
+              suggesting them until someone checks they are still open.
             </p>
             <ul className="mt-2 space-y-1">
               {summary.flagged.map((resource) => (
@@ -121,7 +120,7 @@ export function FollowUpForm({
             href="/outreach"
             className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
           >
-            Back to the queue
+            Back to the list
           </Link>
           <Link
             href={`/veterans/${veteranId}`}
@@ -149,6 +148,10 @@ export function FollowUpForm({
               >
                 {resource.resourceName}
               </Link>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Ask: &ldquo;Did you contact {resource.resourceName}? What
+              happened?&rdquo;
             </p>
 
             <div className="flex flex-wrap gap-2">
@@ -195,9 +198,8 @@ export function FollowUpForm({
       </ul>
 
       <p className="text-xs text-muted-foreground">
-        Leave anything you couldn&rsquo;t ask about blank — only what you
-        answered gets recorded. Submitting closes {veteranName} out of the
-        queue.
+        Skip any you could not ask about. Only the answers you pick are
+        saved. After you save, {veteranName} leaves the follow-up list.
       </p>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -210,7 +212,7 @@ export function FollowUpForm({
         >
           {saving
             ? "Recording…"
-            : `Record ${answered.length || ""} and close out`.replace("  ", " ")}
+            : `Save ${answered.length || ""} answers`.replace("  ", " ")}
         </button>
         <Link
           href="/outreach"

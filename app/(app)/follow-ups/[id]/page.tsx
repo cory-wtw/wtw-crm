@@ -34,7 +34,7 @@ export default async function FollowUpPage({
           </h1>
           <p className="text-sm text-muted-foreground">
             {referral
-              ? `Packet sent ${formatDate(referral.occurredAt)}. Ask about each one.`
+              ? `Programs sent ${formatDate(referral.occurredAt)}. Ask them about each one below.`
               : "No referral packet on this record."}
           </p>
         </div>
@@ -42,18 +42,17 @@ export default async function FollowUpPage({
           href="/outreach"
           className="text-sm font-bold text-muted-foreground hover:text-foreground"
         >
-          Back to the queue
+          Back to the list
         </Link>
       </div>
 
       {!referral || referral.referrals.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-10 text-center">
           <p className="text-sm font-bold">
-            There&rsquo;s no referral packet to follow up on.
+            There are no sent programs to follow up on.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            The concierge status says a packet went out, but the timeline
-            doesn&rsquo;t have one. Check{" "}
+            The record says programs were sent, but none are saved. Check{" "}
             <Link
               href={`/veterans/${veteran.id}`}
               className="font-bold underline-offset-4 hover:underline"

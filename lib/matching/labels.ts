@@ -24,7 +24,7 @@ export const GATE_FAILURE_LABELS: Record<GateFailure, string> = {
   "not-crisis-capable": "No same-day intake",
   geography: "Outside their service area",
   locality: "Outside their city or county",
-  discharge: "Discharge doesn't meet their floor",
+  discharge: "Their discharge type does not qualify",
   "va-enrollment": "Requires VA enrollment",
   "valid-id": "Requires a valid ID",
   era: "Restricted to other service eras",

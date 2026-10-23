@@ -184,12 +184,12 @@ export function IntakeResults({
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-black tracking-tight">
-            Referral recorded for {veteranName}
+            Saved for {veteranName}
           </h2>
           <p className="text-sm text-muted-foreground">
-            It&rsquo;s on their timeline. Follow-up is due{" "}
-            {formatDate(referral.followUpDue)}. Nothing has been sent — copy
-            the text below into your own email and send it yourself.
+            Nothing has been sent yet. Copy the text below and send it to
+            them yourself (email or text). Check back with them on{" "}
+            {formatDate(referral.followUpDue)}.
           </p>
         </div>
 
@@ -237,7 +237,7 @@ export function IntakeResults({
               onClick={copyText}
               className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
-              {copied ? "Copied" : "Copy to clipboard"}
+              {copied ? "Copied" : "Copy text"}
             </button>
           </div>
           <pre className="mobile-touch-scroll overflow-x-auto whitespace-pre-wrap rounded-lg border border-border bg-card p-4 text-sm">
@@ -265,13 +265,13 @@ export function IntakeResults({
         <div>
           <h2 className="text-xl font-black tracking-tight">
             {result.candidates.length === 0
-              ? "Nothing cleared the gates"
-              : `${result.candidates.length} for ${veteranName}`}
+              ? "No programs match"
+              : `${result.candidates.length} programs match ${veteranName}`}
           </h2>
           <p className="text-sm text-muted-foreground">
             {result.crisis
-              ? "Same-day options only. Everything else waits until they're safe."
-              : `Ranked from ${result.consideredCount} resources in the directory. Pick ${PACKET_SIZE}.`}
+              ? "Same-day help only. Everything else waits until they are safe."
+              : `Best match first. Tick up to ${PACKET_SIZE} to send them.`}
           </p>
         </div>
         <button
@@ -295,17 +295,17 @@ export function IntakeResults({
 
       {result.claimsLane && (
         <div className="rounded-lg border border-border bg-card p-4 text-sm">
-          <p className="font-bold">Claims lane</p>
+          <p className="font-bold">VA disability claim</p>
           <p className="mt-1 text-muted-foreground">
-            They&rsquo;ve never filed, or they&rsquo;re not sure. Hand this to
-            an accredited VSO —{" "}
+            They don&rsquo;t get VA disability now, or they&rsquo;re not sure.
+            Connect them with a VA-accredited helper —{" "}
             <Link
               href="/vsos"
               className="font-bold underline-offset-4 hover:underline"
             >
-              the rolodex is here
+              see the VSO list
             </Link>
-            . We don&rsquo;t assess the claim.
+            . We do not judge their claim.
           </p>
         </div>
       )}
@@ -313,11 +313,11 @@ export function IntakeResults({
       {result.candidates.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-10 text-center">
           <p className="text-sm font-bold">
-            No resource in the directory clears every gate.
+            No program fits all of their answers.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Check the excluded list below — a wrong gate value on one record is
-            the usual cause.
+            Open &ldquo;Everything else&rdquo; below to see why. Often one
+            program has a wrong setting.
           </p>
         </div>
       ) : (
@@ -355,7 +355,7 @@ export function IntakeResults({
                   {r.organizationName}
                 </label>
                 <span className="text-xs text-muted-foreground">
-                  Gated out: {failureText(r) || "—"}
+                  Did not fit: {failureText(r) || "—"}
                 </span>
               </li>
             ))}
@@ -407,7 +407,7 @@ export function IntakeResults({
                       </Link>
                       <p className="text-xs text-muted-foreground">
                         {r.failures.length === 0
-                          ? "Passed the gates but ranked below the short list"
+                          ? "Fits, but ranked lower"
                           : failureText(r)}
                       </p>
                     </div>
@@ -436,7 +436,7 @@ export function IntakeResults({
             {selected.length > PACKET_SIZE && (
               <span className="text-muted-foreground">
                 {" "}
-                · a packet is usually {PACKET_SIZE}
+                · usually send {PACKET_SIZE}
               </span>
             )}
           </p>
@@ -452,7 +452,7 @@ export function IntakeResults({
             >
               {approving
                 ? "Recording…"
-                : `Approve ${selected.length || ""} and write the referral`.replace(
+                : `Save ${selected.length || ""} and make the message`.replace(
                     "  ",
                     " ",
                   )}

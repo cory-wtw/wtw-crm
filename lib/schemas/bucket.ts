@@ -54,26 +54,26 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
  */
 export const BUCKET_PROMPTS: Record<Bucket, string> = {
   crisis:
-    "Is tonight the problem? Nowhere safe to sleep, or you're in danger, or you're in a bad place mentally right now.",
+    "Do you need help right now? No safe place to sleep tonight, in danger, or feeling very bad.",
   housing:
-    "Do you need somewhere to live, or are you about to lose where you're at?",
+    "Do you need a place to live, or could you lose your home soon?",
   essentials:
-    "Do you need help with food, clothes, hygiene stuff, or anything for the house?",
+    "Do you need help with food, clothes, soap and toilet items, or things for your home?",
   health:
-    "Do you need to see a doctor or a dentist? Includes getting signed up with the VA if you never did.",
+    "Do you need to see a doctor or a dentist? This includes signing up for VA health care.",
   mental:
-    "Would you like somebody to talk to? Counseling, PTSD, drinking or using, or just another veteran who gets it.",
+    "Do you need someone to talk to? Counseling, PTSD, alcohol or drugs, or another veteran to talk with.",
   claims:
     "Do you need help filing a VA disability claim, or appealing one that got turned down?",
   income:
-    "Do you need help with money coming in? Social Security, food stamps, the light bill or the rent, or debt.",
-  work: "Do you need help finding work, going back to school, getting a certification, or starting something of your own?",
+    "Do you need help with money? Social Security, food stamps (SNAP), paying bills or rent, or debt.",
+  work: "Do you need help finding a job, going to school, getting a certificate, or starting a business?",
   legal:
     "Do you need help replacing your ID or your DD-214, getting a discharge upgrade, or with a court date?",
   family:
-    "Do you need help with anybody depending on you, or with getting care for yourself? Kids, a spouse, an aging parent.",
+    "Do you need help caring for your family, or getting care for yourself? Kids, a spouse, an older parent.",
   transport:
-    "Do you need help getting around or staying reachable? A ride, a bus pass, a phone, internet.",
+    "Do you need help getting around, or a way for people to reach you? A ride, a bus pass, a phone, internet.",
 };
 
 /**
