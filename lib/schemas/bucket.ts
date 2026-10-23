@@ -47,28 +47,33 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
  * What the staff member says out loud during intake. These are the checkbox
  * labels on the intake form — the bucket name means nothing to a veteran, the
  * question does.
+ *
+ * Every prompt asks whether they need help, so a "yes" always means tick the
+ * box. Never phrase one as "do you have X?" — there a yes means they're fine,
+ * and staff end up ticking the things the veteran doesn't need.
  */
 export const BUCKET_PROMPTS: Record<Bucket, string> = {
   crisis:
-    "Is tonight the problem? Nowhere safe to sleep, or you're in danger, or you're in a bad place mentally right now.",
+    "Do you need help right now? No safe place to sleep tonight, in danger, or feeling very bad.",
   housing:
-    "Do you need somewhere to live, or are you about to lose where you're at?",
-  essentials: "Food, clothes, hygiene stuff, anything for the house.",
+    "Do you need a place to live, or could you lose your home soon?",
+  essentials:
+    "Do you need help with food, clothes, soap and toilet items, or things for your home?",
   health:
-    "Do you need to see a doctor or a dentist? Includes getting signed up with the VA if you never did.",
+    "Do you need to see a doctor or a dentist? This includes signing up for VA health care.",
   mental:
-    "Somebody to talk to. Counseling, PTSD, drinking or using, or just another veteran who gets it.",
+    "Do you need someone to talk to? Counseling, PTSD, alcohol or drugs, or another veteran to talk with.",
   claims:
-    "Have you ever filed for disability with the VA? If you haven't, or you filed and got turned down, that's a yes.",
+    "Do you need help filing a VA disability claim, or appealing one that got turned down?",
   income:
-    "Money coming in. Social Security, food stamps, help with the light bill or the rent, somebody to help with debt.",
-  work: "Looking for work, going back to school, getting a certification, or starting something of your own.",
+    "Do you need help with money? Social Security, food stamps (SNAP), paying bills or rent, or debt.",
+  work: "Do you need help finding a job, going to school, getting a certificate, or starting a business?",
   legal:
-    "Do you have a valid ID? Do you have your DD-214? Anything with a discharge upgrade or a court date also goes here.",
+    "Do you need help replacing your ID or your DD-214, getting a discharge upgrade, or with a court date?",
   family:
-    "Anybody depending on you, or anybody taking care of you. Kids, a spouse, an aging parent.",
+    "Do you need help caring for your family, or getting care for yourself? Kids, a spouse, an older parent.",
   transport:
-    "How you get around and how people reach you. A ride, a bus pass, a phone, internet.",
+    "Do you need help getting around, or a way for people to reach you? A ride, a bus pass, a phone, internet.",
 };
 
 /**

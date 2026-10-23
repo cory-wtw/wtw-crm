@@ -45,14 +45,14 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
     setError(null);
     const occurred = new Date(values.occurredAt);
     if (Number.isNaN(occurred.getTime())) {
-      setError("Invalid occurred-at date.");
+      setError("Please enter a valid date.");
       return;
     }
     const due = values.nextStepDueAt
       ? new Date(values.nextStepDueAt)
       : null;
     if (due && Number.isNaN(due.getTime())) {
-      setError("Invalid next-step due date.");
+      setError("Please enter a valid date for the next step.");
       return;
     }
 
@@ -87,7 +87,7 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
         onClick={() => setExpanded(true)}
         className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
       >
-        Log encounter
+        Log contact
       </button>
     );
   }
@@ -98,7 +98,7 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
       className="space-y-4 rounded-lg border border-border bg-background p-4"
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Occurred at" required error={errors.occurredAt?.message}>
+        <Field label="Date" required error={errors.occurredAt?.message}>
           <Input type="date" {...register("occurredAt")} />
         </Field>
         <Field label="Location">
@@ -120,10 +120,10 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
         <Field label="Next step">
           <Input
             {...register("nextStep")}
-            placeholder="What's the follow-up?"
+            placeholder="What needs to happen next?"
           />
         </Field>
-        <Field label="Next step due">
+        <Field label="Next step by">
           <Input type="date" {...register("nextStepDueAt")} />
         </Field>
       </div>
@@ -134,7 +134,7 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
           disabled={isSubmitting || isPending}
           className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
-          {isSubmitting || isPending ? "Saving…" : "Save encounter"}
+          {isSubmitting || isPending ? "Saving…" : "Save"}
         </button>
         <button
           type="button"

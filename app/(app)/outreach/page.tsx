@@ -62,7 +62,7 @@ function QueueSection({
           <p className="mt-1 text-xs text-muted-foreground">
             {upcoming === 0
               ? emptyMessage
-              : `${upcoming} more still inside the window.`}
+              : `${upcoming} more, not due yet.`}
           </p>
         </div>
       ) : (
@@ -109,7 +109,7 @@ function QueueSection({
           </ul>
           {upcoming > 0 && (
             <p className="text-xs text-muted-foreground">
-              {upcoming} more still inside the window.
+              {upcoming} more, not due yet.
             </p>
           )}
         </>
@@ -141,7 +141,7 @@ export default async function OutreachPage() {
       badge: hasFiled(veteran.pipelineStage) ? "Monthly · filed" : "Weekly · not filed",
       due,
       actionHref: `/veterans/${veteran.id}`,
-      actionLabel: "Log check-in",
+      actionLabel: "Log contact",
     }));
   const checkInsUpcoming = cadenceActive.length - checkInRows.length;
 
@@ -158,7 +158,7 @@ export default async function OutreachPage() {
       name: formatShortName(veteran.firstName, veteran.lastInitial),
       due: veteran.followUpDue!,
       actionHref: `/follow-ups/${veteran.id}`,
-      actionLabel: "Record outcomes",
+      actionLabel: "Ask how it went",
     }));
   const followUpsUpcoming = veterans.filter(
     (v) =>
@@ -174,14 +174,14 @@ export default async function OutreachPage() {
           Outreach
         </h1>
         <p className="text-sm text-muted-foreground">
-          Two queues: the standing check-in cadence, and the two-week read on
-          referrals.
+          People to contact today: regular check-ins, and follow-ups on
+          programs we sent them.
         </p>
       </div>
 
       <QueueSection
         title="Check-ins"
-        description="Once a week until they file, once a month after. Nobody goes quiet waiting on a claim."
+        description="Contact them once a week until they file a claim, then once a month."
         now={now}
         rows={checkInRows}
         upcoming={checkInsUpcoming}
@@ -190,7 +190,7 @@ export default async function OutreachPage() {
 
       <QueueSection
         title="Referral follow-ups"
-        description="Two weeks after a packet goes out, we ask how it went. What they say is the only way we find out a number is dead."
+        description="Two weeks after we send programs, ask how it went. This is how we learn if a program's phone number no longer works."
         now={now}
         rows={followUpRows}
         upcoming={followUpsUpcoming}

@@ -28,7 +28,7 @@ export const encounterTypeSchema = z.enum(ENCOUNTER_TYPES);
 export type EncounterType = z.infer<typeof encounterTypeSchema>;
 
 export const ENCOUNTER_TYPE_LABELS: Record<EncounterType, string> = {
-  note: "Encounter",
+  note: "Contact",
   intake: "Intake",
   referral: "Referral",
   followUp: "Follow-up",
@@ -89,11 +89,11 @@ export const followUpOutcomeSchema = z.enum(FOLLOW_UP_OUTCOMES);
 export type FollowUpOutcome = z.infer<typeof followUpOutcomeSchema>;
 
 export const FOLLOW_UP_OUTCOME_LABELS: Record<FollowUpOutcome, string> = {
-  reached: "Got through",
+  reached: "They reached them",
   unreachable: "Couldn't reach them",
   ineligible: "Turned away — didn't qualify",
   declined: "Veteran decided not to",
-  helped: "They helped",
+  helped: "They got help",
 };
 
 export const followUpResultSchema = z.object({

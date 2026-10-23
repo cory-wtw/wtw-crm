@@ -116,7 +116,7 @@ export default async function VeteranDetailPage({
               href={`/veterans/${veteran.id}/intake`}
               className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
-              Run intake
+              Start intake
             </Link>
           )}
           {canEdit && (
@@ -154,14 +154,14 @@ export default async function VeteranDetailPage({
           }
         />
         <Row
-          label="Assignee"
+          label="Assigned to"
           value={
             assignee ? (assignee.displayName ?? assignee.email) : "Unassigned"
           }
         />
       </Card>
 
-      <Details title="Eligibility keys">
+      <Details title="Basic details">
         <Row
           label="Discharge"
           value={
@@ -190,7 +190,7 @@ export default async function VeteranDetailPage({
         />
       </Details>
 
-      <Card title="Concierge">
+      <Card title="Programs sent">
         <Row
           label="Status"
           value={
@@ -202,7 +202,7 @@ export default async function VeteranDetailPage({
         <Row label="Follow-up due" value={formatDate(veteran.followUpDue)} />
       </Card>
 
-      <Card title="Pipeline">
+      <Card title="Claim progress">
         <Row label="Stage" value={PIPELINE_LABELS[veteran.pipelineStage]} />
         <Row label="Date found" value={formatDate(veteran.dateFound)} />
         <Row label="Date connected" value={formatDate(veteran.dateConnected)} />
@@ -265,7 +265,7 @@ export default async function VeteranDetailPage({
         )}
       </Details>
 
-      <Details title="Pipeline history">
+      <Details title="Claim progress history">
         {veteran.pipelineHistory.length === 0 ? (
           <p className="text-sm text-muted-foreground">No history yet.</p>
         ) : (
@@ -307,7 +307,7 @@ export default async function VeteranDetailPage({
       <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
-            Encounters ({encounters.length})
+            Contact history ({encounters.length})
           </h2>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {claimGuide && <SendClaimGuideButton send={claimGuide} />}
@@ -326,7 +326,7 @@ export default async function VeteranDetailPage({
         </div>
         {encounters.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No encounters logged yet. Tap &ldquo;Log encounter&rdquo; above.
+            Nothing logged yet. Tap &ldquo;Log contact&rdquo; above.
           </p>
         ) : (
           <ol className="space-y-4">

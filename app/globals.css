@@ -17,6 +17,22 @@
   }
 }
 
+/* Keyboard users need to see where they are. Browsers hide the default ring
+   on many styled controls, so draw one everywhere. */
+:focus-visible {
+  outline: 3px solid var(--wtw-deep-gold);
+  outline-offset: 2px;
+}
+
+/* Default checkboxes and radios are about 13px — too small to hit on a phone
+   or to see at a glance. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
 /* 2. Long unbroken strings (emails, URLs, IMEIs) shouldn't force horizontal
       page scroll on narrow screens. */
 body {
@@ -38,7 +54,9 @@ body {
   --wtw-near-black: #1d1912;
   --wtw-brand-gold: #d2a63c;
   --wtw-gold-light: #eecd5c;
-  --wtw-deep-gold: #bb8525;
+  /* Darkened from the brand #bb8525, which is only 2.9:1 on cream. This is
+     used for small heading text, so it needs 4.5:1 (WCAG AA). */
+  --wtw-deep-gold: #8f6316;
 
   --background: var(--wtw-cream);
   --foreground: var(--wtw-near-black);
@@ -70,6 +88,7 @@ body {
 }
 
 .dark {
+  --wtw-deep-gold: #bb8525;
   --background: var(--wtw-near-black);
   --foreground: var(--wtw-cream);
   --card: #2a251a;
