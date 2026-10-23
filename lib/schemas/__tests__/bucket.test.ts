@@ -26,6 +26,13 @@ describe("buckets", () => {
     }
   });
 
+  it("phrases every prompt so a yes means tick the box", () => {
+    // "Do you have a valid ID?" got ticked for veterans who were fine.
+    for (const code of BUCKET_CODES) {
+      expect(BUCKET_PROMPTS[code]).not.toMatch(/^(Do|Have) you (have|ever)\b/);
+    }
+  });
+
   it("parses a known code and rejects an unknown one", () => {
     expect(bucketSchema.safeParse("housing").success).toBe(true);
     expect(bucketSchema.safeParse("hosuing").success).toBe(false);

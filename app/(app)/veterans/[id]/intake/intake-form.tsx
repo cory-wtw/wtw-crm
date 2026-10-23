@@ -58,6 +58,10 @@ type Props = {
 const NEEDS_LEAD_IN =
   "I'm going to run through a short list of things we help with. Some won't apply. Just say yes or no as I go, and if you're not sure, say that and we'll come back to it.";
 
+/** The rule for the boxes, shown above them so nobody has to infer it. */
+const NEEDS_RULE =
+  "Tick only what they need help with. Leave a box empty if they're fine on it.";
+
 export function IntakeForm({
   veteranId,
   veteranName,
@@ -197,7 +201,7 @@ export function IntakeForm({
 
         {inCrisis && <CrisisLine />}
 
-        <Question prompt="Have you ever filed for disability with the VA? If you haven't, or you filed and got turned down, that's a yes for us.">
+        <Question prompt="Are you getting VA disability benefits right now?">
           <Radios
             name="receivingVaBenefits"
             register={register}
@@ -229,6 +233,9 @@ export function IntakeForm({
                 answers, and the earlier run stays on the record as it was.
               </p>
             )}
+            <p className="rounded-md border-l-4 border-[color:var(--wtw-brand-gold)] bg-primary/10 p-3 text-sm font-bold md:col-span-2">
+              {NEEDS_RULE}
+            </p>
             <div className="space-y-2 md:col-span-2">
               {BUCKET_CODES.map((code) => (
                 <label
