@@ -375,6 +375,17 @@ describe("scoreLink", () => {
       scoreLink({ url: "https://x.org/eligibility-requirements", text: "" }),
     ).toBeGreaterThan(0);
   });
+  it("ignores the host, so a penalty word in the domain doesn't sink every link", () => {
+    expect(
+      scoreLink({
+        url: "https://volunteerbehavioralhealth.org/contact-us",
+        text: "Contact Us",
+      }),
+    ).toBeGreaterThan(0);
+    expect(
+      scoreLink({ url: "https://x.org/volunteer", text: "Get involved" }),
+    ).toBe(0);
+  });
 });
 
 describe("rankLinks", () => {

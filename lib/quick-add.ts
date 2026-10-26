@@ -80,32 +80,17 @@ export function splitPaste(raw: string): { url: string | null; text: string } {
 const FOLLOW_PATTERN =
   /contact|reach us|phone|services|programs?|what we (do|offer)|eligib|qualif|who (we serve|is eligible)|requirements|get help|how to (get|apply)|\bapply\b/i;
 
-/** The link minus its host, which is the same for every link on the site. */
-function pathOnly(link: PageLink): PageLink {
-  try {
-    const parsed = new URL(link.url);
-    return { url: `${parsed.pathname}${parsed.search}`, text: link.text };
-  } catch {
-    return link;
-  }
-}
-
 /**
  * Up to two linked pages worth reading: contact, services, or eligibility.
  * Same-site only — extractLinks already enforces that.
- *
- * Scored on the path, not the full URL: the host is on every link, and a
- * domain like volunteerbehavioralhealth.org trips the "volunteer" penalty on
- * all of them.
  */
 export function pickFollowLinks(
   links: PageLink[],
   limit = FOLLOW_LINK_LIMIT,
 ): string[] {
   return links
-    .map((link) => ({ link, local: pathOnly(link) }))
-    .filter(({ local }) => FOLLOW_PATTERN.test(`${local.text} ${local.url}`))
-    .map(({ link, local }) => ({ url: link.url, score: scoreLink(local) }))
+    .filter((link) => FOLLOW_PATTERN.test(`${link.text} ${link.url}`))
+    .map((link) => ({ url: link.url, score: scoreLink(link) }))
     .filter((link) => link.score > 0)
     .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url))
     .slice(0, limit)

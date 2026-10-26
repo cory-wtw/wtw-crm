@@ -36,8 +36,8 @@ import { adminDb } from "@/lib/firebase/admin";
 import { findByExternalId } from "@/lib/external-id";
 import { resourceInputSchema, type ResourceInput } from "@/lib/schemas";
 
-/** Named in the build request, not chosen here. */
-export const ENRICH_MODEL = "claude-sonnet-4-6";
+/** The newest model. Quick add (lib/quick-add-runner.ts) uses the same one. */
+export const ENRICH_MODEL = "claude-opus-5-5";
 export const ENRICH_SOURCE = "ai-enrich";
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_TOKENS = 16_000;
@@ -235,10 +235,15 @@ export async function proposeFromPageText(
   let raw: string;
   try {
     const client = new Anthropic();
-    const message = await client.messages.create({
+    const message = await client.beta.messages.create({
       model: ENRICH_MODEL,
       max_tokens: MAX_TOKENS,
       thinking: { type: "adaptive" },
+      output_config: { effort: "medium" },
+      // On a safety decline, rerun on a model the API picks rather than
+      // losing the organization.
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
       system: ENRICH_SYSTEM_PROMPT,
       messages: [
         {

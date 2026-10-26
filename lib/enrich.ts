@@ -396,9 +396,29 @@ const LINK_SIGNALS: { pattern: RegExp; weight: number }[] = [
 const LINK_PENALTIES =
   /privacy|terms|cookie|accessibility|sitemap|donate|volunteer|news|blog|press|events|careers|jobs|shop|store|login|sign ?in|search|espanol|español/i;
 
+/**
+ * The part of a link that says what's behind it. The host is the same on every
+ * link a crawl sees, so it can only add noise — volunteerbehavioralhealth.org
+ * tripped the "volunteer" penalty on every one of its pages.
+ */
+function linkPath(url: string): string {
+  let path = url;
+  try {
+    const parsed = new URL(url);
+    path = `${parsed.pathname}${parsed.search}`;
+  } catch {
+    // Not absolute; score it as given.
+  }
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 /** How likely this link leads to a page that answers a gate. 0 means skip it. */
 export function scoreLink(link: PageLink): number {
-  const haystack = `${link.text} ${decodeURIComponent(link.url)}`;
+  const haystack = `${link.text} ${linkPath(link.url)}`;
   if (LINK_PENALTIES.test(haystack)) return 0;
 
   let score = 0;
