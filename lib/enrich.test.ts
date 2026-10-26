@@ -7,6 +7,7 @@ import {
   scoreLink,
   htmlToText,
   isBlockedHost,
+  isPrivateAddress,
   MAX_PAGE_CHARS,
   normalizeUrl,
   parseProposal,
@@ -215,6 +216,31 @@ describe("normalizeUrl", () => {
   });
 });
 
+describe("isPrivateAddress", () => {
+  it("catches private, link-local, and loopback addresses a name resolves to", () => {
+    for (const ip of [
+      "169.254.169.254",
+      "10.1.2.3",
+      "127.0.0.1",
+      "172.20.0.1",
+      "192.168.0.10",
+      "100.64.0.1",
+      "::1",
+      "::ffff:169.254.169.254",
+      "fd12::1",
+      "fe80::1",
+    ]) {
+      expect(isPrivateAddress(ip)).toBe(true);
+    }
+  });
+
+  it("lets public addresses through", () => {
+    for (const ip of ["93.184.216.34", "2606:2800:220:1::1", "172.32.0.1"]) {
+      expect(isPrivateAddress(ip)).toBe(false);
+    }
+  });
+});
+
 describe("isBlockedHost", () => {
   it("blocks the cloud metadata endpoint", () => {
     // On Cloud Run this would put instance credentials into a model prompt.
@@ -237,6 +263,8 @@ describe("isBlockedHost", () => {
 
   it("blocks bare IP literals generally", () => {
     expect(isBlockedHost("8.8.8.8")).toBe(true);
+    expect(isBlockedHost("[::ffff:a9fe:a9fe]")).toBe(true);
+    expect(isBlockedHost("fd00::1")).toBe(true);
   });
 
   it("allows ordinary hostnames", () => {

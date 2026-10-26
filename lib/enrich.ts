@@ -215,6 +215,9 @@ export function isBlockedHost(hostname: string): boolean {
     return true;
   }
   if (host === "::1" || host === "0.0.0.0") return true;
+  // Any IPv6 literal, including ::ffff:169.254.169.254 dressed up as one. No
+  // legitimate resource is reached by a bare address.
+  if (host.includes(":")) return true;
 
   const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
   if (!ipv4) return false;
@@ -224,6 +227,38 @@ export function isBlockedHost(hostname: string): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true;
   if (a === 192 && b === 168) return true;
   return true; // any other bare IPv4 literal: no legitimate resource is one
+}
+
+/**
+ * An address a hostname resolved to that a server-side fetch must not reach.
+ *
+ * isBlockedHost only sees the name in the link. A public-looking name can
+ * resolve to 169.254.169.254 or 10.x, so the resolved addresses are checked
+ * too, before any request goes out.
+ */
+export function isPrivateAddress(address: string): boolean {
+  let ip = address.toLowerCase().replace(/^\[|\]$/g, "");
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(ip);
+  if (mapped) ip = mapped[1];
+
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (ipv4) {
+    const [a, b] = ipv4.slice(1).map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) || // carrier-grade NAT
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224 // multicast and reserved
+    );
+  }
+
+  if (ip === "::" || ip === "::1") return true;
+  if (ip.startsWith("::ffff:")) return true; // mapped, in a form not parsed above
+  return /^(f[cd]|fe[89ab])/.test(ip); // unique-local and link-local
 }
 
 /** Split a pasted block into normalized, de-duplicated URLs. */

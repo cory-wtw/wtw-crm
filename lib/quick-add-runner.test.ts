@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/firebase/admin", () => ({ adminDb: {} }));
 
+// Every test host resolves to a public address unless a test says otherwise.
+const lookup = vi.fn(async () => [{ address: "93.184.216.34", family: 4 }]);
+vi.mock("node:dns/promises", () => ({ lookup }));
+
 const create = vi.fn();
 vi.mock("@anthropic-ai/sdk", () => {
   class APIError extends Error {
@@ -151,6 +155,14 @@ describe("draftFromPaste", () => {
     });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("won't fetch a public name that resolves to a private address", async () => {
+    lookup.mockResolvedValueOnce([{ address: "169.254.169.254", family: 4 }]);
+    const { draftFromPaste } = await import("./quick-add-runner");
+    const outcome = await draftFromPaste("https://sneaky.example/page");
+    expect(outcome.ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("drafts from pasted text when there's no link, without fetching", async () => {

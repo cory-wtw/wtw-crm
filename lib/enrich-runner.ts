@@ -15,6 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import Anthropic from "@anthropic-ai/sdk";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import {
@@ -23,6 +24,7 @@ import {
   extractLinks,
   htmlToText,
   isBlockedHost,
+  isPrivateAddress,
   normalizeUrl,
   parseProposal,
   proposalToInput,
@@ -159,6 +161,20 @@ export type EnrichOutcome =
 const MAX_REDIRECTS = 5;
 
 /**
+ * Whether a hostname resolves to an address we must not reach. A name that
+ * doesn't resolve is left to fetch, which fails it as unreachable.
+ */
+async function resolvesPrivate(hostname: string): Promise<boolean> {
+  let addresses: { address: string }[];
+  try {
+    addresses = await lookup(hostname, { all: true });
+  } catch {
+    return false;
+  }
+  return addresses.some(({ address }) => isPrivateAddress(address));
+}
+
+/**
  * Fetch a page as readable text plus its raw HTML, refusing hosts a server must
  * not be aimed at.
  *
@@ -183,7 +199,8 @@ export async function fetchPage(
       const target = new URL(current);
       if (
         (target.protocol !== "http:" && target.protocol !== "https:") ||
-        isBlockedHost(target.hostname)
+        isBlockedHost(target.hostname) ||
+        (await resolvesPrivate(target.hostname))
       ) {
         return {
           ok: false,
