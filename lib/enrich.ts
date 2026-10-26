@@ -401,7 +401,7 @@ const LINK_PENALTIES =
  * link a crawl sees, so it can only add noise — volunteerbehavioralhealth.org
  * tripped the "volunteer" penalty on every one of its pages.
  */
-function linkPath(url: string): string {
+export function linkPath(url: string): string {
   let path = url;
   try {
     const parsed = new URL(url);

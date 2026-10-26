@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,12 +28,14 @@ import {
 } from "@/lib/schemas";
 import {
   draftKeyFor,
+  possibleDuplicates,
   type DraftKey,
   type DraftValues,
+  type DuplicateCandidate,
   type PossibleDuplicate,
 } from "@/lib/quick-add";
 import { createResourceAction, editResourceAction } from "./actions";
-import { checkDuplicatesAction } from "./quick-add-actions";
+import { listDuplicateCandidatesAction } from "./quick-add-actions";
 
 // Text inputs are strings so empty values are easy to detect and are coerced
 // at submit, per the existing *-form.tsx convention. Checkbox groups and
@@ -113,7 +115,7 @@ export function ResourceForm({ initial, draft }: Props) {
   const [unchecked, setUnchecked] = useState<Set<DraftKey>>(
     () => new Set(draft?.filled ?? []),
   );
-  const [duplicates, setDuplicates] = useState<PossibleDuplicate[]>([]);
+  const [candidates, setCandidates] = useState<DuplicateCandidate[]>([]);
 
   const {
     register,
@@ -187,27 +189,29 @@ export function ResourceForm({ initial, draft }: Props) {
   useEffect(() => {
     if (initial) return;
     let cancelled = false;
-    const timer = setTimeout(async () => {
-      if (!nameValue?.trim() && !phoneValue?.trim() && !websiteValue?.trim()) {
-        setDuplicates([]);
-        return;
-      }
-      try {
-        const found = await checkDuplicatesAction({
+    listDuplicateCandidatesAction()
+      .then((found) => {
+        if (!cancelled) setCandidates(found);
+      })
+      .catch(() => {
+        // The check is a courtesy; a failure must not get in the way of saving.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initial]);
+  const duplicates: PossibleDuplicate[] = useMemo(
+    () =>
+      possibleDuplicates(
+        {
           organizationName: nameValue,
           contactPhone: phoneValue,
           website: websiteValue,
-        });
-        if (!cancelled) setDuplicates(found);
-      } catch {
-        // The check is a courtesy; a failure must not get in the way of saving.
-      }
-    }, 600);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [initial, nameValue, phoneValue, websiteValue]);
+        },
+        candidates,
+      ),
+    [candidates, nameValue, phoneValue, websiteValue],
+  );
 
   const geoScope = watch("geoScope");
   const accessMethod = watch("accessMethod");

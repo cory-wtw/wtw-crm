@@ -3,11 +3,7 @@
 import { listResources } from "@/lib/db/resources";
 import { getSession } from "@/lib/firebase/session";
 import { canAccessCrm } from "@/lib/permissions";
-import {
-  MAX_PASTE_CHARS,
-  possibleDuplicates,
-  type PossibleDuplicate,
-} from "@/lib/quick-add";
+import { MAX_PASTE_CHARS, type DuplicateCandidate } from "@/lib/quick-add";
 import { draftFromPaste, type QuickAddResult } from "@/lib/quick-add-runner";
 
 async function requireCrm() {
@@ -38,22 +34,20 @@ export async function draftResourceAction(
   return draftFromPaste(paste);
 }
 
-/** Existing records that look like the one being entered. */
-export async function checkDuplicatesAction(entry: {
-  organizationName?: string;
-  contactPhone?: string;
-  website?: string;
-}): Promise<PossibleDuplicate[]> {
+/**
+ * What the duplicate check compares against: name, phone, and website of
+ * every record. Read once when the form opens and matched in the browser, so
+ * typing a name doesn't re-read the whole roster on every pause.
+ */
+export async function listDuplicateCandidatesAction(): Promise<DuplicateCandidate[]> {
   const guard = await requireCrm();
   if (!guard.ok) return [];
 
   const resources = await listResources();
-  return possibleDuplicates(
-    {
-      organizationName: entry.organizationName?.slice(0, 300),
-      contactPhone: entry.contactPhone?.slice(0, 300),
-      website: entry.website?.slice(0, 500),
-    },
-    resources,
-  );
+  return resources.map((r) => ({
+    id: r.id,
+    organizationName: r.organizationName,
+    contactPhone: r.contactPhone ?? null,
+    website: r.website ?? null,
+  }));
 }

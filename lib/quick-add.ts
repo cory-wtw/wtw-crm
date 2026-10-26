@@ -14,7 +14,7 @@
  */
 
 import { format } from "date-fns";
-import { normalizeUrl, scoreLink, type PageLink } from "@/lib/enrich";
+import { linkPath, normalizeUrl, scoreLink, type PageLink } from "@/lib/enrich";
 import {
   ACCESS_METHOD_LABELS,
   ACCESS_METHODS,
@@ -89,7 +89,7 @@ export function pickFollowLinks(
   limit = FOLLOW_LINK_LIMIT,
 ): string[] {
   return links
-    .filter((link) => FOLLOW_PATTERN.test(`${link.text} ${link.url}`))
+    .filter((link) => FOLLOW_PATTERN.test(`${link.text} ${linkPath(link.url)}`))
     .map((link) => ({ url: link.url, score: scoreLink(link) }))
     .filter((link) => link.score > 0)
     .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url))
@@ -206,11 +206,16 @@ function lookup<T extends string>(
   value: string,
   aliases: Record<string, T> = {},
 ): T | null {
-  const wanted = clean(value);
+  // Compare whole and with any trailing note stripped, on both sides: the
+  // label "Pre-9/11 (other)" has a parenthetical of its own.
+  const wanted = [value.trim().toLowerCase(), clean(value)];
   for (const code of codes) {
-    if (code === wanted || labels[code].toLowerCase() === wanted) return code;
+    const label = labels[code].toLowerCase();
+    if (wanted.some((w) => w === code || w === label || w === clean(label))) {
+      return code;
+    }
   }
-  return aliases[wanted] ?? null;
+  return aliases[wanted[0]] ?? aliases[wanted[1]] ?? null;
 }
 
 function asText(value: unknown): string | undefined {
@@ -329,10 +334,17 @@ export function draftToForm(raw: unknown, sourceName: string): Draft {
       filled.add("geoScope");
     }
   }
+  // States only mean something under a statewide or local scope. Without one
+  // the form sits at National, where the field is hidden — so a state list
+  // with no scope is named rather than filled in where nobody would see it.
   const states = asList(record.states).map((s) => s.toUpperCase());
-  if (states.length > 0 && values.geoScope !== "national") {
-    values.geoStates = states.join(", ");
-    filled.add("geoStates");
+  if (states.length > 0) {
+    if (values.geoScope === "state" || values.geoScope === "local") {
+      values.geoStates = states.join(", ");
+      filled.add("geoStates");
+    } else if (!values.geoScope) {
+      notes.push(`Source names states (${states.join(", ")}) but no service area — set the area, then the states.`);
+    }
   }
   const localities = asList(record.localities);
   if (localities.length > 0 && values.geoScope === "local") {
@@ -428,7 +440,7 @@ export function couldNotFind(values: DraftValues): string[] {
     missing.push("Phone");
   }
   if (!values.eligibility && !values.eligibilityNotes) missing.push("Eligibility");
-  if (!values.geoScope) missing.push("Counties served");
+  if (!values.geoScope) missing.push("Service area");
   else if (values.geoScope !== "national" && !values.geoStates) {
     missing.push("States served");
   }

@@ -100,6 +100,59 @@ describe("draftFromPaste", () => {
     expect(result.missing).toEqual(["Eligibility"]);
   });
 
+  it("follows same-site links from where a redirect landed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "https://example.org/help") {
+          return new Response(null, {
+            status: 301,
+            headers: { location: "https://www.example.org/help" },
+          });
+        }
+        if (url === "https://www.example.org/help") {
+          return new Response(
+            `<p>${filler}</p><a href="https://www.example.org/contact">Contact</a>`,
+            { headers: { "content-type": "text/html" } },
+          );
+        }
+        if (url === "https://www.example.org/contact") {
+          return new Response(`<p>${filler}</p>`, {
+            headers: { "content-type": "text/html" },
+          });
+        }
+        return new Response("", { status: 404 });
+      }),
+    );
+    const { draftFromPaste } = await import("./quick-add-runner");
+    const outcome = await draftFromPaste("https://example.org/help");
+    if (!outcome.ok) throw new Error(outcome.error);
+    expect(outcome.result.pagesRead).toEqual([
+      "https://example.org/help",
+      "https://www.example.org/contact",
+    ]);
+  });
+
+  it("won't follow a redirect to a private address", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: "http://169.254.169.254/computeMetadata/v1/" },
+        }),
+      ),
+    );
+    const { draftFromPaste } = await import("./quick-add-runner");
+    const outcome = await draftFromPaste("https://example.org/r");
+    expect(outcome).toEqual({
+      ok: false,
+      error: "Couldn't read that link: That host isn't reachable from here, by design.",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("drafts from pasted text when there's no link, without fetching", async () => {
     const { draftFromPaste } = await import("./quick-add-runner");
     const outcome = await draftFromPaste("Homeless help in Walker County GA. Call 423-486-5278.");

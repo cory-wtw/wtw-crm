@@ -48,6 +48,17 @@ describe("pickFollowLinks", () => {
     expect(picked).toEqual(["https://x.org/eligibility", "https://x.org/services"]);
   });
 
+  it("ignores the host, which every link shares", () => {
+    expect(
+      pickFollowLinks([{ url: "https://veteranservices.org/about", text: "About" }]),
+    ).toEqual([]);
+    expect(
+      pickFollowLinks([
+        { url: "https://volunteerbehavioralhealth.org/contact-us", text: "Contact Us" },
+      ]),
+    ).toEqual(["https://volunteerbehavioralhealth.org/contact-us"]);
+  });
+
   it("skips pages that aren't about contact, services, or eligibility", () => {
     expect(
       pickFollowLinks([{ url: "https://x.org/about", text: "About" }]),
@@ -157,6 +168,19 @@ describe("draftToForm", () => {
     );
   });
 
+  it("matches a label that has a parenthetical of its own", () => {
+    const draft = draftToForm({ eras: ["Pre-9/11 (other)"] }, SOURCE);
+    expect(draft.values.eraRestriction).toEqual(["pre911"]);
+    expect(draft.notes).toEqual([]);
+  });
+
+  it("names states it can't place instead of hiding them under National", () => {
+    const draft = draftToForm({ states: ["TN"] }, SOURCE);
+    expect(draft.values.geoStates).toBeUndefined();
+    expect(draft.filled).not.toContain("geoStates");
+    expect(draft.notes).toHaveLength(1);
+  });
+
   it("never takes status or source from the model", () => {
     const draft = draftToForm({ status: "Live", source: "made up" }, SOURCE);
     expect(draft.values.verificationStatus).toBe("flagged");
@@ -179,6 +203,12 @@ describe("couldNotFind", () => {
       "Phone",
       "Eligibility",
       "Counties served",
+    ]);
+  });
+
+  it("asks for the service area, not counties, when there's no area", () => {
+    expect(couldNotFind({ contactPhone: "1", eligibility: "x", buckets: ["housing"] })).toEqual([
+      "Service area",
     ]);
   });
 

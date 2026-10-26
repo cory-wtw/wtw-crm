@@ -8,8 +8,9 @@ import { ResourceForm } from "../resource-form";
 /**
  * The Add Resource form, pre-filled from a Quick add draft when there is one.
  *
- * The draft is read once and then removed, so a reload or a second visit is a
- * blank form rather than a stale draft somebody already dealt with.
+ * The draft is left in storage rather than removed on read: Strict Mode runs
+ * this effect twice, and a read-then-delete loses the draft on the second run.
+ * The next Quick add overwrites it, and it goes when the tab closes.
  */
 export function DraftReview({ fromDraft }: { fromDraft: boolean }) {
   const [draft, setDraft] = useState<QuickAddResult | null | undefined>(
@@ -22,7 +23,6 @@ export function DraftReview({ fromDraft }: { fromDraft: boolean }) {
     try {
       const raw = sessionStorage.getItem(QUICK_ADD_STORAGE_KEY);
       if (raw) stored = JSON.parse(raw) as QuickAddResult;
-      sessionStorage.removeItem(QUICK_ADD_STORAGE_KEY);
     } catch {
       stored = null;
     }
