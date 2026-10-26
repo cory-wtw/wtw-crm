@@ -1,12 +1,17 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
-import { ResourceForm } from "../resource-form";
+import { DraftReview } from "./draft-review";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewResourcePage() {
+export default async function NewResourcePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ draft?: string }>;
+}) {
   const session = await getSession();
   if (!session) notFound();
+  const { draft } = await searchParams;
 
   return (
     <div className="space-y-6">
@@ -19,7 +24,7 @@ export default async function NewResourcePage() {
           now.
         </p>
       </div>
-      <ResourceForm />
+      <DraftReview fromDraft={draft === "1"} />
     </div>
   );
 }

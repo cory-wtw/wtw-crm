@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/firebase/session";
 import { listResources } from "@/lib/db/resources";
 import { classificationGaps } from "@/lib/schemas";
+import { QuickAdd } from "./quick-add";
 import { ResourcesTable } from "./resources-table";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,8 @@ export default async function ResourcesPage() {
           </div>
         )}
       </div>
+
+      {canEdit && <QuickAdd />}
 
       {canEdit && unmatchable > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color:var(--wtw-deep-gold)]/40 bg-[color:var(--wtw-deep-gold)]/10 p-4">
