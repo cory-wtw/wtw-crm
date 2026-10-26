@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -25,7 +26,16 @@ import {
   VERIFICATION_STATUS_LABELS,
   VERIFICATION_STATUSES,
 } from "@/lib/schemas";
+import {
+  draftKeyFor,
+  possibleDuplicates,
+  type DraftKey,
+  type DraftValues,
+  type DuplicateCandidate,
+  type PossibleDuplicate,
+} from "@/lib/quick-add";
 import { createResourceAction, editResourceAction } from "./actions";
+import { listDuplicateCandidatesAction } from "./quick-add-actions";
 
 // Text inputs are strings so empty values are easy to detect and are coerced
 // at submit, per the existing *-form.tsx convention. Checkbox groups and
@@ -76,6 +86,8 @@ export type ResourceFormInitial = {
 
 type Props = {
   initial?: ResourceFormInitial | null;
+  /** A Quick add draft: values to start from, and which ones to highlight. */
+  draft?: { values: DraftValues; filled: DraftKey[] } | null;
 };
 
 /** "TN, GA , al" -> ["TN", "GA", "AL"] */
@@ -94,10 +106,16 @@ const ACCESS_VALUE_LABEL: Record<FormValues["accessMethod"], string> = {
   referral: "Who has to refer them",
 };
 
-export function ResourceForm({ initial }: Props) {
+export function ResourceForm({ initial, draft }: Props) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Drafted fields nobody has looked at yet. Editing one, or saying it looks
+  // right, takes it off the list.
+  const [unchecked, setUnchecked] = useState<Set<DraftKey>>(
+    () => new Set(draft?.filled ?? []),
+  );
+  const [candidates, setCandidates] = useState<DuplicateCandidate[]>([]);
 
   const {
     register,
@@ -137,8 +155,63 @@ export function ResourceForm({ initial }: Props) {
       fragility: "stable",
       sourceName: "",
       ...initial?.values,
+      ...draft?.values,
     },
   });
+
+  function confirmField(key: DraftKey) {
+    setUnchecked((current) => {
+      if (!current.has(key)) return current;
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  }
+  const mark = (key: DraftKey) => ({
+    drafted: unchecked.has(key),
+    onConfirm: () => confirmField(key),
+  });
+
+  useEffect(() => {
+    const subscription = watch((_, { name, type }) => {
+      if (type !== "change" || !name) return;
+      const key = draftKeyFor(name);
+      if (key) confirmField(key);
+    });
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
+  // Possible duplicates, for new records only. A warning, never a block — two
+  // offices of one org can legitimately share a website.
+  const nameValue = watch("organizationName");
+  const phoneValue = watch("contactPhone");
+  const websiteValue = watch("website");
+  useEffect(() => {
+    if (initial) return;
+    let cancelled = false;
+    listDuplicateCandidatesAction()
+      .then((found) => {
+        if (!cancelled) setCandidates(found);
+      })
+      .catch(() => {
+        // The check is a courtesy; a failure must not get in the way of saving.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initial]);
+  const duplicates: PossibleDuplicate[] = useMemo(
+    () =>
+      possibleDuplicates(
+        {
+          organizationName: nameValue,
+          contactPhone: phoneValue,
+          website: websiteValue,
+        },
+        candidates,
+      ),
+    [candidates, nameValue, phoneValue, websiteValue],
+  );
 
   const geoScope = watch("geoScope");
   const accessMethod = watch("accessMethod");
@@ -201,40 +274,41 @@ export function ResourceForm({ initial }: Props) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
+      <DuplicateWarning duplicates={duplicates} />
       <Section title="Organization">
         <Field
-          label="Organization name"
+          label="Organization name" {...mark("organizationName")}
           required
           error={errors.organizationName?.message}
         >
           <Input {...register("organizationName")} autoFocus />
         </Field>
         <Field
-          label="Parent organization"
+          label="Parent organization" {...mark("parentOrg")}
           hint="The national body or health system this one sits under, if any."
         >
           <Input {...register("parentOrg")} />
         </Field>
-        <Field label="Website" hint="e.g. https://example.org">
+        <Field label="Website" {...mark("website")} hint="e.g. https://example.org">
           <Input {...register("website")} />
         </Field>
       </Section>
 
       <Section title="Contact">
-        <Field label="Contact name">
+        <Field label="Contact name" {...mark("contactName")}>
           <Input {...register("contactName")} />
         </Field>
-        <Field label="Phone">
+        <Field label="Phone" {...mark("contactPhone")}>
           <Input {...register("contactPhone")} />
         </Field>
-        <Field label="Email" error={errors.contactEmail?.message}>
+        <Field label="Email" {...mark("contactEmail")} error={errors.contactEmail?.message}>
           <Input type="email" {...register("contactEmail")} />
         </Field>
       </Section>
 
       <Section title="Details">
         <Field
-          label="What they help with"
+          label="What they help with" {...mark("helpsWith")}
           hint="One plain line for the veteran's email — 'Help with rent and keeping your home.' Not who they are; what they'll do for you. No he/she."
           error={errors.helpsWith?.message}
           full
@@ -242,7 +316,7 @@ export function ResourceForm({ initial }: Props) {
           <Input {...register("helpsWith")} placeholder="Help finding work and job training." />
         </Field>
         <Field
-          label="Primary service(s) offered"
+          label="Primary service(s) offered" {...mark("services")}
           hint="What this org actually provides — e.g. 'rent assistance, utility help, food pantry'."
           full
         >
@@ -253,7 +327,7 @@ export function ResourceForm({ initial }: Props) {
           />
         </Field>
         <Field
-          label="Description of organization"
+          label="Description of organization" {...mark("description")}
           hint="A short summary of who they are and what they do."
           full
         >
@@ -264,7 +338,7 @@ export function ResourceForm({ initial }: Props) {
           />
         </Field>
         <Field
-          label="Eligibility requirements"
+          label="Eligibility requirements" {...mark("eligibility")}
           hint="Who qualifies — income limits, residency, veteran status, etc. Free text, for a human to read. The gates below are what filtering actually uses."
           full
         >
@@ -278,7 +352,7 @@ export function ResourceForm({ initial }: Props) {
 
       <Section title="Needs served">
         <Field
-          label="Buckets"
+          label="Buckets" {...mark("buckets")}
           hint="Check every need this org can actually help with. A resource with no buckets checked will never be suggested for anyone."
           full
         >
@@ -300,7 +374,7 @@ export function ResourceForm({ initial }: Props) {
 
       <Section title="Who they'll take">
         <Field
-          label="Service area"
+          label="Service area" {...mark("geoScope")}
           hint="How wide their coverage is."
         >
           <Select {...register("geoScope")}>
@@ -314,6 +388,7 @@ export function ResourceForm({ initial }: Props) {
         {needsStates ? (
           <Field
             label="States served"
+            {...mark("geoStates")}
             required
             hint="Two-letter codes, comma separated — e.g. TN, GA, AL. Required once the area is narrower than national."
           >
@@ -328,7 +403,7 @@ export function ResourceForm({ initial }: Props) {
         )}
         {needsLocalities && (
           <Field
-            label="Cities or counties served"
+            label="Cities or counties served" {...mark("geoLocalities")}
             required
             hint="Comma separated — e.g. Chattanooga, East Ridge. A veteran's city is matched against this list, so name the cities, not just the county."
             full
@@ -341,7 +416,7 @@ export function ResourceForm({ initial }: Props) {
         )}
 
         <Field
-          label="Eligibility notes"
+          label="Eligibility notes" {...mark("eligibilityNotes")}
           hint="Eligibility the checkboxes can't hold — combat theater service, military sexual trauma, and the like. Shown to staff and included in the referral; it never filters anything."
           full
           error={errors.eligibilityNotes?.message}
@@ -349,7 +424,7 @@ export function ResourceForm({ initial }: Props) {
           <Textarea {...register("eligibilityNotes")} rows={3} />
         </Field>
         <Field
-          label="Minimum discharge accepted"
+          label="Minimum discharge accepted" {...mark("minDischarge")}
           hint="Inclusive upward. Vet Centers and most crisis services accept any discharge — check before restricting this."
         >
           <Select {...register("minDischarge")}>
@@ -362,7 +437,7 @@ export function ResourceForm({ initial }: Props) {
         </Field>
 
         <Field
-          label="Era restriction"
+          label="Era restriction" {...mark("eraRestriction")}
           hint="Leave all unchecked unless the org genuinely turns away other eras."
         >
           <div className="grid gap-2 rounded-md border border-input bg-background p-3">
@@ -381,7 +456,7 @@ export function ResourceForm({ initial }: Props) {
         </Field>
 
         <Field
-          label="Only serves"
+          label="Only serves" {...mark("populationRestriction")}
           hint="Check only when the org takes nobody else — an MST line or HUD-VASH. It is offered only when staff marks the veteran as in that group at intake."
         >
           <div className="grid gap-2 rounded-md border border-input bg-background p-3">
@@ -400,7 +475,7 @@ export function ResourceForm({ initial }: Props) {
         </Field>
 
         <Field
-          label="Requirements"
+          label="Requirements" {...mark("requirements")}
           hint="Only check what the org actually enforces — each one of these hides the resource from veterans who don't meet it."
           full
         >
@@ -442,7 +517,7 @@ export function ResourceForm({ initial }: Props) {
       </Section>
 
       <Section title="How to start">
-        <Field label="Access method">
+        <Field label="Access method" {...mark("accessMethod")}>
           <Select {...register("accessMethod")}>
             {ACCESS_METHODS.map((method) => (
               <option key={method} value={method}>
@@ -453,12 +528,13 @@ export function ResourceForm({ initial }: Props) {
         </Field>
         <Field
           label={ACCESS_VALUE_LABEL[accessMethod]}
+          {...mark("accessValue")}
           hint="What a veteran does first — this goes in the referral they receive."
         >
           <Input {...register("accessValue")} />
         </Field>
         <Field
-          label="What to bring"
+          label="What to bring" {...mark("whatToBring")}
           hint="Documents or items they should have with them."
           full
         >
@@ -467,7 +543,7 @@ export function ResourceForm({ initial }: Props) {
             placeholder="DD-214, photo ID, proof of address"
           />
         </Field>
-        <Field label="Typical wait">
+        <Field label="Typical wait" {...mark("typicalWait")}>
           <Select {...register("typicalWait")}>
             {TYPICAL_WAITS.map((wait) => (
               <option key={wait} value={wait}>
@@ -492,7 +568,7 @@ export function ResourceForm({ initial }: Props) {
           </Select>
         </Field>
         <Field
-          label="Fragility"
+          label="Fragility" {...mark("fragility")}
           hint="Fragile = small, single-site, or grant-dependent. Those get re-checked more often."
         >
           <Select {...register("fragility")}>
@@ -504,13 +580,15 @@ export function ResourceForm({ initial }: Props) {
           </Select>
         </Field>
         <Field
-          label="Source"
+          label="Source" {...mark("sourceName")}
           hint="Where this record came from — a grant list, their website, a phone call."
           full
         >
           <Input {...register("sourceName")} placeholder="SSVF grantee list" />
         </Field>
       </Section>
+
+      <DuplicateWarning duplicates={duplicates} />
 
       {serverError && (
         <p className="text-sm text-destructive">{serverError}</p>
@@ -559,12 +637,40 @@ function Section({
   );
 }
 
+function DuplicateWarning({ duplicates }: { duplicates: PossibleDuplicate[] }) {
+  if (duplicates.length === 0) return null;
+  return (
+    <div className="space-y-1 rounded-md border border-[color:var(--wtw-deep-gold)]/50 bg-[color:var(--wtw-deep-gold)]/10 p-3 text-sm">
+      {duplicates.map((dup) => (
+        <p key={dup.id}>
+          <span className="font-bold">Possible duplicate of </span>
+          <Link
+            href={`/resources/${dup.id}`}
+            target="_blank"
+            className="font-bold underline"
+          >
+            {dup.organizationName}
+          </Link>{" "}
+          <span className="text-xs text-muted-foreground">
+            ({dup.reasons.join(", ")})
+          </span>
+        </p>
+      ))}
+      <p className="text-xs text-muted-foreground">
+        You can still save — check it isn&rsquo;t already in the roster.
+      </p>
+    </div>
+  );
+}
+
 function Field({
   label,
   hint,
   error,
   required,
   full,
+  drafted,
+  onConfirm,
   children,
 }: {
   label: string;
@@ -572,15 +678,35 @@ function Field({
   error?: string;
   required?: boolean;
   full?: boolean;
+  /** Filled by a Quick add draft and not checked yet. */
+  drafted?: boolean;
+  onConfirm?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <div className={`space-y-1.5 ${full ? "md:col-span-2" : ""}`}>
+    <div
+      className={`space-y-1.5 ${full ? "md:col-span-2" : ""} ${
+        drafted
+          ? "-m-2 rounded-md bg-[color:var(--wtw-brand-gold)]/25 p-2"
+          : ""
+      }`}
+    >
       {label && (
-        <label className="block text-sm font-bold">
-          {label}
-          {required && <span className="text-destructive"> *</span>}
-        </label>
+        <div className="flex items-baseline justify-between gap-2">
+          <label className="block text-sm font-bold">
+            {label}
+            {required && <span className="text-destructive"> *</span>}
+          </label>
+          {drafted && onConfirm && (
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="shrink-0 text-xs font-bold text-[color:var(--wtw-deep-gold)] hover:underline"
+            >
+              Looks right
+            </button>
+          )}
+        </div>
       )}
       {children}
       {hint && !error && (

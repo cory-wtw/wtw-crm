@@ -215,6 +215,9 @@ export function isBlockedHost(hostname: string): boolean {
     return true;
   }
   if (host === "::1" || host === "0.0.0.0") return true;
+  // Any IPv6 literal, including ::ffff:169.254.169.254 dressed up as one. No
+  // legitimate resource is reached by a bare address.
+  if (host.includes(":")) return true;
 
   const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
   if (!ipv4) return false;
@@ -224,6 +227,38 @@ export function isBlockedHost(hostname: string): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true;
   if (a === 192 && b === 168) return true;
   return true; // any other bare IPv4 literal: no legitimate resource is one
+}
+
+/**
+ * An address a hostname resolved to that a server-side fetch must not reach.
+ *
+ * isBlockedHost only sees the name in the link. A public-looking name can
+ * resolve to 169.254.169.254 or 10.x, so the resolved addresses are checked
+ * too, before any request goes out.
+ */
+export function isPrivateAddress(address: string): boolean {
+  let ip = address.toLowerCase().replace(/^\[|\]$/g, "");
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(ip);
+  if (mapped) ip = mapped[1];
+
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (ipv4) {
+    const [a, b] = ipv4.slice(1).map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) || // carrier-grade NAT
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224 // multicast and reserved
+    );
+  }
+
+  if (ip === "::" || ip === "::1") return true;
+  if (ip.startsWith("::ffff:")) return true; // mapped, in a form not parsed above
+  return /^(f[cd]|fe[89ab])/.test(ip); // unique-local and link-local
 }
 
 /** Split a pasted block into normalized, de-duplicated URLs. */
@@ -396,9 +431,29 @@ const LINK_SIGNALS: { pattern: RegExp; weight: number }[] = [
 const LINK_PENALTIES =
   /privacy|terms|cookie|accessibility|sitemap|donate|volunteer|news|blog|press|events|careers|jobs|shop|store|login|sign ?in|search|espanol|español/i;
 
+/**
+ * The part of a link that says what's behind it. The host is the same on every
+ * link a crawl sees, so it can only add noise — volunteerbehavioralhealth.org
+ * tripped the "volunteer" penalty on every one of its pages.
+ */
+export function linkPath(url: string): string {
+  let path = url;
+  try {
+    const parsed = new URL(url);
+    path = `${parsed.pathname}${parsed.search}`;
+  } catch {
+    // Not absolute; score it as given.
+  }
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 /** How likely this link leads to a page that answers a gate. 0 means skip it. */
 export function scoreLink(link: PageLink): number {
-  const haystack = `${link.text} ${decodeURIComponent(link.url)}`;
+  const haystack = `${link.text} ${linkPath(link.url)}`;
   if (LINK_PENALTIES.test(haystack)) return 0;
 
   let score = 0;

@@ -15,6 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
 import Anthropic from "@anthropic-ai/sdk";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import {
@@ -23,6 +24,7 @@ import {
   extractLinks,
   htmlToText,
   isBlockedHost,
+  isPrivateAddress,
   normalizeUrl,
   parseProposal,
   proposalToInput,
@@ -36,8 +38,8 @@ import { adminDb } from "@/lib/firebase/admin";
 import { findByExternalId } from "@/lib/external-id";
 import { resourceInputSchema, type ResourceInput } from "@/lib/schemas";
 
-/** Named in the build request, not chosen here. */
-export const ENRICH_MODEL = "claude-sonnet-4-6";
+/** The newest model. Quick add (lib/quick-add-runner.ts) uses the same one. */
+export const ENRICH_MODEL = "claude-opus-5-5";
 export const ENRICH_SOURCE = "ai-enrich";
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_TOKENS = 16_000;
@@ -155,36 +157,73 @@ export type EnrichOutcome =
   | { ok: true; result: EnrichedPage }
   | { ok: false; error: string };
 
+/** Redirects followed before giving up on a page. */
+const MAX_REDIRECTS = 5;
+
+/**
+ * Whether a hostname resolves to an address we must not reach. A name that
+ * doesn't resolve is left to fetch, which fails it as unreachable.
+ */
+async function resolvesPrivate(hostname: string): Promise<boolean> {
+  let addresses: { address: string }[];
+  try {
+    addresses = await lookup(hostname, { all: true });
+  } catch {
+    return false;
+  }
+  return addresses.some(({ address }) => isPrivateAddress(address));
+}
+
 /**
  * Fetch a page as readable text plus its raw HTML, refusing hosts a server must
  * not be aimed at.
  *
  * The host check runs here rather than at the entry point, so it covers every
- * fetch in a crawl — a page can link anywhere, including at a redirect that
- * lands on a private address.
+ * fetch in a crawl — a page can link anywhere. Redirects are followed by hand
+ * for the same reason: a public page that 302s to a private address must be
+ * checked at every hop, not just the first.
+ *
+ * `finalUrl` is where the page actually came from after redirects, which is
+ * the base its relative and same-site links resolve against.
  */
 export async function fetchPage(
   url: string,
 ): Promise<
-  { ok: true; text: string; html: string } | { ok: false; error: string }
+  | { ok: true; text: string; html: string; finalUrl: string }
+  | { ok: false; error: string }
 > {
-  if (isBlockedHost(new URL(url).hostname)) {
-    return {
-      ok: false,
-      error: "That host isn't reachable from here, by design.",
-    };
-  }
-
   try {
-    const response = await fetch(url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: {
-        // Say who we are rather than pretending to be a browser.
-        "user-agent": "WorthTheirWeightRoster/1.0 (+resource directory)",
-        accept: "text/html,application/xhtml+xml",
-      },
-    });
+    let current = url;
+    let response: Response | null = null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const target = new URL(current);
+      if (
+        (target.protocol !== "http:" && target.protocol !== "https:") ||
+        isBlockedHost(target.hostname) ||
+        (await resolvesPrivate(target.hostname))
+      ) {
+        return {
+          ok: false,
+          error: "That host isn't reachable from here, by design.",
+        };
+      }
+      response = await fetch(current, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: {
+          // Say who we are rather than pretending to be a browser.
+          "user-agent": "WorthTheirWeightRoster/1.0 (+resource directory)",
+          accept: "text/html,application/xhtml+xml",
+        },
+      });
+      const location = response.headers.get("location");
+      if (response.status < 300 || response.status >= 400 || !location) break;
+      current = new URL(location, current).toString();
+      response = null;
+    }
+    if (!response) {
+      return { ok: false, error: "The page redirected too many times." };
+    }
     if (!response.ok) {
       return { ok: false, error: `The page returned ${response.status}.` };
     }
@@ -202,7 +241,7 @@ export async function fetchPage(
           "There's almost no readable text on that page — it may render client-side.",
       };
     }
-    return { ok: true, text, html };
+    return { ok: true, text, html, finalUrl: current };
   } catch (error) {
     const reason =
       error instanceof Error && error.name === "TimeoutError"
@@ -235,10 +274,15 @@ export async function proposeFromPageText(
   let raw: string;
   try {
     const client = new Anthropic();
-    const message = await client.messages.create({
+    const message = await client.beta.messages.create({
       model: ENRICH_MODEL,
       max_tokens: MAX_TOKENS,
       thinking: { type: "adaptive" },
+      output_config: { effort: "medium" },
+      // On a safety decline, rerun on a model the API picks rather than
+      // losing the organization.
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
       system: ENRICH_SYSTEM_PROMPT,
       messages: [
         {
@@ -313,7 +357,7 @@ export async function enrichUrl(rawUrl: string): Promise<EnrichOutcome> {
 
   // Rank every internal link, keep the best few to read now and the rest as a
   // menu the model can ask from.
-  const allLinks = rankLinks(extractLinks(entry.html, url), 25);
+  const allLinks = rankLinks(extractLinks(entry.html, entry.finalUrl), 25);
   const toFetch = allLinks.slice(0, CRAWL_LIMIT);
 
   const fetched = await mapWithConcurrency(
