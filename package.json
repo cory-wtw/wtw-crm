@@ -1,6 +1,6 @@
 {
   "name": "wtw-crm",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,6 +16,7 @@
     "seed-resources": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/seed-resources.ts",
     "infer-veteran-zips": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/infer-veteran-zips.ts",
     "import-qb-ledger": "tsx --env-file=.env.local --tsconfig=tsconfig.json scripts/import-qb-ledger.ts",
+    "e2e:mcp": "tsx --tsconfig=tsconfig.json scripts/e2e-mcp.ts",
     "deploy-rules": "firebase deploy --only firestore:rules,storage --project=wtw-crm-31aef"
   },
   "dependencies": {

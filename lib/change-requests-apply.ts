@@ -21,6 +21,7 @@ import { Timestamp, type Transaction } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { getResourcesByIds } from "@/lib/db/resources";
 import {
+  noonIfDateOnly,
   buildResourceInput,
   buildTransactionInput,
   driftedFields,
@@ -53,7 +54,7 @@ import { followUpInputSchema, recordFollowUp } from "@/lib/ops/follow-up";
 import { logOutcome } from "@/lib/ops/outcome";
 import { createResource, editResource } from "@/lib/ops/resources";
 import { loadCategory, saveTransaction } from "@/lib/ops/transactions";
-import type { Actor } from "@/lib/ops/actor";
+import type { Actor, OnCommit } from "@/lib/ops/actor";
 import {
   FOLLOW_UP_OUTCOME_LABELS,
   OUTCOME_KIND_INFO,
@@ -69,6 +70,10 @@ import {
 } from "@/lib/schemas";
 
 const COLLECTION = "changeRequests";
+
+/** How long an approval may hold a request in "applying" before another tap
+ *  may take it over. */
+const CLAIM_LEASE_MS = 5 * 60 * 1000;
 
 /** Proposals are stored under this uid plus the admin whose connector sent
  *  them, so the queue and the audit log both say "via Claude". */
@@ -111,8 +116,14 @@ export async function listChangeRequests(
   status?: ChangeRequest["status"],
   limit = 50,
 ): Promise<ChangeRequest[]> {
-  let query: FirebaseFirestore.Query = adminDb.collection(COLLECTION);
-  if (status) query = query.where("status", "==", status);
+  // The full history only ever grows, so without a status it's the newest
+  // `limit`, read in order. The pending queue is small enough to sort here —
+  // which keeps the status filter clear of a composite index.
+  if (!status) {
+    const recent = await adminDb.collection(COLLECTION).orderBy("proposedAt", "desc").limit(limit).get();
+    return recent.docs.map((d) => deserialize(d.id, d.data()));
+  }
+  const query = adminDb.collection(COLLECTION).where("status", "==", status);
   // Sorted here rather than with orderBy so the status filter doesn't need a
   // composite index.
   const snap = await query.get();
@@ -451,9 +462,16 @@ export async function proposeFollowUp(
   if (!referral.exists || referral.data()!.type !== "referral") {
     return { ok: false, error: "referralEncounterId: no such referral on this veteran (see get_veteran → openReferrals)." };
   }
+  if (referral.data()!.followUpCompleted) {
+    return { ok: false, error: "That referral's follow-up is already recorded." };
+  }
   const names = new Map(
     ((referral.data()!.referrals ?? []) as { resourceId: string; resourceName: string }[]).map((r) => [r.resourceId, r.resourceName]),
   );
+  const strangers = parsed.data.outcomes.filter((o) => !names.has(o.resourceId));
+  if (strangers.length > 0) {
+    return { ok: false, error: `Not in that referral: ${strangers.map((o) => o.resourceId).join(", ")}.` };
+  }
   const changes: FieldChanges = Object.fromEntries(
     parsed.data.outcomes.map((o) => [
       names.get(o.resourceId) ?? o.resourceId,
@@ -485,7 +503,8 @@ export async function proposeOutcome(
 ): Promise<ProposeResult> {
   const v = await veteranForPropose(veteranId);
   if (!v.ok) return v;
-  const parsed = outcomeInputSchema.safeParse(input);
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const parsed = outcomeInputSchema.safeParse({ ...raw, achievedAt: noonIfDateOnly(raw.achievedAt) });
   if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
   const o = parsed.data;
   if (o.achievedAt.getTime() > Date.now() + 60 * 60 * 1000) {
@@ -588,11 +607,21 @@ async function resolveVeteranTarget(targetId: string, tx?: Transaction): Promise
   throw new Stale(`The new veteran it was for was ${cr?.status ?? "removed"}.`);
 }
 
+/** JSON with object keys sorted: Firestore doesn't promise to hand a map's
+ *  keys back in the order they were written. */
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, (v as Record<string, unknown>)[k]]))
+      : v,
+  );
+}
+
 /** Same plan the proposal ran, against the record as it is now. The request's
  *  changes must come out identical — anything else means the world moved. */
 function recheck(plan: Plan, expected: FieldChanges): void {
   if (!plan.ok) throw new Blocked(`No longer valid: ${plan.error}`);
-  if (JSON.stringify(plan.changes) !== JSON.stringify(expected)) {
+  if (stableJson(plan.changes) !== stableJson(expected)) {
     throw new Stale("The record no longer matches what this change was built from.");
   }
 }
@@ -645,7 +674,7 @@ async function applyFields(tx: Transaction, cr: ChangeRequest, actor: Actor, now
         dateWon: null,
         dateLost: null,
         vsoIds: after.vsoIds ?? [],
-        assigneeUid: after.assigneeUid ?? actor.uid,
+        assigneeUid: after.assigneeUid ?? null,
         lastContactedAt: now,
         createdBy: actor.uid,
         createdAt: now,
@@ -718,10 +747,13 @@ async function applyFields(tx: Transaction, cr: ChangeRequest, actor: Actor, now
   }
 }
 
-type OpOutcome = { appliedId: string | null; result?: Record<string, unknown> };
-
-/** Throws Stale/Blocked, or returns the op's own error as Blocked. */
-async function applyOp(cr: ChangeRequest, actor: Actor): Promise<OpOutcome> {
+/**
+ * Run the app's own code for a request, as the approving admin. `onCommit`
+ * adds the request's "approved" write to the op's own batch, so the change and
+ * its approval land together or not at all. Throws Stale/Blocked; an op's own
+ * error comes back as Blocked.
+ */
+async function applyOp(cr: ChangeRequest, actor: Actor, onCommit: OnCommit): Promise<void> {
   const payload = cr.payload ?? {};
   const after = afterValues(cr.changes);
   const unwrap = <T extends object>(r: Result<T>): T => {
@@ -732,35 +764,34 @@ async function applyOp(cr: ChangeRequest, actor: Actor): Promise<OpOutcome> {
   switch (cr.kind) {
     case "intake.record": {
       const veteranId = await resolveVeteranTarget(cr.targetId!);
-      const r = unwrap(await recordIntake(actor, veteranId, payload as unknown as IntakeRecord));
-      return { appliedId: r.encounterId };
+      unwrap(await recordIntake(actor, veteranId, payload as unknown as IntakeRecord, onCommit));
+      return;
     }
     case "referral.create": {
       const veteranId = await resolveVeteranTarget(cr.targetId!);
-      const r = unwrap(await createReferral(actor, veteranId, payload)).result;
-      return {
-        appliedId: r.encounterId,
-        result: {
-          veteranId,
-          referralText: r.referralText,
-          followUpDue: r.followUpDue,
-          screenedLines: r.substitutions.length,
-        },
-      };
+      unwrap(await createReferral(actor, veteranId, payload, onCommit));
+      return;
     }
     case "followUp.record": {
-      const r = unwrap(await recordFollowUp(actor, cr.targetId!, payload));
-      return { appliedId: null, result: { flagged: r.summary.flagged } };
+      const referral = await adminDb
+        .collection("veterans").doc(cr.targetId!)
+        .collection("encounters").doc(String(payload.referralEncounterId)).get();
+      if (referral.data()?.followUpCompleted) {
+        throw new Stale("That referral's follow-up has already been recorded.");
+      }
+      unwrap(await recordFollowUp(actor, cr.targetId!, payload, onCommit));
+      return;
     }
     case "outcome.log": {
       const veteranId = await resolveVeteranTarget(cr.targetId!);
-      unwrap(await logOutcome(actor, veteranId, payload));
-      return { appliedId: null };
+      unwrap(await logOutcome(actor, veteranId, payload, onCommit));
+      return;
     }
     case "resource.create": {
       const built = buildResourceInput(null, after);
       if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
-      return { appliedId: unwrap(await createResource(actor, built.input)).id };
+      unwrap(await createResource(actor, built.input, onCommit));
+      return;
     }
     case "resource.update": {
       const snap = await readDoc("resources", cr.targetId!);
@@ -769,13 +800,14 @@ async function applyOp(cr: ChangeRequest, actor: Actor): Promise<OpOutcome> {
       if (drifted.length > 0) throw new Stale(`Changed since proposed: ${drifted.join(", ")}.`);
       const built = buildResourceInput(snap.data()!, after);
       if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
-      unwrap(await editResource(actor, snap.id, built.input));
-      return { appliedId: null };
+      unwrap(await editResource(actor, snap.id, built.input, onCommit));
+      return;
     }
     case "transaction.create": {
       const built = buildTransactionInput(null, after);
       if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
-      return { appliedId: unwrap(await saveTransaction(actor, null, built.input)).id };
+      unwrap(await saveTransaction(actor, null, built.input, onCommit));
+      return;
     }
     case "transaction.update": {
       const snap = await readDoc("transactions", cr.targetId!);
@@ -784,8 +816,8 @@ async function applyOp(cr: ChangeRequest, actor: Actor): Promise<OpOutcome> {
       if (drifted.length > 0) throw new Stale(`Changed since proposed: ${drifted.join(", ")}.`);
       const built = buildTransactionInput(snap.data()!, after);
       if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
-      unwrap(await saveTransaction(actor, snap.id, built.input));
-      return { appliedId: null };
+      unwrap(await saveTransaction(actor, snap.id, built.input, onCommit));
+      return;
     }
     default:
       throw new Error(`${cr.kind} has no operation.`);
@@ -849,10 +881,18 @@ export async function decideChange(
       const snap = await tx.get(ref);
       if (!snap.exists) return { ok: false, error: "Change request not found." };
       const cr = deserialize(snap.id, snap.data()!);
-      if (cr.status !== "pending") return { ok: false, error: `It's already ${cr.status}.` };
       const now = new Date();
+      // A claim nobody finished — the server died mid-approve. The change and
+      // its approval commit together, so nothing was written: free to retry.
+      const abandoned =
+        cr.status === "applying" &&
+        now.getTime() - (tsToDate(snap.data()!.claimedAt)?.getTime() ?? 0) > CLAIM_LEASE_MS;
+      if (cr.status !== "pending" && !abandoned) {
+        return { ok: false, error: cr.status === "applying" ? "It's saving right now." : `It's already ${cr.status}.` };
+      }
 
       if (decision === "reject") {
+        if (cr.status !== "pending") return { ok: false, error: "It's saving right now." };
         tx.update(ref, { status: "rejected", ...decided(now) });
         decisionAudit(tx, id, actor, "rejected", now);
         return { ok: true, status: "rejected", appliedId: null };
@@ -863,7 +903,7 @@ export async function decideChange(
 
       if (!FIELD_KINDS.has(cr.kind)) {
         // Claim it; the op runs outside this transaction.
-        tx.update(ref, { status: "applying" });
+        tx.update(ref, { status: "applying", claimedAt: now });
         return { claimed: cr };
       }
 
@@ -895,46 +935,72 @@ export async function decideChange(
 
   if (!("claimed" in first)) return first;
 
-  // The operations: the app's own code, run as the approving admin.
+  // The operations: the app's own code, run as the approving admin, with the
+  // approval written into the same commit.
   const cr = first.claimed;
+  let appliedId: string | null = null;
   try {
-    const done = await applyOp(cr, actor);
-    const now = new Date();
-    const batch = adminDb.batch();
-    batch.update(ref, {
-      status: "approved",
-      appliedId: done.appliedId,
-      result: done.result ?? null,
-      ...decided(now),
+    await applyOp(cr, actor, (batch, applied) => {
+      const now = new Date();
+      appliedId = applied.id;
+      batch.update(ref, {
+        status: "approved",
+        appliedId: applied.id,
+        result: applied.result ?? null,
+        claimedAt: null,
+        ...decided(now),
+      });
+      decisionAudit(batch, id, actor, "approved", now);
     });
-    decisionAudit(batch, id, actor, "approved", now);
-    await batch.commit();
-    return { ok: true, status: "approved", appliedId: done.appliedId };
+    return { ok: true, status: "approved", appliedId };
   } catch (err) {
+    // Something after the commit can still throw. If the approval landed, the
+    // change did too — say so rather than offering to apply it again.
+    const current = (await ref.get()).data();
+    if (current?.status === "approved") {
+      return { ok: true, status: "approved", appliedId: current.appliedId ?? null };
+    }
     if (err instanceof Stale) {
       await markStale(ref, actor, err.message);
       return { ok: false, status: "stale", error: `${err.message} Marked out of date — nothing was changed.` };
     }
+    // Nothing committed: safe to try again.
     const message = err instanceof Error ? err.message : String(err);
-    await ref.update({ status: "pending", lastError: message });
+    await ref.update({ status: "pending", claimedAt: null, lastError: message });
     return { ok: false, error: err instanceof Blocked ? message : `Didn't save: ${message}` };
   }
 }
 
+/** Proposal order, with a new veteran ahead of anything proposed in the same
+ *  millisecond — its intake and notes can't land before it. */
+export function inApplyOrder(requests: ChangeRequest[]): ChangeRequest[] {
+  const rank = (cr: ChangeRequest) => (cr.kind === "veteran.create" ? 0 : 1);
+  return [...requests].sort(
+    (a, b) => a.proposedAt.getTime() - b.proposedAt.getTime() || rank(a) - rank(b),
+  );
+}
+
 /**
- * Approve everything pending under one call's label, oldest first, stopping
- * at the first one that doesn't save — so a referral never lands for a new
- * veteran whose record didn't.
+ * Approve exactly the requests the admin was shown for one call — by id, so
+ * anything added to the call after the page loaded is never swept in. Refuses
+ * if the call has changed since; stops at the first one that doesn't save, so
+ * a referral never lands for a new veteran whose record didn't.
  */
 export async function approveGroup(
   groupLabel: string,
+  shownIds: string[],
   actor: Actor,
 ): Promise<{ approved: number; stoppedAt: { id: string; error: string } | null }> {
-  const pending = (await listChangeRequests("pending", 500))
-    .filter((cr) => cr.groupLabel === groupLabel)
-    .reverse();
+  const pending = (await listChangeRequests("pending", 500)).filter((cr) => cr.groupLabel === groupLabel);
+  const shown = new Set(shownIds);
+  if (pending.length !== shown.size || pending.some((cr) => !shown.has(cr.id))) {
+    return {
+      approved: 0,
+      stoppedAt: { id: "", error: "This call changed since the page loaded. Refresh and check it again." },
+    };
+  }
   let approved = 0;
-  for (const cr of pending) {
+  for (const cr of inApplyOrder(pending)) {
     const r = await decideChange(cr.id, "approve", actor);
     if (!r.ok) return { approved, stoppedAt: { id: cr.id, error: r.error } };
     approved++;

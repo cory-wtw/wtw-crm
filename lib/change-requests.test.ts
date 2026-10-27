@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  noonIfDateOnly,
+  resourceSnapshot,
   buildResourceInput,
   driftedFields,
   planResourceCreate,
@@ -215,5 +217,23 @@ describe("transactions", () => {
       ok: true,
       changes: { donorName: { before: null, after: "Pat" } },
     });
+  });
+});
+
+describe("review fixes", () => {
+  it("reads a bare date as that day, not the evening before", () => {
+    expect(noonIfDateOnly("2026-10-20")).toBe("2026-10-20T12:00:00Z");
+    expect(noonIfDateOnly("2026-10-20T09:00:00Z")).toBe("2026-10-20T09:00:00Z");
+    const plan = planEncounterCreate({ summary: "x", occurredAt: "2026-10-20" }, new Date("2026-10-27T00:00:00Z"));
+    expect(plan.ok && plan.changes.occurredAt.after).toBe("2026-10-20T12:00:00.000Z");
+  });
+
+  it("sees an unverified 'live' resource as aging, so an edit doesn't re-verify it", () => {
+    const old = { organizationName: "X", verificationStatus: "live", lastVerified: new Date("2025-01-01") };
+    expect(resourceSnapshot(old).verificationStatus).toBe("aging");
+    const built = buildResourceInput(old, { contactPhone: "4235550100" });
+    expect(built.ok && built.input.verificationStatus).toBe("aging");
+    // And marking it live is now a real change Claude can propose.
+    expect(planResourceUpdate(old, { verificationStatus: "live" }).ok).toBe(true);
   });
 });

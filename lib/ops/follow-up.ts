@@ -26,7 +26,7 @@ import {
   type VeteranOutcome,
 } from "@/lib/schemas";
 import { stageVerification } from "@/lib/verifications";
-import type { Actor } from "./actor";
+import type { Actor, OnCommit } from "./actor";
 
 function tsToDate(value: unknown): Date | null {
   if (!value) return null;
@@ -86,6 +86,7 @@ export async function recordFollowUp(
   actor: Actor,
   veteranId: string,
   rawInput: unknown,
+  onCommit?: OnCommit,
 ): Promise<
   { ok: true; summary: FollowUpSummary } | { ok: false; error: string }
 > {
@@ -114,6 +115,11 @@ export async function recordFollowUp(
   const referralSnap = await referralRef.get();
   if (!referralSnap.exists) {
     return { ok: false, error: "That referral is no longer on the record." };
+  }
+  // Once per packet: a second recording would double the wins and could flag
+  // a resource on one veteran's say-so.
+  if (referralSnap.data()!.followUpCompleted) {
+    return { ok: false, error: "This referral's follow-up is already recorded." };
   }
 
   const now = new Date();
@@ -257,6 +263,7 @@ export async function recordFollowUp(
     updatedAt: now,
   });
 
+  onCommit?.(batch, { id: encounterRef.id, result: { flagged } });
   await batch.commit();
 
   await logAudit({

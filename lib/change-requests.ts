@@ -11,6 +11,8 @@
 import { computeDiff } from "./audit-diff";
 import { tidyResource, tidyVeteran } from "./tidy";
 import {
+  derivedVerificationStatus,
+  type VerificationStatus,
   encounterInputSchema,
   resourceInputSchema,
   transactionInputSchema,
@@ -288,12 +290,20 @@ export function planVsoCreate(inputRaw: unknown): Plan {
   return { ok: true, changes: changesFrom({}, after, fields) };
 }
 
+/**
+ * "2026-10-20" alone parses as UTC midnight, which every US time zone shows as
+ * the day before. A bare date means that day, so it's read as noon UTC.
+ */
+export function noonIfDateOnly(value: unknown): unknown {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00Z` : value;
+}
+
 function toDate(value: unknown): Date | undefined | null {
   if (value === undefined) return undefined;
   if (value === null || value === "") return null;
   if (value instanceof Date) return value;
   if (typeof value === "string" || typeof value === "number") {
-    const d = new Date(value);
+    const d = new Date(noonIfDateOnly(value) as string | number);
     return Number.isNaN(d.getTime()) ? new Date(NaN) : d;
   }
   return new Date(NaN);
@@ -350,8 +360,20 @@ function forSchema(merged: Record<string, unknown>): Record<string, unknown> {
   );
 }
 
+/**
+ * The resource as the form shows it — status included. A stored "live" that's
+ * gone 90 days unverified reads as "aging" everywhere, and it has to here too:
+ * otherwise editing a phone number would hand editResource a "live" it reads
+ * as a fresh verification, silently re-stamping the record.
+ */
 export function resourceSnapshot(raw: Record<string, unknown>): Record<string, unknown> {
-  return pick(raw, RESOURCE_FIELDS);
+  const out = pick(raw, RESOURCE_FIELDS);
+  const lastVerified = raw.lastVerified as { toDate?: () => Date } | Date | null | undefined;
+  out.verificationStatus = derivedVerificationStatus(
+    (raw.verificationStatus as VerificationStatus | undefined) ?? "live",
+    lastVerified instanceof Date ? lastVerified : (lastVerified?.toDate?.() ?? null),
+  );
+  return out;
 }
 
 export function transactionSnapshot(raw: Record<string, unknown>): Record<string, unknown> {
@@ -392,6 +414,7 @@ export function buildTransactionInput(
 function planEdit(
   label: string,
   fields: readonly string[],
+  snapshot: (raw: Record<string, unknown>) => Record<string, unknown>,
   raw: Record<string, unknown>,
   patchRaw: unknown,
   build: (raw: Record<string, unknown>, after: Record<string, unknown>) => Built,
@@ -406,7 +429,7 @@ function planEdit(
   }
   const built = build(raw, patch);
   if (!built.ok) return built;
-  const changes = changesFrom(pick(raw, fields), built.input, Object.keys(patch));
+  const changes = changesFrom(snapshot(raw), built.input, Object.keys(patch));
   if (Object.keys(changes).length === 0) {
     return { ok: false, error: "That's already what the record says." };
   }
@@ -431,11 +454,11 @@ function planNew(
 }
 
 export const planResourceUpdate = (raw: Record<string, unknown>, patch: unknown) =>
-  planEdit("resource", RESOURCE_FIELDS, raw, patch, buildResourceInput);
+  planEdit("resource", RESOURCE_FIELDS, resourceSnapshot, raw, patch, buildResourceInput);
 export const planResourceCreate = (input: unknown) =>
   planNew("resource", RESOURCE_FIELDS, input, buildResourceInput);
 export const planTransactionUpdate = (raw: Record<string, unknown>, patch: unknown) =>
-  planEdit("transaction", TRANSACTION_FIELDS, raw, patch, buildTransactionInput);
+  planEdit("transaction", TRANSACTION_FIELDS, transactionSnapshot, raw, patch, buildTransactionInput);
 export const planTransactionCreate = (input: unknown) =>
   planNew("transaction", TRANSACTION_FIELDS, input, buildTransactionInput);
 

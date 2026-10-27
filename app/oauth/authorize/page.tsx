@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
+import { formatDate } from "@/lib/format";
 import { getClient } from "@/lib/mcp/oauth";
 import { isAdmin } from "@/lib/permissions";
 import { decideAuthorizeAction } from "./actions";
@@ -99,7 +100,9 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         </button>
       </form>
       <p className="text-xs text-muted-foreground">
-        It will send you back to {new URL(redirectUri).host}.
+        Only allow this if you just started connecting Claude yourself. App
+        registered {client.createdAt ? formatDate(client.createdAt) : "—"} ·
+        it will send you back to {new URL(redirectUri).host}.
       </p>
     </Shell>
   );

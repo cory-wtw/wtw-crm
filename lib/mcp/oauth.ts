@@ -28,7 +28,12 @@ const CODES = "oauthCodes";
 const GRANTS = "oauthGrants";
 const TOKENS = "oauthTokens";
 
-export type OAuthClient = { clientId: string; clientName: string; redirectUris: string[] };
+export type OAuthClient = {
+  clientId: string;
+  clientName: string;
+  redirectUris: string[];
+  createdAt: Date | null;
+};
 
 export type McpUser = { uid: string; email: string; grantId: string };
 
@@ -60,13 +65,14 @@ export async function registerClient(
   if (bad.length > 0) {
     return { ok: false, error: `redirect_uri not allowed: ${bad.join(", ")}` };
   }
+  // Whatever the app calls itself, never a default that borrows Claude's name.
   const clientName =
     typeof b.client_name === "string" && b.client_name.trim()
       ? b.client_name.trim().slice(0, 100)
-      : "Claude";
+      : "Unnamed app";
   const ref = adminDb.collection(CLIENTS).doc();
   await ref.set({ clientName, redirectUris: uris, createdAt: new Date() });
-  return { ok: true, client: { clientId: ref.id, clientName, redirectUris: uris } };
+  return { ok: true, client: { clientId: ref.id, clientName, redirectUris: uris, createdAt: new Date() } };
 }
 
 export async function getClient(clientId: string): Promise<OAuthClient | null> {
@@ -74,7 +80,12 @@ export async function getClient(clientId: string): Promise<OAuthClient | null> {
   const snap = await adminDb.collection(CLIENTS).doc(clientId).get();
   if (!snap.exists) return null;
   const d = snap.data()!;
-  return { clientId, clientName: d.clientName ?? "Claude", redirectUris: d.redirectUris ?? [] };
+  return {
+    clientId,
+    clientName: d.clientName ?? "Unnamed app",
+    redirectUris: d.redirectUris ?? [],
+    createdAt: toDate(d.createdAt),
+  };
 }
 
 /** After the admin taps Allow: a one-time code bound to the client, the
@@ -105,6 +116,7 @@ async function issueTokens(
   tx: FirebaseFirestore.Transaction,
   grantId: string,
   uid: string,
+  previousRefreshHash: string | null = null,
 ): Promise<TokenResponse> {
   const access = newSecret();
   const refresh = newSecret();
@@ -115,6 +127,7 @@ async function issueTokens(
     expiresAt: new Date(now + ACCESS_TOKEN_TTL_S * 1000),
   });
   tx.update(adminDb.collection(GRANTS).doc(grantId), {
+    prevRefreshHash: previousRefreshHash,
     refreshHash: hashSecret(refresh),
     refreshExpiresAt: new Date(now + REFRESH_TOKEN_TTL_S * 1000),
   });
@@ -178,7 +191,18 @@ export async function refreshTokens(input: {
     .where("refreshHash", "==", hashSecret(input.refreshToken))
     .limit(1)
     .get();
-  if (found.empty) return { ok: false, error: "Refresh token is invalid." };
+  if (found.empty) {
+    // A refresh token that was already swapped for a new one is being used
+    // again: one of the two copies is stolen, and there's no telling which.
+    // End the grant (OAuth 2.1 §4.3.1); the admin signs in again.
+    const reused = await adminDb
+      .collection(GRANTS)
+      .where("prevRefreshHash", "==", hashSecret(input.refreshToken))
+      .limit(1)
+      .get();
+    if (!reused.empty) await revokeGrant(reused.docs[0].id);
+    return { ok: false, error: "Refresh token is invalid." };
+  }
   const grantRef = found.docs[0].ref;
 
   return adminDb.runTransaction(async (tx): Promise<Exchange> => {
@@ -196,7 +220,7 @@ export async function refreshTokens(input: {
     if (!user?.active || user.role !== "admin") {
       return { ok: false, error: "This account no longer has admin access." };
     }
-    return { ok: true, tokens: await issueTokens(tx, grantRef.id, g.uid) };
+    return { ok: true, tokens: await issueTokens(tx, grantRef.id, g.uid, g.refreshHash) };
   });
 }
 
@@ -244,5 +268,5 @@ export async function revokeGrant(grantId: string): Promise<void> {
   await adminDb
     .collection(GRANTS)
     .doc(grantId)
-    .update({ revokedAt: new Date(), refreshHash: null });
+    .update({ revokedAt: new Date(), refreshHash: null, prevRefreshHash: null });
 }

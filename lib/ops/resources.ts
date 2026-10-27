@@ -16,7 +16,7 @@ import {
   VERIFICATION_STATUS_LABELS,
 } from "@/lib/schemas";
 import { stageVerification } from "@/lib/verifications";
-import type { Actor } from "./actor";
+import type { Actor, OnCommit } from "./actor";
 
 function dropUndefined<T extends Record<string, unknown>>(
   obj: T,
@@ -42,6 +42,7 @@ function formatIssues(
 export async function createResource(
   actor: Actor,
   rawInput: unknown,
+  onCommit?: OnCommit,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const parsed = resourceInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -86,6 +87,7 @@ export async function createResource(
     );
   }
 
+  onCommit?.(batch, { id: ref.id });
   await batch.commit();
 
   await logAudit({
@@ -101,6 +103,7 @@ export async function editResource(
   actor: Actor,
   id: string,
   rawInput: unknown,
+  onCommit?: OnCommit,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const parsed = resourceInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -175,6 +178,7 @@ export async function editResource(
     );
   }
 
+  onCommit?.(batch, { id: null });
   await batch.commit();
 
   await logAudit({

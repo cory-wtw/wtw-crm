@@ -55,7 +55,7 @@ import {
   type TypicalWait,
   type VerificationStatus,
 } from "@/lib/schemas";
-import type { Actor } from "./actor";
+import type { Actor, OnCommit } from "./actor";
 
 function tsToDate(value: unknown): Date | null {
   if (!value) return null;
@@ -347,6 +347,7 @@ export async function recordIntake(
   actor: Actor,
   veteranId: string,
   record: IntakeRecord,
+  onCommit?: OnCommit,
 ): Promise<{ ok: true; encounterId: string } | { ok: false; error: string }> {
   const docRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await docRef.get();
@@ -408,6 +409,7 @@ export async function recordIntake(
     updatedBy: actor.uid,
     updatedAt: now,
   });
+  onCommit?.(batch, { id: encounterRef.id });
   await batch.commit();
 
   if (eligibilityDiff) {
@@ -476,6 +478,7 @@ export async function createReferral(
   actor: Actor,
   veteranId: string,
   rawInput: unknown,
+  onCommit?: OnCommit,
 ): Promise<
   { ok: true; result: ReferralResult } | { ok: false; error: string }
 > {
@@ -597,6 +600,15 @@ export async function createReferral(
     );
   }
 
+  onCommit?.(batch, {
+    id: encounterRef.id,
+    result: {
+      veteranId,
+      referralText: packet.text,
+      followUpDue: followUpDue.toISOString(),
+      screenedLines: substitutions.length,
+    },
+  });
   await batch.commit();
 
   await logAudit({

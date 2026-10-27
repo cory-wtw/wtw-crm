@@ -3,8 +3,18 @@ import { registerClient } from "@/lib/mcp/oauth";
 
 /** Dynamic client registration. Registering grants nothing — an admin still
  *  has to sign in and tap Allow. */
+/** Anyone can register, so a registration is kept small. */
+const MAX_BODY_BYTES = 10_000;
+
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
+  const text = await request.text();
+  if (text.length > MAX_BODY_BYTES) return oauthError("invalid_client_metadata", "Too large.", 413);
+  let body: unknown = null;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return oauthError("invalid_client_metadata", "Expected JSON.");
+  }
   const result = await registerClient(body);
   if (!result.ok) return oauthError("invalid_redirect_uri", result.error);
   return Response.json(

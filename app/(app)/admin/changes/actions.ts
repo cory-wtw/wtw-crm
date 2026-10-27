@@ -41,12 +41,13 @@ export async function decideChangeAction(
 /** Approve every pending request from one call, oldest first. */
 export async function approveGroupAction(
   groupLabel: string,
+  shownIds: string[],
 ): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
   if (!isAdmin(session)) return { ok: false, error: "Admins only." };
 
-  const { approved, stoppedAt } = await approveGroup(groupLabel, {
+  const { approved, stoppedAt } = await approveGroup(groupLabel, shownIds, {
     uid: session.uid,
     email: session.email ?? session.uid,
   });

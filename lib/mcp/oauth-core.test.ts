@@ -11,11 +11,14 @@ describe("isAllowedRedirectUri", () => {
   });
 
   it("refuses everything else", () => {
+    expect(isAllowedRedirectUri("https://claude.ai/some/other/page")).toBe(false);
+    expect(isAllowedRedirectUri("https://claude.ai/api/mcp/auth_callback?x=1")).toBe(false);
     expect(isAllowedRedirectUri("https://claude.ai.evil.com/cb")).toBe(false);
     expect(isAllowedRedirectUri("http://claude.ai/cb")).toBe(false);
     expect(isAllowedRedirectUri("https://localhost/cb")).toBe(false);
     expect(isAllowedRedirectUri("https://evil.com/cb")).toBe(false);
-    expect(isAllowedRedirectUri("https://claude.ai/cb#x")).toBe(false);
+    expect(isAllowedRedirectUri("https://claude.ai/api/mcp/auth_callback#x")).toBe(false);
+    expect(isAllowedRedirectUri(`http://localhost/${"a".repeat(600)}`)).toBe(false);
     expect(isAllowedRedirectUri("not a url")).toBe(false);
   });
 });

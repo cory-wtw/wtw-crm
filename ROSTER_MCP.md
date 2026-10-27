@@ -44,6 +44,17 @@ attachments, finance records/imports.
 - Note: what Claude reads (records, transcripts) passes through Anthropic,
   and through Plaud if you record calls there.
 
+## Housekeeping (one-time, recommended)
+- In the Google Cloud console → Firestore → TTL, add a policy on field
+  `expiresAt` for collections `oauthTokens` and `oauthCodes`, so expired
+  sign-in tokens delete themselves.
+- Optionally set `APP_ORIGIN=https://<roster-host>` in apphosting.yaml so
+  sign-in links never depend on forwarded headers.
+
+## Testing
+`npm run e2e:mcp` runs the whole flow against the Firestore emulator
+(instructions at the top of scripts/e2e-mcp.ts).
+
 ## Turn it on
 1. Deploy, then run `npm run deploy-rules`.
 2. claude.ai → Settings → Connectors → **Add custom connector** →

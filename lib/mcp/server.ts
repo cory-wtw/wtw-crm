@@ -107,8 +107,12 @@ const GROUP = z
   .optional()
   .describe("Same label on every change from one conversation, e.g. \"Call with Maria G. 10/27\". The admin can review and approve them together, in order.");
 
+/** Firestore ids only: a "/" would walk into another collection. */
+const DOC_ID = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/, "Not a valid id.");
+
 const VETERAN_ID = z
   .string()
+  .regex(/^(pending:)?[A-Za-z0-9_-]{1,128}$/, "Not a valid veteran id.")
   .describe(`A veteran id, or "${PENDING_PREFIX}<change request id>" for a new veteran you proposed in this conversation.`);
 
 const INTAKE_ANSWERS = {
@@ -235,7 +239,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
       title: "Get a veteran",
       description:
         "One veteran's full record, wins, their 15 most recent timeline entries, open referrals awaiting follow-up (with encounter and resource ids), and change requests waiting on them.",
-      inputSchema: { veteranId: z.string() },
+      inputSchema: { veteranId: DOC_ID },
       annotations: { readOnlyHint: true },
     },
     async ({ veteranId }) => {
@@ -298,7 +302,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
       title: "Propose a veteran edit",
       description: `Queue an edit to one veteran. Send only the fields that change. Moving pipelineStage stamps its date and history on approval.\n${VETERAN_FIELD_HELP}`,
       inputSchema: {
-        veteranId: z.string(),
+        veteranId: DOC_ID,
         changes: z.record(z.string(), z.unknown()),
         reason: REASON,
         group: GROUP,
@@ -396,7 +400,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
         veteranId: VETERAN_ID,
         bucketsIdentified: z.array(z.enum(BUCKET_CODES)).describe("The needs they named."),
         referrals: z
-          .array(z.object({ resourceId: z.string(), rank: z.number().int().nonnegative(), score: z.number() }))
+          .array(z.object({ resourceId: DOC_ID, rank: z.number().int().nonnegative(), score: z.number() }))
           .min(1),
         reason: REASON,
         group: GROUP,
@@ -412,12 +416,12 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
       title: "Propose a follow-up",
       description: `Record what came of a referral packet (see get_veteran → openReferrals), one outcome per resource: ${FOLLOW_UP_OUTCOMES.join(" | ")}. For "helped", winKind (${OUTCOME_KINDS.join(", ")}) and amount record the win too. Closes the follow-up on approval.`,
       inputSchema: {
-        veteranId: z.string(),
-        referralEncounterId: z.string(),
+        veteranId: DOC_ID,
+        referralEncounterId: DOC_ID,
         outcomes: z
           .array(
             z.object({
-              resourceId: z.string(),
+              resourceId: DOC_ID,
               outcome: z.enum(FOLLOW_UP_OUTCOMES),
               note: z.string().optional(),
               winKind: z.enum(OUTCOME_KINDS).optional(),
@@ -443,7 +447,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
         kind: z.enum(OUTCOME_KINDS),
         achievedAt: z.string().describe("ISO date it happened."),
         amount: z.number().nonnegative().optional(),
-        resourceId: z.string().optional().describe("The resource that made it happen, if any."),
+        resourceId: DOC_ID.optional().describe("The resource that made it happen, if any."),
         note: z.string().max(500).optional(),
         reason: REASON,
         group: GROUP,
@@ -474,7 +478,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Get a VSO",
       description: "One VSO's full record.",
-      inputSchema: { vsoId: z.string() },
+      inputSchema: { vsoId: DOC_ID },
       annotations: { readOnlyHint: true },
     },
     async ({ vsoId }) => {
@@ -499,7 +503,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Propose a VSO edit",
       description: `Queue an edit to one VSO. Send only the fields that change.\n${VSO_FIELD_HELP}`,
-      inputSchema: { vsoId: z.string(), changes: z.record(z.string(), z.unknown()), reason: REASON, group: GROUP },
+      inputSchema: { vsoId: DOC_ID, changes: z.record(z.string(), z.unknown()), reason: REASON, group: GROUP },
     },
     async ({ vsoId, changes, reason, group }) =>
       queued(await proposeFields(user, { kind: "vso.update", targetId: vsoId, changes }, reason, group)),
@@ -547,7 +551,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Get a community resource",
       description: "One resource's full record.",
-      inputSchema: { resourceId: z.string() },
+      inputSchema: { resourceId: DOC_ID },
       annotations: { readOnlyHint: true },
     },
     async ({ resourceId }) => {
@@ -572,7 +576,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Propose a resource edit",
       description: `Queue an edit to one resource. Send only the fields that change. Moving verificationStatus logs a verification on approval.\n${RESOURCE_FIELD_HELP}`,
-      inputSchema: { resourceId: z.string(), changes: z.record(z.string(), z.unknown()), reason: REASON, group: GROUP },
+      inputSchema: { resourceId: DOC_ID, changes: z.record(z.string(), z.unknown()), reason: REASON, group: GROUP },
     },
     async ({ resourceId, changes, reason, group }) =>
       queued(await proposeFields(user, { kind: "resource.update", targetId: resourceId, changes }, reason, group)),
@@ -637,7 +641,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Propose a transaction edit",
       description: `Queue an edit to one transaction (recategorize, fix an amount, add a donor). Send only the fields that change.\n${TRANSACTION_FIELD_HELP}`,
-      inputSchema: { transactionId: z.string(), changes: z.record(z.string(), z.unknown()), reason: REASON, group: GROUP },
+      inputSchema: { transactionId: DOC_ID, changes: z.record(z.string(), z.unknown()), reason: REASON, group: GROUP },
     },
     async ({ transactionId, changes, reason, group }) =>
       queued(await proposeFields(user, { kind: "transaction.update", targetId: transactionId, changes }, reason, group)),
@@ -671,7 +675,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Get a change request",
       description: "One change request: its changes, status, the reviewer's note — and, for an approved referral, the packet text to send.",
-      inputSchema: { id: z.string() },
+      inputSchema: { id: DOC_ID },
       annotations: { readOnlyHint: true },
     },
     async ({ id }) => {
@@ -685,7 +689,7 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Withdraw a change request",
       description: "Take back a pending proposal that was wrong. It can't be approved after this.",
-      inputSchema: { id: z.string() },
+      inputSchema: { id: DOC_ID },
     },
     async ({ id }) => {
       const result = await withdrawChange(user, id);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listChangeRequests } from "@/lib/change-requests-apply";
+import { inApplyOrder, listChangeRequests } from "@/lib/change-requests-apply";
 import { listGrants } from "@/lib/mcp/oauth";
 import { formatDate } from "@/lib/format";
 import {
@@ -37,7 +37,7 @@ function targetHref(cr: ChangeRequest): string | null {
 function byCall(pending: ChangeRequest[]): { label: string | null; items: ChangeRequest[] }[] {
   const groups = new Map<string, ChangeRequest[]>();
   const loose: { label: null; items: ChangeRequest[] }[] = [];
-  for (const cr of [...pending].reverse()) {
+  for (const cr of inApplyOrder(pending)) {
     if (!cr.groupLabel) loose.push({ label: null, items: [cr] });
     else groups.set(cr.groupLabel, [...(groups.get(cr.groupLabel) ?? []), cr]);
   }
@@ -138,7 +138,7 @@ export default async function ClaudeChangesPage() {
                         primary
                         label={`Approve all ${items.length}`}
                         confirm={`Approve all ${items.length} changes from "${label}", in order?`}
-                        run={approveGroupAction.bind(null, label)}
+                        run={approveGroupAction.bind(null, label, items.map((cr) => cr.id))}
                       />
                     )}
                   </div>

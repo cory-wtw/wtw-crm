@@ -9,7 +9,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
 import { outcomeInputSchema, outcomeAmounts, outcomeSummary } from "@/lib/schemas";
-import type { Actor } from "./actor";
+import type { Actor, OnCommit } from "./actor";
 
 function dropUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Partial<T> = {};
@@ -38,6 +38,7 @@ export async function logOutcome(
   actor: Actor,
   veteranId: string,
   rawInput: unknown,
+  onCommit?: OnCommit,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const parsed = outcomeInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -85,6 +86,7 @@ export async function logOutcome(
     updatedAt: now,
     updatedBy: actor.uid,
   });
+  onCommit?.(batch, { id: outcome.id as string });
   await batch.commit();
 
   await logAudit({

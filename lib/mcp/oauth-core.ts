@@ -12,19 +12,21 @@ export const REFRESH_TOKEN_TTL_S = 30 * 24 * 60 * 60;
 export const AUTH_CODE_TTL_S = 5 * 60;
 
 /**
- * Where a sign-in may send its code back to. Claude's own callback pages, and
- * a local port for Claude Code / Claude Desktop. Anything else is refused at
- * registration, so a look-alike site can't collect a code for someone's
- * account even if they're tricked into approving it.
+ * Where a sign-in may send its code back to: Claude's own connector callback,
+ * exactly, or a local port for Claude Code / Claude Desktop. Anything else is
+ * refused at registration, so a look-alike site can't collect a code for
+ * someone's account even if they're tricked into approving it.
  */
-const ALLOWED_REDIRECTS: { origin?: string; host?: string }[] = [
-  { origin: "https://claude.ai" },
-  { origin: "https://claude.com" },
-  { host: "localhost" },
-  { host: "127.0.0.1" },
-];
+const CLAUDE_CALLBACKS = new Set([
+  "https://claude.ai/api/mcp/auth_callback",
+  "https://claude.com/api/mcp/auth_callback",
+]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
+export const MAX_REDIRECT_URI_LENGTH = 500;
 
 export function isAllowedRedirectUri(uri: string): boolean {
+  if (uri.length > MAX_REDIRECT_URI_LENGTH) return false;
   let url: URL;
   try {
     url = new URL(uri);
@@ -32,11 +34,8 @@ export function isAllowedRedirectUri(uri: string): boolean {
     return false;
   }
   if (url.hash) return false;
-  return ALLOWED_REDIRECTS.some((rule) =>
-    rule.origin
-      ? url.origin === rule.origin
-      : url.protocol === "http:" && url.hostname === rule.host,
-  );
+  if (CLAUDE_CALLBACKS.has(`${url.origin}${url.pathname}`) && !url.search) return true;
+  return url.protocol === "http:" && LOCAL_HOSTS.has(url.hostname);
 }
 
 /** A secret worth handing out: 32 random bytes, URL-safe. */
@@ -76,6 +75,10 @@ export const CORS_HEADERS: Record<string, string> = {
 /** The origin the outside world reached us on. Behind App Hosting the
  *  request URL can carry the internal host; the forwarded headers don't. */
 export function publicOrigin(request: Request): string {
+  // Configured beats inferred: a forwarded header is only as trustworthy as
+  // whatever sits in front of us.
+  const configured = process.env.APP_ORIGIN?.replace(/\/+$/, "");
+  if (configured) return configured;
   const url = new URL(request.url);
   const host = request.headers.get("x-forwarded-host")?.split(",")[0].trim() || url.host;
   const proto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim() || url.protocol.replace(":", "");

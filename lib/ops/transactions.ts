@@ -11,7 +11,7 @@ import { computeDiff } from "@/lib/audit-diff";
 import { CATEGORIES, TRANSACTIONS } from "@/lib/db/finance";
 import { adminDb } from "@/lib/firebase/admin";
 import { transactionInputSchema, type Category } from "@/lib/schemas";
-import type { Actor } from "./actor";
+import type { Actor, OnCommit } from "./actor";
 
 type Result<T = { id: string }> =
   | ({ ok: true } & T)
@@ -61,6 +61,7 @@ export async function saveTransaction(
   actor: Actor,
   id: string | null,
   rawInput: unknown,
+  onCommit?: OnCommit,
 ): Promise<Result> {
   const parsed = transactionInputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -99,7 +100,9 @@ export async function saveTransaction(
   };
 
   if (!id) {
-    const ref = await adminDb.collection(TRANSACTIONS).add({
+    const ref = adminDb.collection(TRANSACTIONS).doc();
+    const batch = adminDb.batch();
+    batch.set(ref, {
       ...dropEmpty(fields),
       source: "manual",
       createdBy: actor.uid,
@@ -107,6 +110,8 @@ export async function saveTransaction(
       updatedBy: actor.uid,
       updatedAt: now,
     });
+    onCommit?.(batch, { id: ref.id });
+    await batch.commit();
     await logAudit({
       action: "create",
       resourceType: "transaction",
@@ -123,7 +128,8 @@ export async function saveTransaction(
 
   // Rewrite the whole document (minus provenance) so a cleared field
   // actually clears instead of lingering from the previous version.
-  await ref.set({
+  const batch = adminDb.batch();
+  batch.set(ref, {
     ...dropEmpty(fields),
     source: existing.source ?? "manual",
     createdBy: existing.createdBy ?? actor.uid,
@@ -131,6 +137,8 @@ export async function saveTransaction(
     updatedBy: actor.uid,
     updatedAt: now,
   });
+  onCommit?.(batch, { id: null });
+  await batch.commit();
   await logAudit({
     action: "update",
     resourceType: "transaction",
