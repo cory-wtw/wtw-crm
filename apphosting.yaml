@@ -53,10 +53,3 @@ env:
     value: https://drive.google.com/file/d/1Q4Ud8Le6E-oAD2KK2FqocpzRyGwUdpgm/view
     availability:
       - RUNTIME
-  # Secret key for the Roster MCP endpoint (/api/mcp/<key>), which lets
-  # Claude look up records and propose edits for admin approval. Leave this
-  # commented out and the endpoint stays off. To turn it on, create the secret
-  # first (40+ random characters), then uncomment:
-  #   openssl rand -hex 32 | firebase apphosting:secrets:set ROSTER_MCP_KEY --data-file=-
-  # - variable: ROSTER_MCP_KEY
-  #   secret: ROSTER_MCP_KEY

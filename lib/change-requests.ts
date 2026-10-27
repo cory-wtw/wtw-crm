@@ -9,9 +9,11 @@
  */
 
 import { computeDiff } from "./audit-diff";
-import { tidyVeteran } from "./tidy";
+import { tidyResource, tidyVeteran } from "./tidy";
 import {
   encounterInputSchema,
+  resourceInputSchema,
+  transactionInputSchema,
   veteranInputSchema,
   vsoInputSchema,
   type FieldChanges,
@@ -49,6 +51,53 @@ export const VSO_FIELDS = [
   "directEmail",
   "preferredContactMethod",
   "partnershipStatus",
+  "notes",
+] as const;
+
+/** The resource form's fields. Verification stamps and import ids stay
+ *  machine-owned. */
+export const RESOURCE_FIELDS = [
+  "organizationName",
+  "parentOrg",
+  "website",
+  "contactName",
+  "contactPhone",
+  "contactEmail",
+  "description",
+  "eligibility",
+  "services",
+  "helpsWith",
+  "buckets",
+  "geoScope",
+  "geoStates",
+  "geoLocalities",
+  "minDischarge",
+  "requiresVaEnrollment",
+  "requiresValidId",
+  "eraRestriction",
+  "requiresDependents",
+  "populationRestriction",
+  "crisisCapable",
+  "eligibilityNotes",
+  "accessMethod",
+  "accessValue",
+  "whatToBring",
+  "typicalWait",
+  "verificationStatus",
+  "fragility",
+  "sourceName",
+] as const;
+
+export const TRANSACTION_FIELDS = [
+  "date",
+  "vendor",
+  "description",
+  "amount",
+  "type",
+  "categoryId",
+  "allocation",
+  "donorName",
+  "campaign",
   "notes",
 ] as const;
 
@@ -287,6 +336,108 @@ export function planEncounterCreate(inputRaw: unknown, now: Date = new Date()): 
   const fields = ENCOUNTER_FIELDS.filter((f) => after[f] !== undefined);
   return { ok: true, changes: changesFrom({}, after, fields) };
 }
+
+function pick(raw: Record<string, unknown>, fields: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of fields) out[field] = nullify(raw[field]);
+  return out;
+}
+
+/** null → undefined, so the schema's defaults and optionals apply. */
+function forSchema(merged: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(merged).map(([k, v]) => [k, v === null ? undefined : v]),
+  );
+}
+
+export function resourceSnapshot(raw: Record<string, unknown>): Record<string, unknown> {
+  return pick(raw, RESOURCE_FIELDS);
+}
+
+export function transactionSnapshot(raw: Record<string, unknown>): Record<string, unknown> {
+  return pick(raw, TRANSACTION_FIELDS);
+}
+
+type Built =
+  | { ok: true; input: Record<string, unknown> }
+  | { ok: false; error: string };
+
+/**
+ * The whole resource input an approval hands to editResource / createResource:
+ * the stored record (or nothing, for a create) with the request's after-values
+ * laid over it, validated and tidied exactly as the form would be.
+ */
+export function buildResourceInput(
+  raw: Record<string, unknown> | null,
+  after: Record<string, unknown>,
+): Built {
+  const parsed = resourceInputSchema.safeParse(
+    forSchema({ ...(raw ? resourceSnapshot(raw) : {}), ...after }),
+  );
+  if (!parsed.success) return { ok: false, error: formatIssues(parsed.error.issues) };
+  return { ok: true, input: tidyResource(parsed.data as Record<string, unknown>) };
+}
+
+export function buildTransactionInput(
+  raw: Record<string, unknown> | null,
+  after: Record<string, unknown>,
+): Built {
+  const parsed = transactionInputSchema.safeParse(
+    forSchema({ ...(raw ? transactionSnapshot(raw) : {}), ...after }),
+  );
+  if (!parsed.success) return { ok: false, error: formatIssues(parsed.error.issues) };
+  return { ok: true, input: parsed.data as Record<string, unknown> };
+}
+
+function planEdit(
+  label: string,
+  fields: readonly string[],
+  raw: Record<string, unknown>,
+  patchRaw: unknown,
+  build: (raw: Record<string, unknown>, after: Record<string, unknown>) => Built,
+): Plan {
+  const patch = asObject(patchRaw);
+  if (!patch || Object.keys(patch).length === 0) {
+    return { ok: false, error: "Nothing to change." };
+  }
+  const extra = unknownKeys(patch, fields);
+  if (extra.length > 0) {
+    return { ok: false, error: `Not editable on a ${label}: ${extra.join(", ")}. Editable: ${fields.join(", ")}.` };
+  }
+  const built = build(raw, patch);
+  if (!built.ok) return built;
+  const changes = changesFrom(pick(raw, fields), built.input, Object.keys(patch));
+  if (Object.keys(changes).length === 0) {
+    return { ok: false, error: "That's already what the record says." };
+  }
+  return { ok: true, changes };
+}
+
+function planNew(
+  label: string,
+  fields: readonly string[],
+  inputRaw: unknown,
+  build: (raw: null, after: Record<string, unknown>) => Built,
+): Plan {
+  const input = asObject(inputRaw);
+  if (!input) return { ok: false, error: "Expected an object of fields." };
+  const extra = unknownKeys(input, fields);
+  if (extra.length > 0) {
+    return { ok: false, error: `Unknown ${label} fields: ${extra.join(", ")}. Allowed: ${fields.join(", ")}.` };
+  }
+  const built = build(null, input);
+  if (!built.ok) return built;
+  return { ok: true, changes: changesFrom({}, built.input, fields.filter((f) => isSet(built.input[f]))) };
+}
+
+export const planResourceUpdate = (raw: Record<string, unknown>, patch: unknown) =>
+  planEdit("resource", RESOURCE_FIELDS, raw, patch, buildResourceInput);
+export const planResourceCreate = (input: unknown) =>
+  planNew("resource", RESOURCE_FIELDS, input, buildResourceInput);
+export const planTransactionUpdate = (raw: Record<string, unknown>, patch: unknown) =>
+  planEdit("transaction", TRANSACTION_FIELDS, raw, patch, buildTransactionInput);
+export const planTransactionCreate = (input: unknown) =>
+  planNew("transaction", TRANSACTION_FIELDS, input, buildTransactionInput);
 
 /** Missing, null and [] all mean "not set" — the readers default them. */
 export function sameValue(a: unknown, b: unknown): boolean {

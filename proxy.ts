@@ -6,21 +6,33 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
 
-  // The Roster MCP endpoint authenticates with its own key (lib/mcp/auth.ts),
-  // not a session cookie, and must not be bounced to /login.
-  if (pathname.startsWith("/api/mcp/")) {
+  // The MCP endpoint and the connector sign-in endpoints authenticate with
+  // bearer tokens and PKCE (lib/mcp/oauth.ts), not a session cookie, and must
+  // not be bounced to /login.
+  if (
+    pathname === "/api/mcp" ||
+    pathname.startsWith("/api/oauth/") ||
+    pathname.startsWith("/.well-known/")
+  ) {
     return NextResponse.next();
   }
 
   if (pathname === "/login") {
     if (hasSession) {
-      return NextResponse.redirect(new URL("/", request.url));
+      const next = request.nextUrl.searchParams.get("next");
+      const target = next?.startsWith("/oauth/authorize?") ? next : "/";
+      return NextResponse.redirect(new URL(target, request.url));
     }
     return NextResponse.next();
   }
 
   if (!hasSession) {
     const target = new URL("/login", request.url);
+    // The connector sign-in has to come back to itself after Google, or
+    // Claude never gets its code.
+    if (pathname === "/oauth/authorize") {
+      target.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+    }
     return NextResponse.redirect(target);
   }
 

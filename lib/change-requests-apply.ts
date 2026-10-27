@@ -1,23 +1,40 @@
 /**
  * Proposing and deciding Claude change requests. Server-only.
  *
- * Proposing writes a `changeRequests` doc and nothing else. Approving runs in
- * one transaction that re-reads the record, refuses if any field it touches
- * has moved since the proposal (marking the request stale instead), re-runs
- * the full validation, and writes the record, the audit entry and the
- * decision together — so a change is never half-applied or unaudited.
+ * Proposing writes a `changeRequests` doc and nothing else. Approving comes
+ * in two shapes:
+ *
+ * - Field writes (veterans, VSOs, contact notes) run in one transaction that
+ *   re-reads the record, refuses if any field it touches has moved since the
+ *   proposal (marking the request stale instead), re-runs the validation, and
+ *   writes the record, the audit entry and the decision together.
+ *
+ * - Everything else (intakes, referrals, follow-ups, wins, resources,
+ *   transactions) runs the very same code the app's own buttons run
+ *   (lib/ops). The request is claimed first — pending → applying — so a
+ *   double tap can't apply it twice; edits are checked for drift before the
+ *   write; and a failure puts the request back to pending with the reason.
  */
 
 import "server-only";
 import { Timestamp, type Transaction } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
+import { getResourcesByIds } from "@/lib/db/resources";
 import {
+  buildResourceInput,
+  buildTransactionInput,
   driftedFields,
   planEncounterCreate,
+  planResourceCreate,
+  planResourceUpdate,
+  planTransactionCreate,
+  planTransactionUpdate,
   planVeteranCreate,
   planVeteranUpdate,
   planVsoCreate,
   planVsoUpdate,
+  resourceSnapshot,
+  transactionSnapshot,
   veteranLabel,
   veteranSnapshot,
   vsoLabel,
@@ -25,7 +42,25 @@ import {
   type Plan,
 } from "@/lib/change-requests";
 import {
+  createReferral,
+  matchIntake,
+  recordIntake,
+  referralInputSchema,
+  type IntakeRecord,
+  type IntakeResult,
+} from "@/lib/ops/concierge";
+import { followUpInputSchema, recordFollowUp } from "@/lib/ops/follow-up";
+import { logOutcome } from "@/lib/ops/outcome";
+import { createResource, editResource } from "@/lib/ops/resources";
+import { loadCategory, saveTransaction } from "@/lib/ops/transactions";
+import type { Actor } from "@/lib/ops/actor";
+import {
+  FOLLOW_UP_OUTCOME_LABELS,
+  OUTCOME_KIND_INFO,
+  PENDING_PREFIX,
   isExpired,
+  outcomeInputSchema,
+  pendingRequestId,
   type ChangeRequest,
   type ChangeRequestKind,
   type FieldChanges,
@@ -35,10 +70,11 @@ import {
 
 const COLLECTION = "changeRequests";
 
-/** Who a proposal is attributed to in the queue and the audit log. */
-export const MCP_ACTOR = { uid: "claude-mcp", email: "claude-mcp" };
+/** Proposals are stored under this uid plus the admin whose connector sent
+ *  them, so the queue and the audit log both say "via Claude". */
+export const MCP_UID = "claude-mcp";
 
-type Actor = { uid: string; email: string };
+type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 function tsToDate(value: unknown): Date | null {
   if (!value) return null;
@@ -55,14 +91,19 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): ChangeRe
     targetId: data.targetId ?? null,
     targetLabel: data.targetLabel ?? "",
     changes: (data.changes ?? {}) as FieldChanges,
+    payload: data.payload ?? null,
     reason: data.reason ?? "",
+    groupLabel: data.groupLabel ?? null,
     proposedBy: data.proposedBy ?? "",
+    proposedByEmail: data.proposedByEmail ?? null,
     proposedAt: tsToDate(data.proposedAt) ?? new Date(0),
     reviewedBy: data.reviewedBy ?? null,
     reviewedByEmail: data.reviewedByEmail ?? null,
     reviewedAt: tsToDate(data.reviewedAt),
     reviewNote: data.reviewNote ?? null,
     appliedId: data.appliedId ?? null,
+    result: data.result ?? null,
+    lastError: data.lastError ?? null,
   };
 }
 
@@ -82,20 +123,102 @@ export async function listChangeRequests(
 }
 
 export async function getChangeRequest(id: string): Promise<ChangeRequest | null> {
+  if (!id || id.includes("/")) return null;
   const snap = await adminDb.collection(COLLECTION).doc(id).get();
   return snap.exists ? deserialize(snap.id, snap.data()!) : null;
 }
 
-export type ProposeInput =
-  | { kind: "veteran.create"; fields: unknown; reason: string }
-  | { kind: "veteran.update"; targetId: string; changes: unknown; reason: string }
-  | { kind: "vso.create"; fields: unknown; reason: string }
-  | { kind: "vso.update"; targetId: string; changes: unknown; reason: string }
-  | { kind: "encounter.create"; targetId: string; fields: unknown; reason: string };
+// ---------------------------------------------------------------------------
+// Proposing
 
-export type ProposeResult =
-  | { ok: true; request: ChangeRequest }
-  | { ok: false; error: string };
+/** Who is proposing: the admin whose Claude connector made the call. */
+export type Proposer = { uid: string; email: string };
+
+type Prepared = {
+  kind: ChangeRequestKind;
+  targetId: string | null;
+  targetLabel: string;
+  changes: FieldChanges;
+  payload?: Record<string, unknown> | null;
+};
+
+export type ProposeResult = Result<{ request: ChangeRequest }>;
+
+type VeteranForPropose = { targetId: string; label: string; data: FirebaseFirestore.DocumentData };
+
+/**
+ * The veteran a proposal is about — a stored one, or one Claude proposed
+ * earlier in the same call ("pending:<id>"), read from its proposed fields.
+ * An approved pending create resolves to the real record.
+ */
+async function veteranForPropose(veteranId: string): Promise<Result<VeteranForPropose>> {
+  const pendingId = pendingRequestId(veteranId);
+  if (pendingId) {
+    const cr = await getChangeRequest(pendingId);
+    if (!cr || cr.kind !== "veteran.create") {
+      return { ok: false, error: `No proposed new veteran ${veteranId}.` };
+    }
+    if (cr.status === "approved" && cr.appliedId) return veteranForPropose(cr.appliedId);
+    if (cr.status !== "pending") {
+      return { ok: false, error: `That new veteran was ${cr.status}; it can't take more changes.` };
+    }
+    const data = Object.fromEntries(Object.entries(cr.changes).map(([k, c]) => [k, c.after]));
+    return { ok: true, targetId: veteranId, label: `${cr.targetLabel} (new)`, data };
+  }
+  if (!veteranId || veteranId.includes("/")) return { ok: false, error: "Veteran not found." };
+  const snap = await adminDb.collection("veterans").doc(veteranId).get();
+  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  return { ok: true, targetId: snap.id, label: veteranLabel(snap.data()!), data: snap.data()! };
+}
+
+async function queue(
+  proposer: Proposer,
+  prepared: Prepared,
+  reasonRaw: string,
+  groupRaw?: string,
+): Promise<ProposeResult> {
+  const reason = reasonRaw?.trim();
+  if (!reason) return { ok: false, error: "reason: Say why — the reviewer needs it." };
+  const groupLabel = groupRaw?.trim().slice(0, 120) || null;
+
+  const now = new Date();
+  const ref = adminDb.collection(COLLECTION).doc();
+  const doc = {
+    kind: prepared.kind,
+    status: "pending",
+    targetId: prepared.targetId,
+    targetLabel: prepared.targetLabel,
+    // Through JSON: Firestore refuses undefined, and optional fields left
+    // blank arrive as exactly that.
+    changes: JSON.parse(JSON.stringify(prepared.changes)) as FieldChanges,
+    payload: prepared.payload ? (JSON.parse(JSON.stringify(prepared.payload)) as Record<string, unknown>) : null,
+    reason,
+    groupLabel,
+    proposedBy: MCP_UID,
+    proposedByEmail: proposer.email,
+    proposedAt: now,
+    reviewedBy: null,
+    reviewedByEmail: null,
+    reviewedAt: null,
+    reviewNote: null,
+    appliedId: null,
+    result: null,
+    lastError: null,
+  };
+  const batch = adminDb.batch();
+  batch.set(ref, doc);
+  batch.set(adminDb.collection("auditLog").doc(), {
+    actorUid: proposer.uid,
+    actorEmail: `${proposer.email} (via Claude)`,
+    action: "create",
+    resourceType: "changeRequest",
+    resourceId: ref.id,
+    diff: prepared.changes,
+    at: now,
+  });
+  await batch.commit();
+  return { ok: true, request: deserialize(ref.id, doc) };
+}
 
 async function missingVsoIds(changes: FieldChanges): Promise<string[]> {
   const ids = changes.vsoIds?.after;
@@ -106,117 +229,321 @@ async function missingVsoIds(changes: FieldChanges): Promise<string[]> {
   return ids.filter((_, i) => !snaps[i].exists).map(String);
 }
 
-/** Validate a proposal against the current record and queue it. Writes only
- *  the request (and its audit entry) — never the record. */
-export async function proposeChange(input: ProposeInput): Promise<ProposeResult> {
-  const reason = input.reason?.trim();
-  if (!reason) return { ok: false, error: "reason: Say why — the reviewer needs it." };
+function fromPlan(plan: Plan, rest: Omit<Prepared, "changes">): Result<{ prepared: Prepared }> {
+  return plan.ok ? { ok: true, prepared: { ...rest, changes: plan.changes } } : plan;
+}
 
-  let plan: Plan;
-  let targetId: string | null = null;
-  let targetLabel: string;
+export type FieldProposal =
+  | { kind: "veteran.create"; fields: unknown }
+  | { kind: "veteran.update"; targetId: string; changes: unknown }
+  | { kind: "vso.create"; fields: unknown }
+  | { kind: "vso.update"; targetId: string; changes: unknown }
+  | { kind: "encounter.create"; targetId: string; fields: unknown }
+  | { kind: "resource.create"; fields: unknown }
+  | { kind: "resource.update"; targetId: string; changes: unknown }
+  | { kind: "transaction.create"; fields: unknown }
+  | { kind: "transaction.update"; targetId: string; changes: unknown };
 
-  switch (input.kind) {
+async function readDoc(collection: string, id: string) {
+  if (!id || id.includes("/")) return null;
+  const snap = await adminDb.collection(collection).doc(id).get();
+  return snap.exists ? snap : null;
+}
+
+async function prepareFields(p: FieldProposal): Promise<Result<{ prepared: Prepared }>> {
+  switch (p.kind) {
     case "veteran.create": {
-      plan = planVeteranCreate(input.fields);
-      targetLabel = plan.ok
-        ? veteranLabel({
-            firstName: plan.changes.firstName?.after,
-            lastInitial: plan.changes.lastInitial?.after,
-          })
-        : "";
-      break;
+      const plan = planVeteranCreate(p.fields);
+      return fromPlan(plan, {
+        kind: p.kind,
+        targetId: null,
+        targetLabel: plan.ok
+          ? veteranLabel({ firstName: plan.changes.firstName?.after, lastInitial: plan.changes.lastInitial?.after })
+          : "",
+      });
     }
-    case "veteran.update":
+    case "veteran.update": {
+      if (pendingRequestId(p.targetId)) {
+        return { ok: false, error: "Change the proposed new veteran by withdrawing it and proposing it again." };
+      }
+      const snap = await readDoc("veterans", p.targetId);
+      if (!snap) return { ok: false, error: "Veteran not found." };
+      return fromPlan(planVeteranUpdate(snap.data()!, p.changes), {
+        kind: p.kind,
+        targetId: snap.id,
+        targetLabel: veteranLabel(snap.data()!),
+      });
+    }
     case "encounter.create": {
-      const snap = await adminDb.collection("veterans").doc(input.targetId).get();
-      if (!snap.exists) return { ok: false, error: "Veteran not found." };
-      const data = snap.data()!;
-      plan =
-        input.kind === "veteran.update"
-          ? planVeteranUpdate(data, input.changes)
-          : planEncounterCreate(input.fields);
-      targetId = snap.id;
-      targetLabel = veteranLabel(data);
-      break;
+      const v = await veteranForPropose(p.targetId);
+      if (!v.ok) return v;
+      return fromPlan(planEncounterCreate(p.fields), { kind: p.kind, targetId: v.targetId, targetLabel: v.label });
     }
     case "vso.create": {
-      plan = planVsoCreate(input.fields);
-      targetLabel = plan.ok ? vsoLabel({ fullName: plan.changes.fullName?.after, affiliation: plan.changes.affiliation?.after }) : "";
-      break;
+      const plan = planVsoCreate(p.fields);
+      return fromPlan(plan, {
+        kind: p.kind,
+        targetId: null,
+        targetLabel: plan.ok
+          ? vsoLabel({ fullName: plan.changes.fullName?.after, affiliation: plan.changes.affiliation?.after })
+          : "",
+      });
     }
     case "vso.update": {
-      const snap = await adminDb.collection("vsos").doc(input.targetId).get();
-      if (!snap.exists) return { ok: false, error: "VSO not found." };
-      const data = snap.data()!;
-      plan = planVsoUpdate(data, input.changes);
-      targetId = snap.id;
-      targetLabel = vsoLabel(data);
-      break;
+      const snap = await readDoc("vsos", p.targetId);
+      if (!snap) return { ok: false, error: "VSO not found." };
+      return fromPlan(planVsoUpdate(snap.data()!, p.changes), {
+        kind: p.kind,
+        targetId: snap.id,
+        targetLabel: vsoLabel(snap.data()!),
+      });
+    }
+    case "resource.create": {
+      const plan = planResourceCreate(p.fields);
+      return fromPlan(plan, {
+        kind: p.kind,
+        targetId: null,
+        targetLabel: plan.ok ? String(plan.changes.organizationName?.after ?? "") : "",
+      });
+    }
+    case "resource.update": {
+      const snap = await readDoc("resources", p.targetId);
+      if (!snap) return { ok: false, error: "Resource not found." };
+      return fromPlan(planResourceUpdate(snap.data()!, p.changes), {
+        kind: p.kind,
+        targetId: snap.id,
+        targetLabel: String(snap.data()!.organizationName ?? ""),
+      });
+    }
+    case "transaction.create":
+    case "transaction.update": {
+      const snap = p.kind === "transaction.update" ? await readDoc("transactions", p.targetId) : null;
+      if (p.kind === "transaction.update" && !snap) return { ok: false, error: "Transaction not found." };
+      const plan =
+        p.kind === "transaction.create"
+          ? planTransactionCreate(p.fields)
+          : planTransactionUpdate(snap!.data()!, p.changes);
+      if (!plan.ok) return plan;
+      // The category has to exist and match the money's direction — the
+      // same check the form's save runs, done now so Claude hears it now.
+      const merged = { ...(snap ? transactionSnapshot(snap.data()!) : {}), ...Object.fromEntries(Object.entries(plan.changes).map(([k, c]) => [k, c.after])) };
+      const category = await loadCategory(String(merged.categoryId ?? ""));
+      if (!category) return { ok: false, error: "categoryId: no such category (use list_finance_categories)." };
+      if (category.type !== merged.type) {
+        return { ok: false, error: `categoryId: "${category.name}" is an ${category.type} category.` };
+      }
+      const label = `${merged.date} · ${merged.vendor || merged.donorName || category.name} · $${Number(merged.amount).toFixed(2)}`;
+      return fromPlan(plan, { kind: p.kind, targetId: snap?.id ?? null, targetLabel: label });
     }
   }
-  if (!plan.ok) return plan;
+}
 
-  const missing = await missingVsoIds(plan.changes);
+/** Every field-shaped proposal: veterans, VSOs, contact notes, resources,
+ *  transactions. */
+export async function proposeFields(
+  proposer: Proposer,
+  proposal: FieldProposal,
+  reason: string,
+  group?: string,
+): Promise<ProposeResult> {
+  const prepared = await prepareFields(proposal);
+  if (!prepared.ok) return prepared;
+  const missing = await missingVsoIds(prepared.prepared.changes);
   if (missing.length > 0) {
     return { ok: false, error: `vsoIds: no VSO with id ${missing.join(", ")}.` };
   }
+  return queue(proposer, prepared.prepared, reason, group);
+}
 
-  const now = new Date();
-  const ref = adminDb.collection(COLLECTION).doc();
-  const doc = {
-    kind: input.kind,
-    status: "pending",
-    targetId,
-    targetLabel,
-    changes: plan.changes,
-    reason,
-    proposedBy: MCP_ACTOR.uid,
-    proposedAt: now,
-    reviewedBy: null,
-    reviewedByEmail: null,
-    reviewedAt: null,
-    reviewNote: null,
-    appliedId: null,
+/**
+ * Run the matcher on what the veteran said and queue the intake record. The
+ * answers that are never stored — safeTonight, receivingVaBenefits,
+ * situations, housing — steer this match and are not in the request.
+ */
+export async function proposeIntake(
+  proposer: Proposer,
+  veteranId: string,
+  answers: unknown,
+  reason: string,
+  group?: string,
+): Promise<Result<{ request: ChangeRequest; match: IntakeResult }>> {
+  const v = await veteranForPropose(veteranId);
+  if (!v.ok) return v;
+  const matched = await matchIntake(v.data, answers);
+  if (!matched.ok) return matched;
+  const r = matched.record;
+  const changes: FieldChanges = {
+    needs: { before: null, after: r.needs },
+    ...Object.fromEntries(
+      Object.entries(r.eligibility)
+        .filter(([, value]) => value !== undefined)
+        .map(([k, value]) => [k, { before: v.data[k] ?? null, after: value }]),
+    ),
+    candidatesFound: { before: null, after: `${r.candidatesFound} of ${r.consideredCount}` },
   };
-  const batch = adminDb.batch();
-  batch.set(ref, doc);
-  batch.set(adminDb.collection("auditLog").doc(), {
-    actorUid: MCP_ACTOR.uid,
-    actorEmail: MCP_ACTOR.email,
-    action: "create",
-    resourceType: "changeRequest",
-    resourceId: ref.id,
-    diff: plan.changes,
-    at: now,
-  });
-  await batch.commit();
-  return { ok: true, request: deserialize(ref.id, doc) };
+  const queued = await queue(
+    proposer,
+    {
+      kind: "intake.record",
+      targetId: v.targetId,
+      targetLabel: v.label,
+      changes,
+      payload: r as unknown as Record<string, unknown>,
+    },
+    reason,
+    group,
+  );
+  return queued.ok ? { ok: true, request: queued.request, match: matched.result } : queued;
+}
+
+export async function proposeReferral(
+  proposer: Proposer,
+  veteranId: string,
+  input: unknown,
+  reason: string,
+  group?: string,
+): Promise<ProposeResult> {
+  const v = await veteranForPropose(veteranId);
+  if (!v.ok) return v;
+  const parsed = referralInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => i.message).join("; ") };
+  const resources = await getResourcesByIds(parsed.data.referrals.map((r) => r.resourceId));
+  const names = new Map(resources.map((r) => [r.id, r.organizationName]));
+  const missing = parsed.data.referrals.filter((r) => !names.has(r.resourceId));
+  if (missing.length > 0) {
+    return { ok: false, error: `No resource with id ${missing.map((m) => m.resourceId).join(", ")}.` };
+  }
+  return queue(
+    proposer,
+    {
+      kind: "referral.create",
+      targetId: v.targetId,
+      targetLabel: v.label,
+      changes: {
+        resources: {
+          before: null,
+          after: [...parsed.data.referrals].sort((a, b) => a.rank - b.rank).map((r) => names.get(r.resourceId)),
+        },
+        needs: { before: null, after: parsed.data.bucketsIdentified },
+      },
+      payload: parsed.data as unknown as Record<string, unknown>,
+    },
+    reason,
+    group,
+  );
+}
+
+export async function proposeFollowUp(
+  proposer: Proposer,
+  veteranId: string,
+  input: unknown,
+  reason: string,
+  group?: string,
+): Promise<ProposeResult> {
+  const v = await veteranForPropose(veteranId);
+  if (!v.ok) return v;
+  if (pendingRequestId(v.targetId)) return { ok: false, error: "A new veteran has no referral to follow up yet." };
+  const parsed = followUpInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
+  const referral = await adminDb
+    .collection("veterans").doc(v.targetId)
+    .collection("encounters").doc(parsed.data.referralEncounterId).get();
+  if (!referral.exists || referral.data()!.type !== "referral") {
+    return { ok: false, error: "referralEncounterId: no such referral on this veteran (see get_veteran → openReferrals)." };
+  }
+  const names = new Map(
+    ((referral.data()!.referrals ?? []) as { resourceId: string; resourceName: string }[]).map((r) => [r.resourceId, r.resourceName]),
+  );
+  const changes: FieldChanges = Object.fromEntries(
+    parsed.data.outcomes.map((o) => [
+      names.get(o.resourceId) ?? o.resourceId,
+      {
+        before: null,
+        after: [
+          FOLLOW_UP_OUTCOME_LABELS[o.outcome],
+          o.winKind ? `win: ${OUTCOME_KIND_INFO[o.winKind].label}` : null,
+          o.amount ? `$${o.amount}` : null,
+          o.note,
+        ].filter(Boolean).join(" — "),
+      },
+    ]),
+  );
+  return queue(
+    proposer,
+    { kind: "followUp.record", targetId: v.targetId, targetLabel: v.label, changes, payload: parsed.data as unknown as Record<string, unknown> },
+    reason,
+    group,
+  );
+}
+
+export async function proposeOutcome(
+  proposer: Proposer,
+  veteranId: string,
+  input: unknown,
+  reason: string,
+  group?: string,
+): Promise<ProposeResult> {
+  const v = await veteranForPropose(veteranId);
+  if (!v.ok) return v;
+  const parsed = outcomeInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") };
+  const o = parsed.data;
+  if (o.achievedAt.getTime() > Date.now() + 60 * 60 * 1000) {
+    return { ok: false, error: "achievedAt: A win can't be in the future." };
+  }
+  let resourceName: string | null = null;
+  if (o.resourceId) {
+    const r = await readDoc("resources", o.resourceId);
+    if (!r) return { ok: false, error: "resourceId: no such resource." };
+    resourceName = r.data()!.organizationName ?? null;
+  }
+  return queue(
+    proposer,
+    {
+      kind: "outcome.log",
+      targetId: v.targetId,
+      targetLabel: v.label,
+      changes: {
+        win: { before: null, after: OUTCOME_KIND_INFO[o.kind].label },
+        achievedAt: { before: null, after: o.achievedAt.toISOString() },
+        ...(o.amount ? { amount: { before: null, after: o.amount } } : {}),
+        ...(resourceName ? { via: { before: null, after: resourceName } } : {}),
+        ...(o.note ? { note: { before: null, after: o.note } } : {}),
+      },
+      payload: { ...o, achievedAt: o.achievedAt.toISOString() },
+    },
+    reason,
+    group,
+  );
 }
 
 /** Claude taking back its own proposal. Only a pending one. */
-export async function withdrawChange(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function withdrawChange(proposer: Proposer, id: string): Promise<Result> {
+  if (!id || id.includes("/")) return { ok: false, error: "Change request not found." };
   const ref = adminDb.collection(COLLECTION).doc(id);
-  return adminDb.runTransaction(async (tx) => {
+  return adminDb.runTransaction(async (tx): Promise<Result> => {
     const snap = await tx.get(ref);
-    if (!snap.exists) return { ok: false as const, error: "Change request not found." };
+    if (!snap.exists) return { ok: false, error: "Change request not found." };
     if (snap.data()!.status !== "pending") {
-      return { ok: false as const, error: `It's already ${snap.data()!.status}.` };
+      return { ok: false, error: `It's already ${snap.data()!.status}.` };
     }
     const now = new Date();
     tx.update(ref, { status: "withdrawn", reviewedAt: now });
     tx.set(adminDb.collection("auditLog").doc(), {
-      actorUid: MCP_ACTOR.uid,
-      actorEmail: MCP_ACTOR.email,
+      actorUid: proposer.uid,
+      actorEmail: `${proposer.email} (via Claude)`,
       action: "update",
       resourceType: "changeRequest",
       resourceId: id,
       diff: { status: { before: "pending", after: "withdrawn" } },
       at: now,
     });
-    return { ok: true as const };
+    return { ok: true };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Deciding
 
 export type DecideResult =
   | { ok: true; status: "approved" | "rejected"; appliedId: string | null }
@@ -236,28 +563,54 @@ function afterValues(changes: FieldChanges): Record<string, unknown> {
   return Object.fromEntries(Object.entries(changes).map(([k, c]) => [k, c.after]));
 }
 
-/** Firestore drops nothing for undefined but refuses it; nulls clear fields. */
+/** Firestore refuses undefined; nulls would clear fields a create never had. */
 function withoutNulls(obj: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== null && v !== undefined));
 }
 
-type Applied = { appliedId: string | null; resourceType: "veteran" | "vso" | "encounter"; resourceId: string };
+/** The world moved: never applied, marked out of date. */
 class Stale extends Error {}
-class Invalid extends Error {}
+/** Can't apply yet or any more, but nothing's wrong with the request's
+ *  facts: it stays pending with the reason. */
+class Blocked extends Error {}
+
+/** A target that's a proposed new veteran resolves once that's approved. */
+async function resolveVeteranTarget(targetId: string, tx?: Transaction): Promise<string> {
+  const pendingId = pendingRequestId(targetId);
+  if (!pendingId) return targetId;
+  const ref = adminDb.collection(COLLECTION).doc(pendingId);
+  const snap = tx ? await tx.get(ref) : await ref.get();
+  const cr = snap.exists ? snap.data()! : null;
+  if (cr?.status === "approved" && cr.appliedId) return cr.appliedId as string;
+  if (cr?.status === "pending" || cr?.status === "applying") {
+    throw new Blocked(`Approve the new veteran (${cr.targetLabel}) first.`);
+  }
+  throw new Stale(`The new veteran it was for was ${cr?.status ?? "removed"}.`);
+}
 
 /** Same plan the proposal ran, against the record as it is now. The request's
  *  changes must come out identical — anything else means the world moved. */
 function recheck(plan: Plan, expected: FieldChanges): void {
-  if (!plan.ok) throw new Invalid(plan.error);
+  if (!plan.ok) throw new Blocked(`No longer valid: ${plan.error}`);
   if (JSON.stringify(plan.changes) !== JSON.stringify(expected)) {
     throw new Stale("The record no longer matches what this change was built from.");
   }
 }
 
-async function apply(tx: Transaction, cr: ChangeRequest, actor: Actor, now: Date): Promise<Applied> {
+type Applied = { appliedId: string | null; resourceType: "veteran" | "vso" | "encounter"; resourceId: string };
+
+const FIELD_KINDS = new Set<ChangeRequestKind>([
+  "veteran.create",
+  "veteran.update",
+  "vso.create",
+  "vso.update",
+  "encounter.create",
+]);
+
+async function applyFields(tx: Transaction, cr: ChangeRequest, actor: Actor, now: Date): Promise<Applied> {
   const after = afterValues(cr.changes);
 
-  switch (cr.kind as ChangeRequestKind) {
+  switch (cr.kind) {
     case "veteran.update": {
       const ref = adminDb.collection("veterans").doc(cr.targetId!);
       const snap = await tx.get(ref);
@@ -330,7 +683,8 @@ async function apply(tx: Transaction, cr: ChangeRequest, actor: Actor, now: Date
     }
 
     case "encounter.create": {
-      const veteranRef = adminDb.collection("veterans").doc(cr.targetId!);
+      const veteranId = await resolveVeteranTarget(cr.targetId!, tx);
+      const veteranRef = adminDb.collection("veterans").doc(veteranId);
       const snap = await tx.get(veteranRef);
       if (!snap.exists) throw new Stale("The veteran has been deleted.");
       recheck(planEncounterCreate(withoutNulls(after), now), cr.changes);
@@ -358,13 +712,119 @@ async function apply(tx: Transaction, cr: ChangeRequest, actor: Actor, now: Date
         resourceId: `${veteranRef.id}/${encounterRef.id}`,
       };
     }
+
+    default:
+      throw new Error(`${cr.kind} isn't a field write.`);
   }
+}
+
+type OpOutcome = { appliedId: string | null; result?: Record<string, unknown> };
+
+/** Throws Stale/Blocked, or returns the op's own error as Blocked. */
+async function applyOp(cr: ChangeRequest, actor: Actor): Promise<OpOutcome> {
+  const payload = cr.payload ?? {};
+  const after = afterValues(cr.changes);
+  const unwrap = <T extends object>(r: Result<T>): T => {
+    if (!r.ok) throw new Blocked(r.error);
+    return r;
+  };
+
+  switch (cr.kind) {
+    case "intake.record": {
+      const veteranId = await resolveVeteranTarget(cr.targetId!);
+      const r = unwrap(await recordIntake(actor, veteranId, payload as unknown as IntakeRecord));
+      return { appliedId: r.encounterId };
+    }
+    case "referral.create": {
+      const veteranId = await resolveVeteranTarget(cr.targetId!);
+      const r = unwrap(await createReferral(actor, veteranId, payload)).result;
+      return {
+        appliedId: r.encounterId,
+        result: {
+          veteranId,
+          referralText: r.referralText,
+          followUpDue: r.followUpDue,
+          screenedLines: r.substitutions.length,
+        },
+      };
+    }
+    case "followUp.record": {
+      const r = unwrap(await recordFollowUp(actor, cr.targetId!, payload));
+      return { appliedId: null, result: { flagged: r.summary.flagged } };
+    }
+    case "outcome.log": {
+      const veteranId = await resolveVeteranTarget(cr.targetId!);
+      unwrap(await logOutcome(actor, veteranId, payload));
+      return { appliedId: null };
+    }
+    case "resource.create": {
+      const built = buildResourceInput(null, after);
+      if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
+      return { appliedId: unwrap(await createResource(actor, built.input)).id };
+    }
+    case "resource.update": {
+      const snap = await readDoc("resources", cr.targetId!);
+      if (!snap) throw new Stale("The resource has been deleted.");
+      const drifted = driftedFields(resourceSnapshot(snap.data()!), cr.changes);
+      if (drifted.length > 0) throw new Stale(`Changed since proposed: ${drifted.join(", ")}.`);
+      const built = buildResourceInput(snap.data()!, after);
+      if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
+      unwrap(await editResource(actor, snap.id, built.input));
+      return { appliedId: null };
+    }
+    case "transaction.create": {
+      const built = buildTransactionInput(null, after);
+      if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
+      return { appliedId: unwrap(await saveTransaction(actor, null, built.input)).id };
+    }
+    case "transaction.update": {
+      const snap = await readDoc("transactions", cr.targetId!);
+      if (!snap) throw new Stale("The transaction has been deleted.");
+      const drifted = driftedFields(transactionSnapshot(snap.data()!), cr.changes);
+      if (drifted.length > 0) throw new Stale(`Changed since proposed: ${drifted.join(", ")}.`);
+      const built = buildTransactionInput(snap.data()!, after);
+      if (!built.ok) throw new Blocked(`No longer valid: ${built.error}`);
+      unwrap(await saveTransaction(actor, snap.id, built.input));
+      return { appliedId: null };
+    }
+    default:
+      throw new Error(`${cr.kind} has no operation.`);
+  }
+}
+
+type Writer = {
+  set(ref: FirebaseFirestore.DocumentReference, data: FirebaseFirestore.DocumentData): unknown;
+};
+
+function decisionAudit(tx: Writer, id: string, actor: Actor, status: string, now: Date) {
+  tx.set(adminDb.collection("auditLog").doc(), {
+    actorUid: actor.uid,
+    actorEmail: actor.email,
+    action: "update",
+    resourceType: "changeRequest",
+    resourceId: id,
+    diff: { status: { before: "pending", after: status } },
+    at: now,
+  });
+}
+
+async function markStale(ref: FirebaseFirestore.DocumentReference, actor: Actor, message: string) {
+  const now = new Date();
+  const batch = adminDb.batch();
+  batch.update(ref, {
+    status: "stale",
+    reviewedBy: actor.uid,
+    reviewedByEmail: actor.email,
+    reviewedAt: now,
+    reviewNote: message,
+  });
+  decisionAudit(batch, ref.id, actor, "stale", now);
+  await batch.commit();
 }
 
 /**
  * An admin's decision. `actor` must already be checked as an admin by the
- * caller. Approving applies the change in the same transaction that records
- * the decision; a stale or invalid request is never applied.
+ * caller. A stale request is never applied; a blocked one stays pending.
  */
 export async function decideChange(
   id: string,
@@ -372,56 +832,44 @@ export async function decideChange(
   actor: Actor,
   note?: string,
 ): Promise<DecideResult> {
+  if (!id || id.includes("/")) return { ok: false, error: "Change request not found." };
   const ref = adminDb.collection(COLLECTION).doc(id);
   const reviewNote = note?.trim() || null;
+  const decided = (now: Date) => ({
+    reviewedBy: actor.uid,
+    reviewedByEmail: actor.email,
+    reviewedAt: now,
+    reviewNote,
+    lastError: null,
+  });
 
-  try {
-    return await adminDb.runTransaction(async (tx): Promise<DecideResult> => {
+  // Reject, and the field writes: one transaction each.
+  const first = await adminDb.runTransaction(
+    async (tx): Promise<DecideResult | { claimed: ChangeRequest }> => {
       const snap = await tx.get(ref);
       if (!snap.exists) return { ok: false, error: "Change request not found." };
       const cr = deserialize(snap.id, snap.data()!);
       if (cr.status !== "pending") return { ok: false, error: `It's already ${cr.status}.` };
-
       const now = new Date();
-      const decided = {
-        reviewedBy: actor.uid,
-        reviewedByEmail: actor.email,
-        reviewedAt: now,
-        reviewNote,
-      };
-      const auditDecision = (status: string) =>
-        tx.set(adminDb.collection("auditLog").doc(), {
-          actorUid: actor.uid,
-          actorEmail: actor.email,
-          action: "update",
-          resourceType: "changeRequest",
-          resourceId: id,
-          diff: { status: { before: "pending", after: status } },
-          at: now,
-        });
 
       if (decision === "reject") {
-        tx.update(ref, { status: "rejected", ...decided });
-        auditDecision("rejected");
+        tx.update(ref, { status: "rejected", ...decided(now) });
+        decisionAudit(tx, id, actor, "rejected", now);
         return { ok: true, status: "rejected", appliedId: null };
       }
-
       if (isExpired(cr.proposedAt, now)) {
         throw new Stale("It's more than a week old. Ask Claude to look again and re-propose.");
       }
 
-      let applied: Applied;
-      try {
-        applied = await apply(tx, cr, actor, now);
-      } catch (err) {
-        if (err instanceof Invalid) {
-          return { ok: false, error: `No longer valid: ${err.message}` };
-        }
-        throw err;
+      if (!FIELD_KINDS.has(cr.kind)) {
+        // Claim it; the op runs outside this transaction.
+        tx.update(ref, { status: "applying" });
+        return { claimed: cr };
       }
 
-      tx.update(ref, { status: "approved", appliedId: applied.appliedId, ...decided });
-      auditDecision("approved");
+      const applied = await applyFields(tx, cr, actor, now);
+      tx.update(ref, { status: "approved", appliedId: applied.appliedId, ...decided(now) });
+      decisionAudit(tx, id, actor, "approved", now);
       tx.set(adminDb.collection("auditLog").doc(), {
         actorUid: actor.uid,
         actorEmail: actor.email,
@@ -432,18 +880,66 @@ export async function decideChange(
         at: now,
       });
       return { ok: true, status: "approved", appliedId: applied.appliedId };
+    },
+  ).catch(async (err: unknown) => {
+    if (err instanceof Stale) {
+      await markStale(ref, actor, err.message);
+      return { ok: false as const, status: "stale" as const, error: `${err.message} Marked out of date — nothing was changed.` };
+    }
+    if (err instanceof Blocked) {
+      await ref.update({ lastError: err.message });
+      return { ok: false as const, error: err.message };
+    }
+    throw err;
+  });
+
+  if (!("claimed" in first)) return first;
+
+  // The operations: the app's own code, run as the approving admin.
+  const cr = first.claimed;
+  try {
+    const done = await applyOp(cr, actor);
+    const now = new Date();
+    const batch = adminDb.batch();
+    batch.update(ref, {
+      status: "approved",
+      appliedId: done.appliedId,
+      result: done.result ?? null,
+      ...decided(now),
     });
+    decisionAudit(batch, id, actor, "approved", now);
+    await batch.commit();
+    return { ok: true, status: "approved", appliedId: done.appliedId };
   } catch (err) {
-    if (!(err instanceof Stale)) throw err;
-    // Outside the failed transaction: retire it so it leaves the queue and
-    // Claude sees why on its next look.
-    await ref.update({
-      status: "stale",
-      reviewedBy: actor.uid,
-      reviewedByEmail: actor.email,
-      reviewedAt: new Date(),
-      reviewNote: err.message,
-    });
-    return { ok: false, status: "stale", error: `${err.message} Marked out of date — nothing was changed.` };
+    if (err instanceof Stale) {
+      await markStale(ref, actor, err.message);
+      return { ok: false, status: "stale", error: `${err.message} Marked out of date — nothing was changed.` };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    await ref.update({ status: "pending", lastError: message });
+    return { ok: false, error: err instanceof Blocked ? message : `Didn't save: ${message}` };
   }
 }
+
+/**
+ * Approve everything pending under one call's label, oldest first, stopping
+ * at the first one that doesn't save — so a referral never lands for a new
+ * veteran whose record didn't.
+ */
+export async function approveGroup(
+  groupLabel: string,
+  actor: Actor,
+): Promise<{ approved: number; stoppedAt: { id: string; error: string } | null }> {
+  const pending = (await listChangeRequests("pending", 500))
+    .filter((cr) => cr.groupLabel === groupLabel)
+    .reverse();
+  let approved = 0;
+  for (const cr of pending) {
+    const r = await decideChange(cr.id, "approve", actor);
+    if (!r.ok) return { approved, stoppedAt: { id: cr.id, error: r.error } };
+    approved++;
+  }
+  return { approved, stoppedAt: null };
+}
+
+export { PENDING_PREFIX };

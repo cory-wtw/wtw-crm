@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildResourceInput,
   driftedFields,
+  planResourceCreate,
+  planResourceUpdate,
+  planTransactionCreate,
+  planTransactionUpdate,
   planEncounterCreate,
   planVeteranCreate,
   planVeteranUpdate,
@@ -154,5 +159,61 @@ describe("labels and expiry", () => {
     const now = new Date("2026-10-27T00:00:00Z");
     expect(isExpired(new Date("2026-10-21T00:00:00Z"), now)).toBe(false);
     expect(isExpired(new Date("2026-10-19T00:00:00Z"), now)).toBe(true);
+  });
+});
+
+describe("resources", () => {
+  const stored = {
+    organizationName: "Hope House",
+    buckets: ["housing"],
+    geoScope: "state",
+    geoStates: ["TN"],
+    accessMethod: "phone",
+    accessValue: "423-555-0100",
+    verificationStatus: "live",
+    externalId: "va:1",
+  };
+
+  it("plans an edit on the named fields and validates the whole record", () => {
+    expect(planResourceUpdate(stored, { buckets: ["housing", "essentials"] })).toEqual({
+      ok: true,
+      changes: { buckets: { before: ["housing"], after: ["housing", "essentials"] } },
+    });
+    // Local scope needs localities.
+    expect(planResourceUpdate(stored, { geoScope: "local" }).ok).toBe(false);
+  });
+
+  it("keeps machine-owned fields off limits", () => {
+    const plan = planResourceUpdate(stored, { externalId: "x", lastVerified: "2026-01-01" });
+    expect(!plan.ok && plan.error).toMatch(/Not editable on a resource: externalId, lastVerified/);
+  });
+
+  it("builds the full input an approval saves", () => {
+    const built = buildResourceInput(stored, { contactPhone: "4235550199" });
+    expect(built.ok && built.input.organizationName).toBe("Hope House");
+    expect(built.ok && built.input.contactPhone).toBe("423-555-0199");
+    expect(built.ok && "externalId" in built.input).toBe(false);
+  });
+
+  it("plans a create", () => {
+    expect(planResourceCreate({ organizationName: "New Org", buckets: ["work"] }).ok).toBe(true);
+    expect(planResourceCreate({ buckets: ["work"] }).ok).toBe(false);
+  });
+});
+
+describe("transactions", () => {
+  it("validates dates and amounts", () => {
+    const ok = planTransactionCreate({ date: "2026-10-27", type: "expense", amount: 42.5, categoryId: "c1", vendor: "Kroger" });
+    expect(ok.ok).toBe(true);
+    expect(planTransactionCreate({ date: "2026-02-30", type: "expense", amount: 1, categoryId: "c1" }).ok).toBe(false);
+    expect(planTransactionCreate({ date: "2026-10-27", type: "expense", amount: 0, categoryId: "c1" }).ok).toBe(false);
+  });
+
+  it("plans an edit", () => {
+    const stored = { date: "2026-10-01", type: "income", amount: 100, categoryId: "c2", vendor: "" };
+    expect(planTransactionUpdate(stored, { donorName: "Pat" })).toEqual({
+      ok: true,
+      changes: { donorName: { before: null, after: "Pat" } },
+    });
   });
 });

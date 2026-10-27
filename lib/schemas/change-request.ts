@@ -12,6 +12,14 @@ export const CHANGE_REQUEST_KINDS = [
   "vso.create",
   "vso.update",
   "encounter.create",
+  "intake.record",
+  "referral.create",
+  "followUp.record",
+  "outcome.log",
+  "resource.create",
+  "resource.update",
+  "transaction.create",
+  "transaction.update",
 ] as const;
 export const changeRequestKindSchema = z.enum(CHANGE_REQUEST_KINDS);
 export type ChangeRequestKind = z.infer<typeof changeRequestKindSchema>;
@@ -22,15 +30,32 @@ export const CHANGE_REQUEST_KIND_LABELS: Record<ChangeRequestKind, string> = {
   "vso.create": "New VSO",
   "vso.update": "Edit VSO",
   "encounter.create": "Log a contact",
+  "intake.record": "Record an intake",
+  "referral.create": "Send a referral",
+  "followUp.record": "Record a follow-up",
+  "outcome.log": "Log a win",
+  "resource.create": "New resource",
+  "resource.update": "Edit resource",
+  "transaction.create": "New transaction",
+  "transaction.update": "Edit transaction",
 };
 
+/** Kinds that touch the books. Admin-only to read, like /finances. */
+export function isFinanceKind(kind: ChangeRequestKind): boolean {
+  return kind.startsWith("transaction.");
+}
+
 /**
+ * `applying` is the moment between an admin tapping Approve and the write
+ * landing; a request is claimed there so a double tap can't apply it twice.
+ *
  * `stale` means the record changed after Claude looked at it, so the "before"
  * values on the request no longer describe what's stored. It's never applied:
  * Claude has to look again and propose again.
  */
 export const CHANGE_REQUEST_STATUSES = [
   "pending",
+  "applying",
   "approved",
   "rejected",
   "withdrawn",
@@ -41,6 +66,7 @@ export type ChangeRequestStatus = z.infer<typeof changeRequestStatusSchema>;
 
 export const CHANGE_REQUEST_STATUS_LABELS: Record<ChangeRequestStatus, string> = {
   pending: "Waiting for approval",
+  applying: "Saving",
   approved: "Approved",
   rejected: "Rejected",
   withdrawn: "Withdrawn",
@@ -63,9 +89,18 @@ export const changeRequestSchema = z.object({
   /** "Maria G." / "Jane Smith (DAV)" — so the queue reads without lookups. */
   targetLabel: z.string(),
   changes: z.record(z.string(), z.object({ before: z.unknown(), after: z.unknown() })),
+  /** What the approval runs, for kinds that aren't a plain field write —
+   *  an intake, a referral, a follow-up, a win, a full resource or
+   *  transaction input. Null for the field-diff kinds. */
+  payload: z.record(z.string(), z.unknown()).nullable().default(null),
   /** Why Claude wants it. Required: an unexplained change isn't reviewable. */
   reason: z.string().min(1),
+  /** Requests from one phone call share a label, so they can be read — and
+   *  approved — together, in the order they were proposed. */
+  groupLabel: z.string().nullable().default(null),
   proposedBy: z.string(),
+  /** The admin whose Claude connector proposed it. */
+  proposedByEmail: z.string().nullable().default(null),
   proposedAt: z.date(),
   reviewedBy: z.string().nullable().default(null),
   reviewedByEmail: z.string().nullable().default(null),
@@ -73,6 +108,11 @@ export const changeRequestSchema = z.object({
   reviewNote: z.string().nullable().default(null),
   /** The id a create was written under, once approved. */
   appliedId: z.string().nullable().default(null),
+  /** What approving produced that the reviewer needs next — the referral
+   *  packet text to send. */
+  result: z.record(z.string(), z.unknown()).nullable().default(null),
+  /** Why the last approve attempt didn't save. The request stays pending. */
+  lastError: z.string().nullable().default(null),
 });
 export type ChangeRequest = z.infer<typeof changeRequestSchema>;
 
@@ -81,4 +121,15 @@ export function isExpired(proposedAt: Date, now: Date = new Date()): boolean {
     now.getTime() - proposedAt.getTime() >
     CHANGE_REQUEST_EXPIRY_DAYS * 24 * 60 * 60 * 1000
   );
+}
+
+/**
+ * A veteranId that names a veteran Claude has proposed but nobody has approved
+ * yet: "pending:<change request id>". Lets one call log a new veteran and their
+ * intake, referral and notes together; approving in order resolves it.
+ */
+export const PENDING_PREFIX = "pending:";
+
+export function pendingRequestId(veteranId: string): string | null {
+  return veteranId.startsWith(PENDING_PREFIX) ? veteranId.slice(PENDING_PREFIX.length) : null;
 }

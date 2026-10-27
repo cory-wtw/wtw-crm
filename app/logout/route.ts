@@ -12,5 +12,9 @@ import { clearSession } from "@/lib/firebase/session";
  */
 export async function GET(request: Request) {
   await clearSession();
-  return NextResponse.redirect(new URL("/login", request.url));
+  const target = new URL("/login", request.url);
+  // The connector sign-in comes back to itself after login; nothing else may.
+  const next = new URL(request.url).searchParams.get("next");
+  if (next?.startsWith("/oauth/authorize?")) target.searchParams.set("next", next);
+  return NextResponse.redirect(target);
 }

@@ -1,34 +1,51 @@
-# Roster MCP — Claude edits, admin approves
+# Roster MCP — Claude does the data entry, an admin approves
 
-Claude (phone, web or desktop) can look up veterans and VSOs and **propose**
-changes. Nothing is written to a record until an admin approves it on
+Talk to Claude (phone, web or desktop): paste a call transcript, or say "I
+talked to Maria, she got the job at Amazon." Claude looks up the records and
+**proposes** every change. Nothing is saved until an admin approves it on
 **Admin → Claude changes**.
 
-## What Claude can do
-- Read: `search_veterans`, `get_veteran`, `search_vsos`, `get_vso`, `list_staff`
-- Propose: `propose_veteran_create`, `propose_veteran_update`,
-  `propose_contact_note`, `propose_vso_create`, `propose_vso_update`
-- Track its own: `list_change_requests`, `get_change_request`, `withdraw_change_request`
+## What Claude can propose
+- Veterans: new, edit (contact, location, eligibility, stage, benefits, VSOs)
+- Timeline notes ("called, left voicemail")
+- Intakes — runs the matcher, returns the short list
+- Referrals — after approval the packet text is on the review page (and
+  Claude can fetch it to draft the email). Nothing is ever sent automatically.
+- Follow-ups on referrals, and wins (job, housing, SNAP…)
+- VSOs, community resources: new and edit
+- Finances: new transaction, edit transaction
 
-No approve tool, no delete tool.
+A whole call shares one label, so the review page groups it with an
+**Approve all** button (in order, stopping at the first problem). A new veteran
+and their intake/referral/notes can be proposed together.
+
+Can't: approve anything, delete anything, touch users/roles, social media,
+attachments, finance records/imports.
 
 ## How strict approval is
-- Admin-only, behind the normal signed-in session. The MCP key can't approve.
-- Each request shows every field before → after plus Claude's reason.
-- Approve writes exactly those values, in one transaction with the audit entry.
-- If anyone edited those fields after Claude proposed, approval is refused and
-  the request is marked **out of date** — Claude must look again and re-propose.
-- Re-validated on approval with the same schema as the edit forms.
-- Requests expire after 7 days.
-- Every proposal, withdrawal and decision is in the Audit log.
+- Only a signed-in admin approves, in the Roster itself. Claude can't.
+- Every request shows what changes and Claude's reason.
+- Approving runs the same code as the app's own buttons, with the same checks.
+- If someone edited the same fields after Claude proposed, it's refused and
+  marked **out of date**.
+- A request for a new veteran's intake/referral waits until that veteran is
+  approved.
+- Requests expire after 7 days. Everything is in the Audit log.
+
+## Security
+- Claude connects with **Google sign-in**: only active Roster admins can
+  connect, and they tap Allow on a Roster page.
+- Tokens last an hour, refresh tokens rotate, all stored as hashes.
+- Every call re-checks the person is still an active admin. **Disconnect**
+  on Admin → Claude changes, or deactivating the user, cuts it off at once.
+- Sign-in only returns to claude.ai / claude.com / your own computer.
+- Crisis, MST, housing and VA-benefit answers steer the match and are never
+  stored — not in the request, not on the timeline.
+- Note: what Claude reads (records, transcripts) passes through Anthropic,
+  and through Plaud if you record calls there.
 
 ## Turn it on
-1. `openssl rand -hex 32 | firebase apphosting:secrets:set ROSTER_MCP_KEY --data-file=-`
-2. Uncomment the `ROSTER_MCP_KEY` block at the bottom of `apphosting.yaml`, deploy.
-3. `npm run deploy-rules` (adds the `changeRequests` rule).
-4. claude.ai → Settings → Connectors → Add custom connector →
-   URL `https://<roster-host>/api/mcp/<the key>`. It then works in the Claude phone app.
-
-The key is the password — anyone with the URL can read veteran records and
-queue proposals. To rotate it, set a new secret and redeploy, then update the
-connector URL.
+1. Deploy, then run `npm run deploy-rules`.
+2. claude.ai → Settings → Connectors → **Add custom connector** →
+   URL `https://<roster-host>/api/mcp`. Sign in with your WTW Google account
+   and tap **Allow**. It then works in the Claude phone app.

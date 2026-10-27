@@ -12,12 +12,11 @@ import { loadDedupeIndex } from "@/lib/finance/dedupe-db";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSession, type Session } from "@/lib/firebase/session";
 import { canManageFinances } from "@/lib/permissions";
+import { saveTransaction } from "@/lib/ops/transactions";
 import {
   DEFAULT_CATEGORIES,
   categoryInputSchema,
   isoDateSchema,
-  transactionInputSchema,
-  type Category,
 } from "@/lib/schemas";
 
 type Result<T = { id: string }> =
@@ -60,112 +59,17 @@ function revalidateFinances() {
   revalidatePath("/finances", "layout");
 }
 
-async function loadCategory(id: string): Promise<Category | null> {
-  const snap = await adminDb.collection(CATEGORIES).doc(id).get();
-  if (!snap.exists) return null;
-  const d = snap.data()!;
-  return {
-    id: snap.id,
-    name: d.name,
-    type: d.type,
-    defaultProgramPct: d.defaultProgramPct,
-    defaultMgmtPct: d.defaultMgmtPct,
-    defaultFundraisingPct: d.defaultFundraisingPct,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Transactions
 
+/** Add or edit a transaction. The work is in lib/ops/transactions.ts. */
 export async function saveTransactionAction(
   id: string | null,
   rawInput: unknown,
 ): Promise<Result> {
   const auth = await requireFinanceSession();
   if ("error" in auth) return { ok: false, error: auth.error };
-  const { session } = auth;
-
-  const parsed = transactionInputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return { ok: false, error: formatIssues(parsed.error.issues) };
-  }
-  const input = parsed.data;
-  const category = await loadCategory(input.categoryId);
-  if (!category) return { ok: false, error: "That category no longer exists." };
-  if (category.type !== input.type) {
-    return {
-      ok: false,
-      error: `"${category.name}" is an ${category.type} category.`,
-    };
-  }
-
-  const now = new Date();
-  // Income is never functionally allocated, and an allocation identical to
-  // the category default is stored as "inherit" so later edits to the
-  // default flow through.
-  const allocation =
-    input.type === "expense" &&
-    input.allocation &&
-    !(
-      input.allocation.programPct === category.defaultProgramPct &&
-      input.allocation.mgmtPct === category.defaultMgmtPct &&
-      input.allocation.fundraisingPct === category.defaultFundraisingPct
-    )
-      ? input.allocation
-      : undefined;
-  const fields = {
-    ...input,
-    amount: Math.round(input.amount * 100) / 100,
-    allocation,
-    donorName: input.type === "income" ? input.donorName : undefined,
-    campaign: input.type === "income" ? input.campaign : undefined,
-  };
-
-  if (!id) {
-    const ref = await adminDb.collection(TRANSACTIONS).add({
-      ...dropEmpty(fields),
-      source: "manual",
-      createdBy: session.uid,
-      createdAt: now,
-      updatedBy: session.uid,
-      updatedAt: now,
-    });
-    await logAudit({
-      action: "create",
-      resourceType: "transaction",
-      resourceId: ref.id,
-    });
-    revalidateFinances();
-    return { ok: true, id: ref.id };
-  }
-
-  const ref = adminDb.collection(TRANSACTIONS).doc(id);
-  const snap = await ref.get();
-  if (!snap.exists) return { ok: false, error: "Transaction not found." };
-  const existing = snap.data()!;
-
-  // Rewrite the whole document (minus provenance) so a cleared field
-  // actually clears instead of lingering from the previous version.
-  await ref.set({
-    ...dropEmpty(fields),
-    source: existing.source ?? "manual",
-    createdBy: existing.createdBy ?? session.uid,
-    createdAt: existing.createdAt ?? now,
-    updatedBy: session.uid,
-    updatedAt: now,
-  });
-  await logAudit({
-    action: "update",
-    resourceType: "transaction",
-    resourceId: id,
-    diff: computeDiff(
-      existing as Record<string, unknown>,
-      fields as unknown as Record<string, unknown>,
-      Object.keys(fields),
-    ),
-  });
-  revalidateFinances();
-  return { ok: true, id };
+  return saveTransaction(auth.session, id, rawInput);
 }
 
 export async function deleteTransactionAction(id: string): Promise<Result> {
