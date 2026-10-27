@@ -30,6 +30,8 @@ function resourceLink(type: ResourceType, id: string): string | null {
       const slash = id.indexOf("/");
       return slash > 0 ? `/veterans/${id.slice(0, slash)}` : null;
     }
+    case "changeRequest":
+      return "/admin/changes";
     default:
       return null;
   }

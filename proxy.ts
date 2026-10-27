@@ -6,6 +6,12 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
 
+  // The Roster MCP endpoint authenticates with its own key (lib/mcp/auth.ts),
+  // not a session cookie, and must not be bounced to /login.
+  if (pathname.startsWith("/api/mcp/")) {
+    return NextResponse.next();
+  }
+
   if (pathname === "/login") {
     if (hasSession) {
       return NextResponse.redirect(new URL("/", request.url));

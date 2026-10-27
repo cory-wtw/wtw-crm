@@ -131,6 +131,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /changeRequests/{id} {
+      // Claude's proposed edits (the Roster MCP server). Written only by the
+      // server: proposals from /api/mcp, decisions from Admin → Claude
+      // changes. Admins can read; nobody writes from a client.
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /auditLog/{id} {
       // Written only by the server (Admin SDK). Admins can read via the
       // /admin/audit page; the rule below is belt-and-suspenders.
