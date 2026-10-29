@@ -21,7 +21,7 @@ const PHASE_LABEL: Record<Exclude<Phase, "idle">, string> = {
   loading: "Loading the Roster…",
 };
 
-export function LoginForm() {
+export function LoginForm({ next = null }: { next?: string | null }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -45,7 +45,7 @@ export function LoginForm() {
       // renders, so there's nothing to reset.
       setPhase("loading");
       startTransition(() => {
-        router.replace("/");
+        router.replace(next ?? "/");
         router.refresh();
       });
     } catch (err) {

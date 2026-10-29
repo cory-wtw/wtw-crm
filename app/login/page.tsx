@@ -3,9 +3,21 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/firebase/session";
 import { LoginForm } from "./login-form";
 
-export default async function LoginPage() {
+/** Only the connector sign-in may ask to come back after login — an open
+ *  "next" would let any link bounce a fresh session somewhere else. */
+function safeNext(value: string | string[] | undefined): string | null {
+  const next = Array.isArray(value) ? value[0] : value;
+  return next?.startsWith("/oauth/authorize?") ? next : null;
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const next = safeNext((await searchParams).next);
   if (await getSession()) {
-    redirect("/");
+    redirect(next ?? "/");
   }
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
@@ -17,7 +29,7 @@ export default async function LoginPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Sign in to continue.</p>
         </div>
-        <LoginForm />
+        <LoginForm next={next} />
       </div>
     </main>
   );

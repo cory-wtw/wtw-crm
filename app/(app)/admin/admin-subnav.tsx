@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 const TABS = [
+  { href: "/admin/changes", label: "Claude changes" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/resources/enrich", label: "Draft resources" },
   { href: "/admin/resources/import", label: "Load JSON" },
