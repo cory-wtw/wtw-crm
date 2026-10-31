@@ -13,7 +13,11 @@ import {
 } from "@tanstack/react-table";
 import { formatDate, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
-import { PIPELINE_LABELS, type PipelineStage } from "@/lib/schemas";
+import {
+  PIPELINE_LABELS,
+  PREFERRED_CONTACT_LABELS,
+  type PipelineStage,
+} from "@/lib/schemas";
 import type { VeteranListItem } from "@/lib/db/veterans";
 
 const STAGE_TINT: Record<PipelineStage, string> = {
@@ -23,6 +27,27 @@ const STAGE_TINT: Record<PipelineStage, string> = {
   won: "bg-primary text-primary-foreground",
   lost: "bg-muted text-muted-foreground",
 };
+
+/** How to reach them, and a flag when that's hard. */
+function ReachBy({ row }: { row: VeteranListItem }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span>{PREFERRED_CONTACT_LABELS[row.preferredContact]}</span>
+      {row.hardToReach && (
+        <span className="inline-flex items-center rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+          Hard to reach
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** Open checklist items, a few by name. */
+function openNeedsText(needs: string[]): string {
+  if (needs.length === 0) return "—";
+  if (needs.length <= 2) return needs.join(", ");
+  return `${needs.slice(0, 2).join(", ")} +${needs.length - 2}`;
+}
 
 const columns: ColumnDef<VeteranListItem>[] = [
   {
@@ -51,6 +76,22 @@ const columns: ColumnDef<VeteranListItem>[] = [
         </span>
       );
     },
+  },
+  {
+    id: "reachBy",
+    accessorFn: (row) => `${row.hardToReach ? 0 : 1}${row.preferredContact}`,
+    header: "Reach by",
+    cell: ({ row }) => <ReachBy row={row.original} />,
+  },
+  {
+    id: "openNeeds",
+    accessorFn: (row) => row.openNeeds.length,
+    header: "Still needs",
+    cell: ({ row }) => (
+      <span title={row.original.openNeeds.join(", ")}>
+        {openNeedsText(row.original.openNeeds)}
+      </span>
+    ),
   },
   {
     accessorKey: "monthlyBenefitAfter",
@@ -139,6 +180,12 @@ export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
                     {PIPELINE_LABELS[v.pipelineStage]}
                   </span>
                 </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  <ReachBy row={v} />
+                  {v.openNeeds.length > 0 && (
+                    <span> · Still needs {openNeedsText(v.openNeeds)}</span>
+                  )}
+                </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {v.monthlyBenefitAfter
                     ? `${formatUsd(v.monthlyBenefitAfter)}/mo`
@@ -152,7 +199,7 @@ export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
       </ul>
 
       <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:pointer-fine:block">
-        <table className="w-full min-w-[36rem] text-sm">
+        <table className="w-full min-w-[52rem] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>

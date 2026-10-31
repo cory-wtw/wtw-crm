@@ -22,6 +22,7 @@ const formSchema = z
     donorName: z.string(),
     campaign: z.string(),
     notes: z.string(),
+    veteranId: z.string(),
     customSplit: z.boolean(),
     programPct: z.string(),
     mgmtPct: z.string(),
@@ -40,15 +41,32 @@ export type TransactionFormInitial = {
   values: Partial<FormValues>;
 };
 
+/** A veteran an expense can be spent on. */
+export type VeteranOption = { id: string; label: string };
+
 type Props = {
   categories: Category[];
+  veterans: VeteranOption[];
   vendors: string[];
   campaigns: string[];
   today: string;
   initial?: TransactionFormInitial | null;
+  /** Starting values for a new transaction, e.g. the veteran it's for. */
+  defaults?: Partial<FormValues>;
+  /** Where Save and Cancel go — the veteran's page when started from there. */
+  returnTo?: string;
 };
 
-export function TransactionForm({ categories, vendors, campaigns, today, initial }: Props) {
+export function TransactionForm({
+  categories,
+  veterans,
+  vendors,
+  campaigns,
+  today,
+  initial,
+  defaults,
+  returnTo = "/finances/transactions",
+}: Props) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -72,10 +90,12 @@ export function TransactionForm({ categories, vendors, campaigns, today, initial
       donorName: "",
       campaign: "",
       notes: "",
+      veteranId: "",
       customSplit: false,
       programPct: "",
       mgmtPct: "",
       fundraisingPct: "",
+      ...defaults,
       ...initial?.values,
     },
   });
@@ -112,6 +132,7 @@ export function TransactionForm({ categories, vendors, campaigns, today, initial
       donorName: v.type === "income" ? v.donorName.trim() || undefined : undefined,
       campaign: v.type === "income" ? v.campaign.trim() || undefined : undefined,
       notes: v.notes.trim() || undefined,
+      veteranId: v.type === "expense" ? v.veteranId || undefined : undefined,
       allocation:
         v.type === "expense" && v.customSplit
           ? {
@@ -127,7 +148,7 @@ export function TransactionForm({ categories, vendors, campaigns, today, initial
       return;
     }
     startTransition(() => {
-      router.push("/finances/transactions");
+      router.push(returnTo);
       router.refresh();
     });
   });
@@ -220,6 +241,24 @@ export function TransactionForm({ categories, vendors, campaigns, today, initial
       )}
 
       {type === "expense" && (
+        <Section title="Spent on a veteran">
+          <Field
+            label="Veteran"
+            hint="Their bus pass, an ID fee, supplies — links the cost to them so you can see spending per veteran."
+          >
+            <Select {...register("veteranId")}>
+              <option value="">Not for one veteran</option>
+              {veterans.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </Section>
+      )}
+
+      {type === "expense" && (
         <Section title="Functional allocation">
           <div className="space-y-3 md:col-span-2">
             <label className="flex items-center gap-2 text-sm">
@@ -277,7 +316,7 @@ export function TransactionForm({ categories, vendors, campaigns, today, initial
         </button>
         <button
           type="button"
-          onClick={() => router.push("/finances/transactions")}
+          onClick={() => router.push(returnTo)}
           className="text-sm font-bold text-muted-foreground hover:text-foreground"
         >
           Cancel

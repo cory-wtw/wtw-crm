@@ -77,6 +77,13 @@ export async function saveTransaction(
     };
   }
 
+  // Only an expense is spent on somebody, and only on a veteran who exists.
+  const veteranId = input.type === "expense" ? input.veteranId || undefined : undefined;
+  if (veteranId) {
+    const veteran = await adminDb.collection("veterans").doc(veteranId).get();
+    if (!veteran.exists) return { ok: false, error: "That veteran is no longer on the Roster." };
+  }
+
   const now = new Date();
   // Income is never functionally allocated, and an allocation identical to
   // the category default is stored as "inherit" so later edits to the
@@ -97,6 +104,7 @@ export async function saveTransaction(
     allocation,
     donorName: input.type === "income" ? input.donorName : undefined,
     campaign: input.type === "income" ? input.campaign : undefined,
+    veteranId,
   };
 
   if (!id) {
@@ -118,6 +126,7 @@ export async function saveTransaction(
       resourceId: ref.id,
     });
     revalidateFinances();
+    if (veteranId) revalidatePath(`/veterans/${veteranId}`);
     return { ok: true, id: ref.id };
   }
 
@@ -150,6 +159,9 @@ export async function saveTransaction(
     ),
   });
   revalidateFinances();
+  for (const v of new Set([veteranId, existing.veteranId as string | undefined])) {
+    if (v) revalidatePath(`/veterans/${v}`);
+  }
   return { ok: true, id };
 }
 

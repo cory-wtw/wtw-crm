@@ -3,6 +3,9 @@ import { listCategories, listTransactions, listVendorAliases, listVendorMonthly 
 import { describeRange, rangePresets, rangeQuery, resolveRange, todayIso } from "@/lib/finance/range";
 import { inRange } from "@/lib/finance/report";
 import { findRecurring, spendByMonth, summarizeVendors, vendorName } from "@/lib/finance/spending";
+import { spendByVeteran } from "@/lib/finance/per-veteran";
+import { listVeterans } from "@/lib/db/veterans";
+import { formatShortName } from "@/lib/name";
 import { formatMonth, formatUsdCents } from "@/lib/format";
 import { RecurringList } from "./recurring-list";
 import { SpendingVendors, type VendorTx } from "./spending-vendors";
@@ -16,12 +19,16 @@ export default async function SpendingPage({
 }) {
   const today = todayIso();
   const range = resolveRange(await searchParams, today);
-  const [transactions, categories, aliases, overrides] = await Promise.all([
+  const [transactions, categories, aliases, overrides, veterans] = await Promise.all([
     listTransactions(),
     listCategories(),
     listVendorAliases(),
     listVendorMonthly(),
+    listVeterans(),
   ]);
+  const veteranName = Object.fromEntries(veterans.map((v) => [v.id, formatShortName(v.firstName, v.lastInitial)]));
+  const perVeteran = spendByVeteran(transactions.filter((t) => inRange(t.date, range)));
+  const perVeteranTotal = perVeteran.reduce((s, r) => s + Math.round(r.total * 100), 0) / 100;
   const catName = Object.fromEntries(categories.map((c) => [c.id, c.name]));
   const rows = transactions.map((t) => ({
     id: t.id,
@@ -158,6 +165,50 @@ export default async function SpendingPage({
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">By veteran</h2>
+          {perVeteran.length > 0 && (
+            <p className="text-sm">
+              <span className="font-black tabular-nums">{formatUsdCents(perVeteranTotal)}</span>
+              <span className="text-muted-foreground"> on {perVeteran.length} {perVeteran.length === 1 ? "veteran" : "veterans"}</span>
+            </p>
+          )}
+        </div>
+        {perVeteran.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No expenses linked to a veteran in this range. Pick the veteran on an expense — their bus pass, an ID fee — to see it here.
+          </p>
+        ) : (
+          <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
+            <table className="w-full min-w-[28rem] text-sm">
+              <thead className="bg-secondary/60">
+                <tr>
+                  <th className={`${th} text-left`}>Veteran</th>
+                  <th className={`${th} text-right`}>Expenses</th>
+                  <th className={`${th} text-right`}>Latest</th>
+                  <th className={`${th} text-right`}>Spent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perVeteran.map((r) => (
+                  <tr key={r.veteranId} className="border-t border-border">
+                    <td className="px-3 py-2 font-bold">
+                      <Link href={`/veterans/${r.veteranId}`} className="underline-offset-4 hover:underline">
+                        {veteranName[r.veteranId] || "(removed veteran)"}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{r.count}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{r.lastDate}</td>
+                    <td className="px-3 py-2 text-right font-bold tabular-nums">{formatUsdCents(r.total)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

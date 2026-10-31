@@ -54,7 +54,11 @@ function requirements(resource: Resource): string {
   if (resource.requiresValidId) parts.push("Valid ID");
   if (resource.requiresDependents) parts.push("Dependents");
   const listed = parts.length > 0 ? parts.join(", ") : "None";
-  return resource.crisisCapable ? `${listed} · Same-day capable` : listed;
+  const extras = [
+    resource.crisisCapable && "Same-day capable",
+    resource.replacesId && "Replaces a lost ID",
+  ].filter(Boolean);
+  return [listed, ...extras].join(" · ");
 }
 
 export default async function ResourceDetailPage({

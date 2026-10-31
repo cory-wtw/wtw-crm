@@ -4,15 +4,18 @@ import { getSession } from "@/lib/firebase/session";
 import {
   canDeleteVeteran,
   canEditVeteran,
+  canManageFinances,
   canRunIntake,
 } from "@/lib/permissions";
+import { listTransactionsForVeteran } from "@/lib/db/finance";
+import { expensesForVeteran } from "@/lib/finance/per-veteran";
 import { listAttachmentsForVeteran } from "@/lib/db/attachments";
 import { listEncounters } from "@/lib/db/encounters";
 import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
 import { claimGuideSend, eight00Url } from "@/lib/claim-guide";
-import { formatDate, formatUsd } from "@/lib/format";
+import { formatDate, formatUsd, formatUsdCents } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { Attachments } from "./attachments";
 import { DeleteVeteranButton } from "./delete-veteran-button";
@@ -33,6 +36,7 @@ import {
   SERVICE_ERA_LABELS,
 } from "@/lib/schemas";
 import { EncounterForm } from "./encounter-form";
+import { Checklist } from "./checklist";
 import { Outcomes } from "./outcomes";
 import { StageChanger } from "./stage-changer";
 
@@ -76,6 +80,13 @@ export default async function VeteranDetailPage({
   const canEdit = canEditVeteran(session, veteran);
   const canDelete = canDeleteVeteran(session);
   const canIntake = canRunIntake(session, veteran);
+  // The books are admin-only, so spending shows only to those who keep them.
+  const canSeeSpending = canManageFinances(session);
+  const spending = canSeeSpending
+    ? expensesForVeteran(await listTransactionsForVeteran(veteran.id), veteran.id)
+    : [];
+  const spentTotal =
+    spending.reduce((s, t) => s + Math.round(t.amount * 100), 0) / 100;
 
   const usersByUid = new Map(allUsers.map((u) => [u.uid, u]));
   function nameForUid(uid: string): string {
@@ -108,6 +119,11 @@ export default async function VeteranDetailPage({
             >
               {PIPELINE_LABELS[veteran.pipelineStage]}
             </span>
+            {veteran.hardToReach && (
+              <span className="inline-flex items-center rounded-full bg-destructive/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] text-destructive">
+                Hard to reach
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -143,6 +159,16 @@ export default async function VeteranDetailPage({
         />
         <Row label="Phone" value={veteran.phone || null} />
         <Row label="Email" value={veteran.email || null} />
+        {(veteran.hardToReach || veteran.contactNotes) && (
+          <Row
+            label="Reaching them"
+            value={
+              [veteran.hardToReach && "Hard to reach", veteran.contactNotes]
+                .filter(Boolean)
+                .join(" — ") || null
+            }
+          />
+        )}
         <Row
           label="Birth year"
           value={veteran.birthYear?.toString() ?? null}
@@ -290,6 +316,60 @@ export default async function VeteranDetailPage({
         )}
       </Details>
 
+      <Checklist
+        veteranId={veteran.id}
+        canManage={canEdit}
+        items={veteran.checklist.map((c) => ({
+          id: c.id,
+          label: c.label,
+          done: c.done,
+          doneAtIso: c.doneAt?.toISOString() ?? null,
+        }))}
+      />
+
+      {canSeeSpending && (
+        <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+          <div className="mb-4 flex items-baseline justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
+                Spent on {veteran.firstName} ({formatUsdCents(spentTotal)})
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Expenses linked to them in the books.
+              </p>
+            </div>
+            <Link
+              href={`/finances/transactions/new?veteranId=${veteran.id}`}
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            >
+              Add an expense
+            </Link>
+          </div>
+          {spending.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing linked yet. Pick {veteran.firstName} as the veteran on an
+              expense to see it here.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {spending.map((t) => (
+                <li key={t.id} className="flex items-baseline justify-between gap-3 text-sm">
+                  <Link
+                    href={`/finances/transactions/${t.id}`}
+                    className="min-w-0 truncate underline-offset-4 hover:underline"
+                  >
+                    {formatDate(`${t.date}T12:00:00`)} · {t.vendor || t.description || "—"}
+                  </Link>
+                  <span className="shrink-0 font-bold tabular-nums">
+                    {formatUsdCents(t.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       <Outcomes
         veteranId={veteran.id}
         canManage={canEdit}
@@ -300,6 +380,7 @@ export default async function VeteranDetailPage({
           monthlyValue: o.monthlyValue,
           oneTimeValue: o.oneTimeValue,
           resourceName: o.resourceName,
+          wtwRole: o.wtwRole,
           note: o.note,
         }))}
       />

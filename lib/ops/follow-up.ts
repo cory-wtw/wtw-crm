@@ -230,6 +230,8 @@ export async function recordFollowUp(
         ...outcomeAmounts(o.winKind, o.amount),
         resourceId: o.resourceId,
         ...(name ? { resourceName: name } : {}),
+        // It came from a referral WTW sent, so WTW helped.
+        wtwRole: "helped",
         // Same cap as a win logged by hand.
         ...(o.note ? { note: o.note.slice(0, 500) } : {}),
         loggedBy: actor.uid,

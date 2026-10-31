@@ -106,6 +106,13 @@ describe("parseSeedResource", () => {
     expect(result.ok && result.input.accessMethod).toBe("web");
   });
 
+  it("reads \"Replaces a lost ID\" into replacesId", () => {
+    const result = parseSeedResource(aSeed({ reqs: ["Replaces a lost ID"] }));
+    expect(result.ok && result.input.replacesId).toBe(true);
+    const plain = parseSeedResource(aSeed({ reqs: [] }));
+    expect(plain.ok && plain.input.replacesId).toBe(false);
+  });
+
   it("turns requirement labels into gates, and leaves the rest permissive", () => {
     const result = parseSeedResource(
       aSeed({ reqs: ["Same-day / crisis capable"] }),

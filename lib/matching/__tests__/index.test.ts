@@ -123,3 +123,20 @@ describe("duplicate records by website", () => {
     expect(ranked).toHaveLength(2);
   });
 });
+
+describe("findCandidates — a lost ID", () => {
+  it("puts the ID office above legal aid for someone with no ID", () => {
+    const ranked = findCandidates(
+      aVeteran({ needs: ["housing", "legal", "transport"], idStatus: "none" }),
+      [
+        aResource({ id: "aid", organizationName: "Legal Aid Society", buckets: ["legal"] }),
+        aResource({ id: "sos", organizationName: "Secretary of State", buckets: ["legal"], replacesId: true }),
+        aResource({ id: "bus", organizationName: "City Bus", buckets: ["transport"] }),
+      ],
+      { now: NOW },
+    );
+    expect(ranked[0].resource.id).toBe("sos");
+    expect(ranked.map((r) => r.resource.id)).toContain("bus");
+  });
+});
+

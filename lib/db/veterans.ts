@@ -2,6 +2,7 @@ import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import type {
+  ChecklistItem,
   PipelineHistoryEntry,
   PipelineStage,
   Veteran,
@@ -31,6 +32,8 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
     preferredContact: data.preferredContact ?? "phone",
     phone: data.phone ?? undefined,
     email: data.email ?? undefined,
+    hardToReach: data.hardToReach === true,
+    contactNotes: data.contactNotes || undefined,
     birthYear: data.birthYear ?? undefined,
     city: data.city ?? undefined,
     state: data.state ?? undefined,
@@ -73,6 +76,16 @@ function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran 
         loggedAt: tsToDate(o.loggedAt) ?? new Date(0),
       }),
     ),
+    checklist: ((data.checklist ?? []) as Array<Record<string, unknown>>).map(
+      (c): ChecklistItem => ({
+        id: String(c.id ?? ""),
+        label: String(c.label ?? ""),
+        done: c.done === true,
+        doneAt: tsToDate(c.doneAt),
+        addedBy: String(c.addedBy ?? ""),
+        addedAt: tsToDate(c.addedAt) ?? new Date(0),
+      }),
+    ),
     vsoIds: data.vsoIds ?? [],
     eight00ThreadId: data.eight00ThreadId ?? null,
     createdBy: data.createdBy ?? "",
@@ -91,6 +104,10 @@ export type VeteranListItem = {
   dateFound: string | null;
   updatedAt: string;
   monthlyBenefitAfter: number;
+  preferredContact: Veteran["preferredContact"];
+  hardToReach: boolean;
+  /** Labels of checklist items still open. */
+  openNeeds: string[];
 };
 
 export async function listVeterans(): Promise<Veteran[]> {

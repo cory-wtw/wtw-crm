@@ -60,6 +60,7 @@ function deserialize(
     eligibilityNotes: data.eligibilityNotes ?? undefined,
     requiresVaEnrollment: data.requiresVaEnrollment ?? false,
     requiresValidId: data.requiresValidId ?? false,
+    replacesId: data.replacesId === true,
     eraRestriction: data.eraRestriction ?? [],
     requiresDependents: data.requiresDependents ?? false,
     populationRestriction: data.populationRestriction ?? [],

@@ -66,6 +66,8 @@ function veteranToFormValues(v: Veteran): VeteranFormInitial["values"] {
     preferredContact: v.preferredContact,
     phone: v.phone ?? "",
     email: v.email ?? "",
+    hardToReach: v.hardToReach,
+    contactNotes: v.contactNotes ?? "",
     birthYear: v.birthYear?.toString() ?? "",
     city: v.city ?? "",
     state: v.state ?? "",

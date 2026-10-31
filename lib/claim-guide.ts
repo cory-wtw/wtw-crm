@@ -14,7 +14,7 @@ const EIGHT00_INBOX = "https://app.800.com/company/worth-their-weight/inbox";
 
 export type ClaimGuideContact = {
   firstName: string;
-  preferredContact: "phone" | "email";
+  preferredContact: "phone" | "text" | "email";
   phone?: string;
   email?: string;
   eight00ThreadId?: string | null;

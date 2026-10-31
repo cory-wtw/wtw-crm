@@ -21,9 +21,14 @@ describe("outcomeAmounts", () => {
 
 describe("outcomeInputSchema", () => {
   it("coerces a date string and rejects unknown kinds", () => {
-    const ok = outcomeInputSchema.safeParse({ kind: "job", achievedAt: "2026-10-01T12:00:00" });
+    const ok = outcomeInputSchema.safeParse({ kind: "job", achievedAt: "2026-10-01T12:00:00", wtwRole: "helped" });
     expect(ok.success && ok.data.achievedAt instanceof Date).toBe(true);
-    expect(outcomeInputSchema.safeParse({ kind: "lottery", achievedAt: "2026-10-01" }).success).toBe(false);
+    expect(outcomeInputSchema.safeParse({ kind: "lottery", achievedAt: "2026-10-01", wtwRole: "helped" }).success).toBe(false);
+  });
+
+  it("requires an answer to Did WTW help?", () => {
+    expect(outcomeInputSchema.safeParse({ kind: "job", achievedAt: "2026-10-01" }).success).toBe(false);
+    expect(outcomeInputSchema.safeParse({ kind: "job", achievedAt: "2026-10-01", wtwRole: "none" }).success).toBe(true);
   });
 });
 

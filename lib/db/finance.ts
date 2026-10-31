@@ -40,6 +40,7 @@ function deserializeTransaction(
     donorName: data.donorName ?? undefined,
     campaign: data.campaign ?? undefined,
     notes: data.notes ?? undefined,
+    veteranId: data.veteranId || undefined,
     source: (data.source as TransactionSource) ?? "manual",
     createdBy: data.createdBy ?? "",
     createdAt: data.createdAt?.toDate?.() ?? data.createdAt ?? new Date(),
@@ -56,6 +57,16 @@ export async function listTransactions(): Promise<Transaction[]> {
   const snap = await adminDb
     .collection(TRANSACTIONS)
     .orderBy("date", "desc")
+    .get();
+  return snap.docs.map((d) => deserializeTransaction(d.id, d.data()));
+}
+
+/** Expenses linked to one veteran. A single-field filter, so no composite
+ *  index; sorted in memory. */
+export async function listTransactionsForVeteran(veteranId: string): Promise<Transaction[]> {
+  const snap = await adminDb
+    .collection(TRANSACTIONS)
+    .where("veteranId", "==", veteranId)
     .get();
   return snap.docs.map((d) => deserializeTransaction(d.id, d.data()));
 }

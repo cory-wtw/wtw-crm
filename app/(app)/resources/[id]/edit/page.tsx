@@ -52,6 +52,7 @@ export default async function EditResourcePage({
             populationRestriction: resource.populationRestriction,
             requiresDependents: resource.requiresDependents,
             crisisCapable: resource.crisisCapable,
+            replacesId: resource.replacesId ?? false,
 
             accessMethod: resource.accessMethod,
             accessValue: resource.accessValue ?? "",

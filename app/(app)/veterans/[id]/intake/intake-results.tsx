@@ -25,7 +25,7 @@ import { CrisisLine } from "./intake-form";
 /** The score, signal by signal, in the order staff reads it. */
 const BREAKDOWN_PARTS: [Exclude<keyof Candidate["breakdown"], "total">, string][] = [
   ["crisis", "crisis"],
-  ["legalUnlock", "ID/legal first"],
+  ["idUnlock", "replaces their ID"],
   ["bucketCoverage", "needs covered"],
   ["geography", "distance"],
   ["access", "access"],

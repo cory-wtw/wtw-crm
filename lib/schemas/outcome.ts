@@ -77,6 +77,37 @@ export const OUTCOME_VALUE_PROMPTS: Record<"monthly" | "oneTime", string> = {
   oneTime: "About how much was it worth? (optional)",
 };
 
+/**
+ * Did WTW help? Asked on every win, because a funder will ask it about every
+ * number. A veteran who found a job on their own still belongs on the record —
+ * it's good news and it changes what they need — but it isn't ours to report.
+ *
+ * Missing on wins logged before the question existed. Those read as
+ * unconfirmed: not counted as WTW's until somebody answers.
+ */
+export const WTW_ROLES = ["led", "helped", "none"] as const;
+export const wtwRoleSchema = z.enum(WTW_ROLES);
+export type WtwRole = z.infer<typeof wtwRoleSchema>;
+
+export const WTW_ROLE_LABELS: Record<WtwRole, string> = {
+  led: "Yes, WTW made it happen",
+  helped: "WTW helped",
+  none: "No, they did it on their own",
+};
+
+/** Short tag for the timeline. */
+export const WTW_ROLE_TAGS: Record<WtwRole | "unconfirmed", string> = {
+  led: "WTW made it happen",
+  helped: "WTW helped",
+  none: "On their own",
+  unconfirmed: "Did WTW help? Not answered",
+};
+
+/** Whether a win counts toward WTW's reported impact. Unanswered doesn't. */
+export function creditsWtw(role: WtwRole | undefined): boolean {
+  return role === "led" || role === "helped";
+}
+
 /** One win, as it sits on the veteran record. */
 export const veteranOutcomeSchema = z.object({
   id: z.string().min(1),
@@ -90,6 +121,8 @@ export const veteranOutcomeSchema = z.object({
    *  snapshot for the same reason referral packets keep one. */
   resourceId: z.string().optional(),
   resourceName: z.string().optional(),
+  /** Did WTW help? Absent means nobody answered yet. */
+  wtwRole: wtwRoleSchema.optional(),
   note: z.string().optional(),
   loggedBy: z.string(),
   loggedAt: z.date(),
@@ -102,6 +135,7 @@ export const outcomeInputSchema = z.object({
   achievedAt: z.coerce.date(),
   amount: z.number().nonnegative().optional(),
   resourceId: z.string().optional(),
+  wtwRole: wtwRoleSchema,
   note: z.string().max(500).optional(),
 });
 export type OutcomeInput = z.infer<typeof outcomeInputSchema>;

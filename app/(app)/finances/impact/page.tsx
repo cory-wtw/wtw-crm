@@ -115,7 +115,7 @@ export default async function ImpactPage() {
         />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            ["Veterans with a win", String(wins.veterans)],
+            ["Veterans WTW helped to a win", String(wins.veterans)],
             ["Jobs", String(wins.jobs)],
             ["Housed", String(wins.housed)],
             ["New income, per year†", formatUsd(wins.annual)],
@@ -145,6 +145,20 @@ export default async function ImpactPage() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No wins logged yet. Use &ldquo;Log a win&rdquo; on a veteran&apos;s record.</p>
+        )}
+        {(wins.onTheirOwn > 0 || wins.unconfirmed > 0) && (
+          <p className="text-xs text-muted-foreground">
+            Not counted above:{" "}
+            {[
+              wins.onTheirOwn > 0 &&
+                `${wins.onTheirOwn} ${wins.onTheirOwn === 1 ? "win" : "wins"} the veteran got on their own`,
+              wins.unconfirmed > 0 &&
+                `${wins.unconfirmed} where nobody has answered "Did WTW help?" yet — answer it on the veteran's Wins list`,
+            ]
+              .filter(Boolean)
+              .join("; ")}
+            .
+          </p>
         )}
       </section>
 

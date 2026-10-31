@@ -1,4 +1,5 @@
 import {
+  creditsWtw,
   lifetimeBenefitsUnlocked,
   monthlyBenefitLift,
   OUTCOME_KINDS,
@@ -23,7 +24,7 @@ export type ImpactVeteran = {
   dateFiled?: Date | null;
   dateWon?: Date | null;
   createdAt: Date;
-  outcomes?: readonly Pick<VeteranOutcome, "kind" | "monthlyValue" | "oneTimeValue">[];
+  outcomes?: readonly Pick<VeteranOutcome, "kind" | "monthlyValue" | "oneTimeValue" | "wtwRole">[];
 };
 
 export const FUNNEL_STAGES = ["found", "connected", "filed", "won"] as const;
@@ -68,6 +69,10 @@ export function benefitTotals(veterans: readonly ImpactVeteran[]) {
  * a job and an apartment counts once in each — except `veterans` and
  * `housed`, which count people. Dollar figures are only what staff
  * entered, so they're a floor, not an estimate.
+ *
+ * Only wins WTW had a hand in count. One the veteran got on their own, or one
+ * nobody has said either way about, is tallied separately so the report can
+ * say so — never folded into WTW's numbers.
  */
 export function outcomeTotals(veterans: readonly ImpactVeteran[]) {
   const byKind = Object.fromEntries(OUTCOME_KINDS.map((k) => [k, 0])) as Record<OutcomeKind, number>;
@@ -76,10 +81,17 @@ export function outcomeTotals(veterans: readonly ImpactVeteran[]) {
   let housed = 0;
   let monthly = 0;
   let oneTime = 0;
+  let onTheirOwn = 0;
+  let unconfirmed = 0;
   for (const v of veterans) {
     // A kind no longer in the list (renamed or retired) is skipped rather
     // than counted somewhere the report can't show it.
-    const outcomes = (v.outcomes ?? []).filter((o) => o.kind in byKind);
+    const known = (v.outcomes ?? []).filter((o) => o.kind in byKind);
+    for (const o of known) {
+      if (o.wtwRole === "none") onTheirOwn += 1;
+      else if (!o.wtwRole) unconfirmed += 1;
+    }
+    const outcomes = known.filter((o) => creditsWtw(o.wtwRole));
     if (outcomes.length > 0) withWins += 1;
     if (outcomes.some((o) => o.kind === "housedPermanent" || o.kind === "housedTemporary")) housed += 1;
     for (const o of outcomes) {
@@ -99,6 +111,10 @@ export function outcomeTotals(veterans: readonly ImpactVeteran[]) {
     monthly,
     annual: monthly * 12,
     oneTime,
+    /** Wins left out: the veteran did it alone. */
+    onTheirOwn,
+    /** Wins left out: nobody has answered "Did WTW help?" yet. */
+    unconfirmed,
   };
 }
 

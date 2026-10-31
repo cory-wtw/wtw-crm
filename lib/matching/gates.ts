@@ -118,6 +118,11 @@ export function localityMatch(v: MatchInput, r: Resource): LocalityTier | null {
   return null;
 }
 
+/** They said they have no current ID: none at all, or one that's expired. */
+export function lacksId(v: Pick<MatchInput, "idStatus">): boolean {
+  return v.idStatus === "none" || v.idStatus === "expired";
+}
+
 /**
  * Whether a resource will take this veteran.
  *
@@ -185,7 +190,13 @@ export function passesGates(v: MatchInput, r: Resource): GateResult {
     failures.push("population");
   }
 
-  if (!r.buckets.some((bucket) => v.needs.includes(bucket))) {
+  // No valid ID blocks a voucher, a job and a bank account, so a resource that
+  // replaces one is offered whether or not anybody ticked "legal" — but only on
+  // a stated "none" or "expired", never a guess.
+  if (
+    !r.buckets.some((bucket) => v.needs.includes(bucket)) &&
+    !(r.replacesId && lacksId(v))
+  ) {
     failures.push("no-bucket-overlap");
   }
 

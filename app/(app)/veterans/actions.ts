@@ -20,7 +20,9 @@ import {
   type PipelineHistoryEntry,
   type PipelineStage,
   pipelineStageSchema,
+  checklistLabelSchema,
   veteranInputSchema,
+  wtwRoleSchema,
 } from "@/lib/schemas";
 
 function tsToDate(value: unknown): Date | null {
@@ -440,4 +442,176 @@ export async function removeOutcomeAction(
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath("/finances/impact");
   return { ok: true };
+}
+
+/**
+ * Answer "Did WTW help?" on a win already on the record — the ones logged
+ * before the question existed, or one somebody got wrong.
+ */
+export async function setOutcomeRoleAction(
+  veteranId: string,
+  outcomeId: string,
+  rawRole: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
+  const role = wtwRoleSchema.safeParse(rawRole);
+  if (!role.success) return { ok: false, error: "Pick an answer." };
+
+  const veteranRef = adminDb.collection("veterans").doc(veteranId);
+  const result = await adminDb.runTransaction<
+    { error: string } | { before: string | null }
+  >(async (tx) => {
+    const snap = await tx.get(veteranRef);
+    if (!snap.exists) return { error: "Veteran not found." };
+    const data = snap.data()!;
+    if (!canEditVeteran(session, data as { assigneeUid: string | null }))
+      return { error: "Your account can't edit this veteran." };
+
+    const outcomes = (data.outcomes ?? []) as Array<{ id: string; wtwRole?: string }>;
+    const target = outcomes.find((o) => o.id === outcomeId);
+    if (!target) return { error: "That win is no longer on the record." };
+
+    tx.update(veteranRef, {
+      outcomes: outcomes.map((o) =>
+        o.id === outcomeId ? { ...o, wtwRole: role.data } : o,
+      ),
+      updatedAt: new Date(),
+      updatedBy: session.uid,
+    });
+    return { before: target.wtwRole ?? null };
+  });
+  if ("error" in result) return { ok: false, error: result.error };
+  await logAudit({
+    action: "update",
+    resourceType: "veteran",
+    resourceId: veteranId,
+    diff: { [`outcomes.${outcomeId}.wtwRole`]: { before: result.before, after: role.data } },
+  });
+
+  revalidatePath(`/veterans/${veteranId}`);
+  revalidatePath("/finances/impact");
+  return { ok: true };
+}
+
+type StoredChecklistItem = {
+  id: string;
+  label: string;
+  done: boolean;
+  doneAt: Date | null;
+  addedBy: string;
+  addedAt: Date;
+};
+
+/**
+ * Read-modify-write on the checklist in a transaction, so two people ticking
+ * boxes at once don't drop each other's change.
+ */
+async function updateChecklist(
+  veteranId: string,
+  change: (
+    items: StoredChecklistItem[],
+    uid: string,
+  ) => { items: StoredChecklistItem[]; audit: { before: unknown; after: unknown } } | { error: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!canAccessCrm(session))
+    return { ok: false, error: "Your account doesn't have access to this." };
+
+  const veteranRef = adminDb.collection("veterans").doc(veteranId);
+  const result = await adminDb.runTransaction<
+    { error: string } | { audit: { before: unknown; after: unknown } }
+  >(async (tx) => {
+    const snap = await tx.get(veteranRef);
+    if (!snap.exists) return { error: "Veteran not found." };
+    const data = snap.data()!;
+    if (!canEditVeteran(session, data as { assigneeUid: string | null }))
+      return { error: "Your account can't edit this veteran." };
+
+    const items = (data.checklist ?? []) as StoredChecklistItem[];
+    const next = change(items, session.uid);
+    if ("error" in next) return next;
+    tx.update(veteranRef, {
+      checklist: next.items,
+      updatedAt: new Date(),
+      updatedBy: session.uid,
+    });
+    return { audit: next.audit };
+  });
+  if ("error" in result) return { ok: false, error: result.error };
+
+  await logAudit({
+    action: "update",
+    resourceType: "veteran",
+    resourceId: veteranId,
+    diff: { checklist: result.audit },
+  });
+  revalidatePath(`/veterans/${veteranId}`);
+  revalidatePath("/veterans");
+  return { ok: true };
+}
+
+/** Add something they still need. */
+export async function addChecklistItemAction(
+  veteranId: string,
+  rawLabel: unknown,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const label = checklistLabelSchema.safeParse(rawLabel);
+  if (!label.success) {
+    return { ok: false, error: label.error.issues[0]?.message ?? "Say what they need." };
+  }
+  return updateChecklist(veteranId, (items, uid) => {
+    const key = label.data.toLowerCase();
+    if (items.some((i) => !i.done && i.label.toLowerCase() === key)) {
+      return { error: `"${label.data}" is already on the list.` };
+    }
+    const item: StoredChecklistItem = {
+      id: crypto.randomUUID(),
+      label: label.data,
+      done: false,
+      doneAt: null,
+      addedBy: uid,
+      addedAt: new Date(),
+    };
+    return { items: [...items, item], audit: { before: null, after: `+ ${item.label}` } };
+  });
+}
+
+/** Tick an item off, or reopen it. */
+export async function setChecklistItemDoneAction(
+  veteranId: string,
+  itemId: string,
+  done: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return updateChecklist(veteranId, (items) => {
+    const target = items.find((i) => i.id === itemId);
+    if (!target) return { error: "That item is no longer on the list." };
+    return {
+      items: items.map((i) =>
+        i.id === itemId ? { ...i, done, doneAt: done ? new Date() : null } : i,
+      ),
+      audit: {
+        before: `${target.label}: ${target.done ? "done" : "open"}`,
+        after: `${target.label}: ${done ? "done" : "open"}`,
+      },
+    };
+  });
+}
+
+/** Take an item off the list entirely — added by mistake, or no longer needed. */
+export async function removeChecklistItemAction(
+  veteranId: string,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return updateChecklist(veteranId, (items) => {
+    const target = items.find((i) => i.id === itemId);
+    if (!target) return { error: "That item is no longer on the list." };
+    return {
+      items: items.filter((i) => i.id !== itemId),
+      audit: { before: target.label, after: null },
+    };
+  });
 }

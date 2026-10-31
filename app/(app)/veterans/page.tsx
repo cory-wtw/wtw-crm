@@ -8,6 +8,7 @@ import { formatUsd } from "@/lib/format";
 import {
   lifetimeBenefitsUnlocked,
   monthlyBenefitLift,
+  openChecklistItems,
   PIPELINE_LABELS,
   type PipelineStage,
 } from "@/lib/schemas";
@@ -55,6 +56,9 @@ export default async function VeteransPage() {
     dateFound: v.dateFound?.toISOString() ?? null,
     updatedAt: v.updatedAt.toISOString(),
     monthlyBenefitAfter: v.monthlyBenefitAfter ?? 0,
+    preferredContact: v.preferredContact,
+    hardToReach: v.hardToReach,
+    openNeeds: openChecklistItems(v.checklist).map((c) => c.label),
   }));
 
   return (

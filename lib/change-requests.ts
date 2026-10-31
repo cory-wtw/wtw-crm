@@ -28,6 +28,8 @@ export const VETERAN_FIELDS = [
   "preferredContact",
   "phone",
   "email",
+  "hardToReach",
+  "contactNotes",
   "birthYear",
   "city",
   "state",
@@ -80,6 +82,7 @@ export const RESOURCE_FIELDS = [
   "requiresDependents",
   "populationRestriction",
   "crisisCapable",
+  "replacesId",
   "eligibilityNotes",
   "accessMethod",
   "accessValue",
@@ -101,6 +104,7 @@ export const TRANSACTION_FIELDS = [
   "donorName",
   "campaign",
   "notes",
+  "veteranId",
 ] as const;
 
 export const ENCOUNTER_FIELDS = [
@@ -155,6 +159,7 @@ export function veteranSnapshot(raw: Record<string, unknown>): Record<string, un
     out.hasDependents = raw.hasDependents ? "yes" : "no";
   }
   out.preferredContact ??= "phone";
+  out.hardToReach ??= false;
   out.pipelineStage ??= "found";
   out.monthlyBenefitBefore ??= 0;
   out.monthlyBenefitAfter ??= 0;

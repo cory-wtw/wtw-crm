@@ -72,6 +72,9 @@ export const transactionInputSchema = z.object({
   donorName: z.string().trim().max(200).optional(),
   campaign: z.string().trim().max(200).optional(),
   notes: z.string().trim().max(2000).optional(),
+  // The veteran this was spent on — their bus pass, a night in a motel — so
+  // the books can say what each veteran has cost. Expenses only.
+  veteranId: z.string().trim().max(128).optional(),
 });
 export type TransactionInput = z.infer<typeof transactionInputSchema>;
 

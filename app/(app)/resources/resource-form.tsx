@@ -67,6 +67,7 @@ const formSchema = z.object({
   requiresDependents: z.boolean(),
   populationRestriction: z.array(z.string()),
   crisisCapable: z.boolean(),
+  replacesId: z.boolean(),
 
   accessMethod: z.enum(ACCESS_METHODS),
   accessValue: z.string().optional(),
@@ -147,6 +148,7 @@ export function ResourceForm({ initial, draft }: Props) {
       requiresDependents: false,
       populationRestriction: [],
       crisisCapable: false,
+      replacesId: false,
       accessMethod: "phone",
       accessValue: "",
       whatToBring: "",
@@ -249,6 +251,7 @@ export function ResourceForm({ initial, draft }: Props) {
       requiresDependents: values.requiresDependents,
       populationRestriction: values.populationRestriction,
       crisisCapable: values.crisisCapable,
+      replacesId: values.replacesId,
 
       accessMethod: values.accessMethod,
       accessValue: values.accessValue || undefined,
@@ -511,6 +514,15 @@ export function ResourceForm({ initial, draft }: Props) {
                 className="accent-[color:var(--wtw-brand-gold)]"
               />
               Same-day / crisis capable
+            </label>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                {...register("replacesId")}
+                className="accent-[color:var(--wtw-brand-gold)]"
+              />
+              Replaces a lost ID — state ID, driver&apos;s license, birth
+              certificate, Social Security card or DD-214 (not legal aid)
             </label>
           </div>
         </Field>

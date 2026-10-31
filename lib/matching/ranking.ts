@@ -19,14 +19,15 @@ import type { MatchInput } from "./types";
  * The whole scoring model, in one object.
  *
  * Crisis dwarfs everything because when someone has nowhere to sleep tonight,
- * nothing else on the list matters yet. Legal unlock outranks what the veteran
+ * nothing else on the list matters yet. ID unlock outranks what the veteran
  * actually asked for on purpose: no valid ID blocks a housing voucher, a job,
  * and a bank account, so if someone calls about housing with no ID, the ID
- * surfaces first.
+ * surfaces first. It goes only to resources that actually replace an ID
+ * (`replacesId`) — legal aid sits in the same bucket but can't issue one.
  */
 export const RANKING_WEIGHTS = {
   crisis: 1000,
-  legalUnlock: 200,
+  idUnlock: 200,
   geography: {
     /** Local resources, nearest first — see localityMatch. */
     city: 140,
@@ -69,7 +70,7 @@ export const RANKING_WEIGHTS = {
 /** Per-signal contributions, kept so the review screen can explain a score. */
 export type ScoreBreakdown = {
   crisis: number;
-  legalUnlock: number;
+  idUnlock: number;
   geography: number;
   access: number;
   wait: number;
@@ -132,10 +133,10 @@ export function scoreResource(
   const crisis =
     v.safeTonight === false && r.crisisCapable ? RANKING_WEIGHTS.crisis : 0;
 
-  const legalUnlock =
-    r.buckets.includes("legal") && v.idStatus !== "valid"
-      ? RANKING_WEIGHTS.legalUnlock
-      : 0;
+  // Unsure or unasked counts too: ranking only orders, so a wrong guess costs
+  // a place on the list, not a wasted trip.
+  const idUnlock =
+    r.replacesId && v.idStatus !== "valid" ? RANKING_WEIGHTS.idUnlock : 0;
 
   const geography =
     r.geoScope === "national"
@@ -152,7 +153,7 @@ export function scoreResource(
 
   return {
     crisis,
-    legalUnlock,
+    idUnlock,
     geography,
     access,
     wait,
@@ -161,7 +162,7 @@ export function scoreResource(
     repeatNeed: 0,
     total:
       crisis +
-      legalUnlock +
+      idUnlock +
       geography +
       access +
       wait +

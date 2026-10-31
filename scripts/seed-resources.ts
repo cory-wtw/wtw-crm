@@ -71,6 +71,7 @@ function printRecord(record: Ready, index: number) {
     input.requiresValidId && "valid ID",
     input.requiresDependents && "dependents",
     input.crisisCapable && "same-day capable",
+    input.replacesId && "replaces a lost ID",
   ].filter(Boolean);
   console.log(`    gates:        ${gates.join(", ") || "none"}`);
   console.log(`    access:       ${input.accessMethod} · ${input.accessValue ?? "—"}`);

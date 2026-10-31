@@ -315,6 +315,7 @@ export function parseSeedResource(source: SeedResource): SeedParse {
     ["requires dependents", "requiresDependents"],
     ["requires a valid id", "requiresValidId"],
     ["same-day / crisis capable", "crisisCapable"],
+    ["replaces a lost id", "replacesId"],
     ["mst survivors only", "populationRestriction"],
     ["homeless veterans only", "populationRestriction"],
   ]);
@@ -365,6 +366,7 @@ export function parseSeedResource(source: SeedResource): SeedParse {
       ...(reqs.has("homeless veterans only") ? (["homeless"] as const) : []),
     ],
     crisisCapable: reqs.has("same-day / crisis capable"),
+    replacesId: reqs.has("replaces a lost id"),
 
     accessMethod,
     // The dialling instruction, not the switchboard number: "423-855-6570

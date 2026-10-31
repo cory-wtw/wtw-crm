@@ -5,11 +5,19 @@ import { useState, useTransition } from "react";
 import {
   OUTCOME_KIND_INFO,
   outcomeSummary,
+  WTW_ROLES,
+  WTW_ROLE_LABELS,
+  WTW_ROLE_TAGS,
   type OutcomeKind,
+  type WtwRole,
 } from "@/lib/schemas";
 import { localTodayIso as todayIso, positiveAmount } from "@/lib/utils";
 import { OutcomeKindPicker } from "../../outcome-kind-picker";
-import { logOutcomeAction, removeOutcomeAction } from "../actions";
+import {
+  logOutcomeAction,
+  removeOutcomeAction,
+  setOutcomeRoleAction,
+} from "../actions";
 
 export type OutcomeItem = {
   id: string;
@@ -18,8 +26,45 @@ export type OutcomeItem = {
   monthlyValue?: number;
   oneTimeValue?: number;
   resourceName?: string;
+  wtwRole?: WtwRole;
   note?: string;
 };
+
+/**
+ * "Did WTW help?" as three buttons. Required on a new win; on an old one it's
+ * how somebody answers after the fact.
+ */
+function WtwRolePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: WtwRole | "";
+  onChange: (role: WtwRole) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Did WTW help?">
+      {WTW_ROLES.map((role) => (
+        <button
+          key={role}
+          type="button"
+          role="radio"
+          aria-checked={value === role}
+          disabled={disabled}
+          onClick={() => onChange(role)}
+          className={`inline-flex min-h-11 items-center rounded-md border px-3 text-sm font-bold transition-colors disabled:opacity-50 ${
+            value === role
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-input bg-background hover:border-primary"
+          }`}
+        >
+          {WTW_ROLE_LABELS[role]}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Wins beyond VA benefits — the job, the apartment, the SNAP card. One tap to
@@ -40,6 +85,7 @@ export function Outcomes({
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayIso());
   const [note, setNote] = useState("");
+  const [wtwRole, setWtwRole] = useState<WtwRole | "">("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -51,13 +97,35 @@ export function Outcomes({
     setAmount("");
     setDate(todayIso());
     setNote("");
+    setWtwRole("");
     setError(null);
+  }
+
+  async function answer(item: OutcomeItem, role: WtwRole) {
+    if (removing) return;
+    setRemoving(item.id);
+    try {
+      const result = await setOutcomeRoleAction(veteranId, item.id, role);
+      if (!result.ok) {
+        alert(result.error);
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      alert("Couldn't save — check your connection and try again.");
+    } finally {
+      setRemoving(null);
+    }
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!kind) {
       setError("Pick what they got.");
+      return;
+    }
+    if (!wtwRole) {
+      setError("Say whether WTW helped. The Impact report only counts the wins we had a hand in.");
       return;
     }
     setError(null);
@@ -67,6 +135,7 @@ export function Outcomes({
         kind,
         achievedAt: `${date}T12:00:00`,
         amount: positiveAmount(amount),
+        wtwRole,
         note: note.trim() || undefined,
       });
       if (!result.ok) {
@@ -138,6 +207,10 @@ export function Outcomes({
             onAmount={setAmount}
             optional={false}
           />
+          <div className="space-y-1.5">
+            <span className="block text-sm font-bold">Did WTW help?</span>
+            <WtwRolePicker value={wtwRole} onChange={setWtwRole} />
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1.5">
               <span className="block text-sm font-bold">When</span>
@@ -201,7 +274,26 @@ export function Outcomes({
                     day: "numeric",
                     year: "numeric",
                   })}
+                  {" · "}
+                  <span
+                    className={
+                      item.wtwRole
+                        ? undefined
+                        : "font-bold text-[color:var(--wtw-deep-gold)]"
+                    }
+                  >
+                    {WTW_ROLE_TAGS[item.wtwRole ?? "unconfirmed"]}
+                  </span>
                 </p>
+                {!item.wtwRole && canManage && (
+                  <div className="mt-2">
+                    <WtwRolePicker
+                      value=""
+                      onChange={(role) => answer(item, role)}
+                      disabled={removing !== null}
+                    />
+                  </div>
+                )}
               </div>
               {canManage && (
                 <button

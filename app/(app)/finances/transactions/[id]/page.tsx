@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTransaction, listCategories, listFormOptions } from "@/lib/db/finance";
+import { listVeterans } from "@/lib/db/veterans";
+import { veteranOptions } from "@/lib/finance/per-veteran";
 import { todayIso } from "@/lib/finance/range";
 import { TRANSACTION_SOURCE_LABELS } from "@/lib/schemas";
 import { formatDate } from "@/lib/format";
@@ -13,10 +15,11 @@ export default async function EditTransactionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [categories, options, tx] = await Promise.all([
+  const [categories, options, tx, veterans] = await Promise.all([
     listCategories(),
     listFormOptions(),
     getTransaction(id),
+    listVeterans(),
   ]);
   if (!tx) notFound();
 
@@ -30,6 +33,7 @@ export default async function EditTransactionPage({
       </div>
       <TransactionForm
         categories={categories}
+        veterans={veteranOptions(veterans)}
         today={todayIso()}
         {...options}
         initial={{
@@ -44,6 +48,7 @@ export default async function EditTransactionPage({
             donorName: tx.donorName ?? "",
             campaign: tx.campaign ?? "",
             notes: tx.notes ?? "",
+            veteranId: tx.veteranId ?? "",
             customSplit: !!tx.allocation,
             programPct: tx.allocation ? String(tx.allocation.programPct) : "",
             mgmtPct: tx.allocation ? String(tx.allocation.mgmtPct) : "",

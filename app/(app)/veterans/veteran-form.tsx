@@ -47,6 +47,8 @@ const formSchema = z.object({
   preferredContact: z.enum(PREFERRED_CONTACT_METHODS),
   phone: z.string().optional(),
   email: z.string().optional(),
+  hardToReach: z.boolean(),
+  contactNotes: z.string().max(200, "Keep it to one short line").optional(),
 
   birthYear: z.string().optional(),
   city: z.string().optional(),
@@ -109,6 +111,8 @@ export function VeteranForm({
       preferredContact: "phone",
       phone: "",
       email: "",
+      hardToReach: false,
+      contactNotes: "",
       birthYear: "",
       city: "",
       state: "",
@@ -138,6 +142,8 @@ export function VeteranForm({
       // "" rather than undefined so clearing a field actually clears it.
       phone: (values.phone ?? "").trim(),
       email: (values.email ?? "").trim(),
+      hardToReach: values.hardToReach,
+      contactNotes: (values.contactNotes ?? "").trim(),
       birthYear: toNumber(values.birthYear),
       city: values.city || undefined,
       state: values.state || undefined,
@@ -202,7 +208,7 @@ export function VeteranForm({
           }
         />
         <Field
-          label={preferredContact === "phone" ? "Phone" : "Phone (optional)"}
+          label={preferredContact === "email" ? "Phone (optional)" : "Phone"}
           error={errors.phone?.message}
           input={<Input type="tel" {...register("phone")} />}
         />
@@ -210,6 +216,26 @@ export function VeteranForm({
           label={preferredContact === "email" ? "Email" : "Email (optional)"}
           error={errors.email?.message}
           input={<Input type="email" {...register("email")} />}
+        />
+        <Field
+          label="Hard to reach"
+          hint="No steady phone, only on Wi-Fi, moves around. Flags them on the Roster."
+          input={
+            <label className="flex min-h-11 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="size-5 accent-[color:var(--wtw-deep-gold)]"
+                {...register("hardToReach")}
+              />
+              Yes, hard to reach
+            </label>
+          }
+        />
+        <Field
+          label="How to reach them (optional)"
+          hint="e.g. Only gets texts on Wi-Fi — try evenings."
+          error={errors.contactNotes?.message}
+          input={<Input maxLength={200} {...register("contactNotes")} />}
         />
       </Section>
 

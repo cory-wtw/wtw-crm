@@ -71,7 +71,7 @@ describe("scoreResource", () => {
     );
     expect(breakdown).toEqual({
       crisis: 0,
-      legalUnlock: 0,
+      idUnlock: 0,
       geography: RANKING_WEIGHTS.geography.national,
       access: RANKING_WEIGHTS.access.phone,
       wait: RANKING_WEIGHTS.wait.unknown,
@@ -103,16 +103,23 @@ describe("scoreResource", () => {
     ).toBe(0);
   });
 
-  it("pays the legal unlock when the veteran has no valid ID", () => {
-    const legal = aResource({ buckets: ["legal"] });
+  it("pays the ID unlock only to resources that replace an ID", () => {
+    const idOffice = aResource({ buckets: ["legal"], replacesId: true });
     expect(
-      scoreResource(aVeteran({ idStatus: "none" }), legal, NOW).legalUnlock,
-    ).toBe(RANKING_WEIGHTS.legalUnlock);
+      scoreResource(aVeteran({ idStatus: "none" }), idOffice, NOW).idUnlock,
+    ).toBe(RANKING_WEIGHTS.idUnlock);
     expect(
-      scoreResource(aVeteran({ idStatus: "expired" }), legal, NOW).legalUnlock,
-    ).toBe(RANKING_WEIGHTS.legalUnlock);
+      scoreResource(aVeteran({ idStatus: "expired" }), idOffice, NOW).idUnlock,
+    ).toBe(RANKING_WEIGHTS.idUnlock);
     expect(
-      scoreResource(aVeteran({ idStatus: "valid" }), legal, NOW).legalUnlock,
+      scoreResource(aVeteran({ idStatus: "valid" }), idOffice, NOW).idUnlock,
+    ).toBe(0);
+  });
+
+  it("gives legal aid no ID unlock — it can't issue a state ID", () => {
+    const legalAid = aResource({ buckets: ["legal"] });
+    expect(
+      scoreResource(aVeteran({ idStatus: "none" }), legalAid, NOW).idUnlock,
     ).toBe(0);
   });
 
@@ -204,8 +211,8 @@ describe("rankResources", () => {
   });
 
   it("surfaces the ID before the housing the veteran called about", () => {
-    // No valid ID blocks a voucher, a job, and a bank account, so Legal &
-    // Records outranks the stated need on purpose.
+    // No valid ID blocks a voucher, a job, and a bank account, so a resource
+    // that replaces one outranks the stated need on purpose.
     const veteran = aVeteran({
       needs: ["housing", "legal"],
       idStatus: "none",
@@ -219,6 +226,7 @@ describe("rankResources", () => {
       id: "records",
       organizationName: "Records Help",
       buckets: ["legal"],
+      replacesId: true,
     });
 
     const ranked = rankResources(veteran, [housing, records], NOW);

@@ -8,7 +8,12 @@ import { revalidatePath } from "next/cache";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
-import { outcomeInputSchema, outcomeAmounts, outcomeSummary } from "@/lib/schemas";
+import {
+  outcomeInputSchema,
+  outcomeAmounts,
+  outcomeSummary,
+  wtwRoleSchema,
+} from "@/lib/schemas";
 import type { Actor, OnCommit } from "./actor";
 
 function dropUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
@@ -40,7 +45,12 @@ export async function logOutcome(
   rawInput: unknown,
   onCommit?: OnCommit,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const parsed = outcomeInputSchema.safeParse(rawInput);
+  // "Did WTW help?" is required everywhere a win is entered, but a proposal
+  // queued before the question existed still has to apply — it lands
+  // unconfirmed, which the Impact report doesn't count.
+  const parsed = outcomeInputSchema
+    .extend({ wtwRole: wtwRoleSchema.optional() })
+    .safeParse(rawInput);
   if (!parsed.success) {
     return { ok: false, error: formatIssues(parsed.error.issues) };
   }
@@ -67,6 +77,7 @@ export async function logOutcome(
     ...outcomeAmounts(input.kind, input.amount),
     resourceId: resourceName ? input.resourceId : undefined,
     resourceName,
+    wtwRole: input.wtwRole,
     note: input.note?.trim() || undefined,
     loggedBy: actor.uid,
     loggedAt: now,

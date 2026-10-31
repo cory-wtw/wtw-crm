@@ -7,12 +7,15 @@ import {
 } from "./pipeline";
 
 // How a veteran prefers to be reached. The preferred channel is required;
-// the other is optional and kept only when the veteran gives it.
-export const PREFERRED_CONTACT_METHODS = ["phone", "email"] as const;
+// the other is optional and kept only when the veteran gives it. Text is its
+// own answer, not a kind of phone: plenty of veterans can't take a call but
+// read every text, and calling them first wastes the one chance.
+export const PREFERRED_CONTACT_METHODS = ["phone", "text", "email"] as const;
 export const preferredContactSchema = z.enum(PREFERRED_CONTACT_METHODS);
 export type PreferredContact = z.infer<typeof preferredContactSchema>;
 export const PREFERRED_CONTACT_LABELS: Record<PreferredContact, string> = {
-  phone: "Phone",
+  phone: "Call",
+  text: "Text",
   email: "Email",
 };
 
@@ -97,6 +100,40 @@ export const RECEIVING_VA_BENEFITS_LABELS: Record<
   unsure: "Not sure",
 };
 
+/**
+ * The concrete things a veteran still needs — a bus pass, an ID, a phone.
+ * Distinct from intake's need buckets, which route a match: this is the
+ * to-do list staff work through, one tick at a time, so what's still open
+ * shows at a glance instead of hiding in note text.
+ */
+export const CHECKLIST_PRESETS = [
+  "Bus pass",
+  "State ID",
+  "Phone",
+  "Supplies",
+  "DD-214",
+  "Birth certificate",
+  "Social Security card",
+] as const;
+
+export const checklistItemSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().trim().min(1, "Say what they need").max(80, "Keep it short"),
+  done: z.boolean().default(false),
+  doneAt: z.date().nullable().default(null),
+  addedBy: z.string(),
+  addedAt: z.date(),
+});
+export type ChecklistItem = z.infer<typeof checklistItemSchema>;
+
+/** What staff type when adding an item. */
+export const checklistLabelSchema = checklistItemSchema.shape.label;
+
+/** Items still open, in the order they were added. */
+export function openChecklistItems<T extends { done: boolean }>(items: readonly T[]): T[] {
+  return items.filter((i) => !i.done);
+}
+
 const currentYear = new Date().getFullYear();
 
 export const veteranSchema = z.object({
@@ -112,11 +149,16 @@ export const veteranSchema = z.object({
     .optional()
     .or(z.literal("")),
 
-  // Contact. `preferredContact` says which of phone/email to reach them on;
-  // that field must hold a value, the other is optional.
+  // Contact. `preferredContact` says how to reach them first; text and call
+  // both need the phone number, email needs the email.
   preferredContact: preferredContactSchema.default("phone"),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
+  /** Hard to get hold of — no steady phone, only on Wi-Fi, moves around. A
+   *  flag rather than a guess from missed calls, so it shows before the call. */
+  hardToReach: z.boolean().default(false),
+  /** The how: "Only gets texts on Wi-Fi — try evenings." */
+  contactNotes: z.string().max(200, "Keep it to one short line").optional(),
 
   // Demographics
   birthYear: z
@@ -180,6 +222,10 @@ export const veteranSchema = z.object({
   // logOutcomeAction and the follow-up form, never by the edit form.
   outcomes: z.array(veteranOutcomeSchema).default([]),
 
+  // What they still need. Written by the checklist actions on the veteran
+  // page, never by the edit form.
+  checklist: z.array(checklistItemSchema).default([]),
+
   // Links
   vsoIds: z.array(z.string()).default([]),
   // The numeric id from an 800.com inbox thread URL
@@ -202,11 +248,14 @@ function refinePreferredContact(
   data: { preferredContact: PreferredContact; phone?: string; email?: string },
   ctx: z.RefinementCtx,
 ): void {
-  if (data.preferredContact === "phone" && !data.phone?.trim()) {
+  if (
+    (data.preferredContact === "phone" || data.preferredContact === "text") &&
+    !data.phone?.trim()
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["phone"],
-      message: "Add a phone number, or switch the preferred method to email.",
+      message: `Add a phone number to ${data.preferredContact === "text" ? "text" : "call"}, or switch the preferred method to email.`,
     });
   }
   if (data.preferredContact === "email" && !data.email?.trim()) {
@@ -227,6 +276,7 @@ export const veteranInputSchema = veteranSchema
     lastContactedAt: true,
     pipelineHistory: true,
     outcomes: true,
+    checklist: true,
     dateFound: true,
     dateConnected: true,
     dateFiled: true,
@@ -250,6 +300,9 @@ export const veteranInputSchema = veteranSchema
     // Null clears it: a ZIP left over from an old address would keep winning
     // over the corrected city at matching.
     zip: z.string().nullish(),
+    // Left unset unless somebody says so, so a new record from Claude doesn't
+    // list "hard to reach: no" as a change to approve. Reads as false.
+    hardToReach: z.boolean().optional(),
   })
   .superRefine(refinePreferredContact);
 export type VeteranInput = z.infer<typeof veteranInputSchema>;

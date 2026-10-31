@@ -49,6 +49,8 @@ import {
   ID_STATUSES,
   OUTCOME_KINDS,
   OUTCOME_KIND_INFO,
+  WTW_ROLES,
+  WTW_ROLE_LABELS,
   PARTNERSHIP_STATUSES,
   PENDING_PREFIX,
   PIPELINE_STAGES,
@@ -66,7 +68,8 @@ const NEVER_STORED =
 
 const VETERAN_FIELD_HELP = `Fields: ${VETERAN_FIELDS.join(", ")}.
 - firstName (required on create), lastInitial (one letter)
-- preferredContact: ${PREFERRED_CONTACT_METHODS.join(" | ")} — that channel (phone or email) must have a value
+- preferredContact: ${PREFERRED_CONTACT_METHODS.join(" | ")} — phone and text need a phone number, email needs an email
+- hardToReach (boolean): no steady phone, only on Wi-Fi, moves around; contactNotes: one line on how to reach them ("Only gets texts on Wi-Fi")
 - birthYear (number), city, state (2 letters), zip
 - dischargeCharacter: ${DISCHARGE_CHARACTERS.join(" | ")}; serviceEra: ${SERVICE_ERAS.join(" | ")}
 - idStatus: ${ID_STATUSES.join(" | ")}; hasDependents: ${DEPENDENTS_ANSWERS.join(" | ")}
@@ -85,7 +88,7 @@ const RESOURCE_FIELD_HELP = `Fields: ${RESOURCE_FIELDS.join(", ")}.
 - description (for staff), helpsWith (one short line a veteran would understand, ≤160 chars), services, eligibility, eligibilityNotes (≤500)
 - buckets (needs it serves): ${BUCKET_CODES.join(", ")}
 - geoScope: ${GEO_SCOPES.join(" | ")}; geoStates: 2-letter codes (required unless national); geoLocalities: cities/counties (required for local)
-- gates: minDischarge (any | general | honorable), requiresVaEnrollment, requiresValidId, requiresDependents, crisisCapable (booleans), eraRestriction: [${SERVICE_ERAS.join(", ")}], populationRestriction: [${POPULATIONS.join(", ")}]
+- gates: minDischarge (any | general | honorable), requiresVaEnrollment, requiresValidId, requiresDependents, crisisCapable (booleans); replacesId (boolean, not a gate): actually replaces a state ID / driver's license or the papers for one (birth certificate, SS card, DD-214) — true for a Secretary of State or vital records office, false for legal aid, eraRestriction: [${SERVICE_ERAS.join(", ")}], populationRestriction: [${POPULATIONS.join(", ")}]
 - accessMethod: ${ACCESS_METHODS.join(" | ")}; accessValue: the number/URL/address; whatToBring; typicalWait: ${TYPICAL_WAITS.join(" | ")}
 - verificationStatus: ${VERIFICATION_STATUSES.join(" | ")}; fragility: stable | fragile; sourceName
 Search first so you don't add a duplicate.`;
@@ -95,7 +98,8 @@ const TRANSACTION_FIELD_HELP = `Fields: ${TRANSACTION_FIELDS.join(", ")}.
 - categoryId: from list_finance_categories, matching the type
 - vendor (who was paid / who paid), description, notes
 - income only: donorName, campaign
-- expense only, optional: allocation {programPct, mgmtPct, fundraisingPct} adding to 100 (omit to use the category's default)`;
+- expense only, optional: allocation {programPct, mgmtPct, fundraisingPct} adding to 100 (omit to use the category's default)
+- expense only, optional: veteranId — the veteran it was spent on (search_veterans), e.g. their bus pass`;
 
 const REASON = z
   .string()
@@ -448,6 +452,11 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
         achievedAt: z.string().describe("ISO date it happened."),
         amount: z.number().nonnegative().optional(),
         resourceId: DOC_ID.optional().describe("The resource that made it happen, if any."),
+        wtwRole: z
+          .enum(WTW_ROLES)
+          .describe(
+            `Did WTW help? ${WTW_ROLES.map((r) => `${r} = ${WTW_ROLE_LABELS[r]}`).join("; ")}. Only what the user said — ask if unclear. "none" wins stay on the record but aren't counted as WTW's impact.`,
+          ),
         note: z.string().max(500).optional(),
         reason: REASON,
         group: GROUP,

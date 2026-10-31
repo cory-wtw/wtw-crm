@@ -351,6 +351,23 @@ describe("bucket overlap", () => {
     ).toContain("no-bucket-overlap");
   });
 
+  it("offers an ID-replacement office to someone with no ID, whatever they ticked", () => {
+    const idOffice = aResource({ buckets: ["legal"], replacesId: true });
+    for (const idStatus of ["none", "expired"] as const) {
+      expect(passesGates(aVeteran({ needs: ["housing"], idStatus }), idOffice).passes).toBe(true);
+    }
+    // Only on a stated answer: valid, unsure or unasked don't open it.
+    for (const idStatus of ["valid", "unsure", undefined] as const) {
+      expect(passesGates(aVeteran({ needs: ["housing"], idStatus }), idOffice).failures).toContain(
+        "no-bucket-overlap",
+      );
+    }
+    // Legal aid doesn't get the same pass.
+    expect(
+      passesGates(aVeteran({ needs: ["housing"], idStatus: "none" }), aResource({ buckets: ["legal"] })).failures,
+    ).toContain("no-bucket-overlap");
+  });
+
   it("excludes an unclassified resource from everything", () => {
     const result = passesGates(aVeteran(), aResource({ buckets: [] }));
     expect(result.failures).toContain("no-bucket-overlap");

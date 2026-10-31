@@ -214,6 +214,20 @@ export const resourceSchema = z.object({
    *  has nowhere safe tonight. */
   crisisCapable: z.boolean().default(false),
 
+  /**
+   * Actually replaces a lost or expired state ID or driver's license, or the
+   * papers it takes to get one — a birth certificate, a Social Security card,
+   * a DD-214. The Secretary of State office, vital records, an ID-voucher
+   * program.
+   *
+   * Not "legal": a legal aid group can help with a court date but doesn't
+   * hand anyone a state ID, and the matcher used to treat the two the same.
+   * Not a gate either — it opens a door rather than closing one: someone with
+   * no valid ID sees these whatever needs were ticked, and first. Optional so
+   * records written before it read as false.
+   */
+  replacesId: z.boolean().optional(),
+
   // --- Access. How a veteran starts. Ranking signal, not a gate. ---
 
   /**

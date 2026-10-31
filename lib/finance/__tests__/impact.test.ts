@@ -71,16 +71,16 @@ describe("outcomeTotals", () => {
     const t = outcomeTotals([
       v({
         outcomes: [
-          { kind: "job", monthlyValue: 2400 },
-          { kind: "housedPermanent" },
-          { kind: "financialAssistance", oneTimeValue: 800 },
+          { kind: "job", monthlyValue: 2400, wtwRole: "led" },
+          { kind: "housedPermanent", wtwRole: "helped" },
+          { kind: "financialAssistance", oneTimeValue: 800, wtwRole: "led" },
         ],
       }),
-      v({ outcomes: [{ kind: "snap", monthlyValue: 290 }, { kind: "job" }] }),
+      v({ outcomes: [{ kind: "snap", monthlyValue: 290, wtwRole: "helped" }, { kind: "job", wtwRole: "helped" }] }),
       // Shelter then an apartment: one person housed.
-      v({ outcomes: [{ kind: "housedTemporary" }, { kind: "housedPermanent" }] }),
+      v({ outcomes: [{ kind: "housedTemporary", wtwRole: "led" }, { kind: "housedPermanent", wtwRole: "led" }] }),
       // A retired kind is skipped, not counted as NaN.
-      v({ outcomes: [{ kind: "retiredKind" as never }] }),
+      v({ outcomes: [{ kind: "retiredKind" as never, wtwRole: "led" }] }),
       v({}),
     ]);
     expect(t.total).toBe(7);
@@ -91,5 +91,30 @@ describe("outcomeTotals", () => {
     expect(t.monthly).toBe(2690);
     expect(t.annual).toBe(2690 * 12);
     expect(t.oneTime).toBe(800);
+  });
+});
+
+describe("outcomeTotals attribution", () => {
+  it("counts only wins WTW had a hand in, and tallies the rest", () => {
+    const t = outcomeTotals([
+      // Got her own job and housing; WTW got her the bus pass.
+      v({
+        outcomes: [
+          { kind: "job", monthlyValue: 2000, wtwRole: "none" },
+          { kind: "housedPermanent", wtwRole: "none" },
+          { kind: "transportation", oneTimeValue: 60, wtwRole: "led" },
+        ],
+      }),
+      // Logged before the question existed.
+      v({ outcomes: [{ kind: "snap", monthlyValue: 290 }] }),
+    ]);
+    expect(t.total).toBe(1);
+    expect(t.veterans).toBe(1);
+    expect(t.jobs).toBe(0);
+    expect(t.housed).toBe(0);
+    expect(t.monthly).toBe(0);
+    expect(t.oneTime).toBe(60);
+    expect(t.onTheirOwn).toBe(2);
+    expect(t.unconfirmed).toBe(1);
   });
 });
