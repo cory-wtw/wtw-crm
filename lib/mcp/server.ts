@@ -30,6 +30,7 @@ import {
   proposeFollowUp,
   proposeIntake,
   proposeOutcome,
+  proposeChecklist,
   proposeReferral,
   withdrawChange,
   type ProposeResult,
@@ -40,6 +41,7 @@ import {
   ACCESS_METHODS,
   BUCKET_CODES,
   CHANGE_REQUEST_STATUSES,
+  CHECKLIST_PRESETS,
   CONTACT_METHODS,
   DEPENDENTS_ANSWERS,
   DISCHARGE_CHARACTERS,
@@ -145,7 +147,8 @@ Logging a phone call (from a transcript, or "I talked to so-and-so"):
 4. If it was an intake: propose_intake with what they said. It returns the short list.
 5. If the user picked resources to send: propose_referral with the ids, ranks and scores from that list. After approval, get_change_request returns the packet text to send.
 6. Following up on a referral: get_veteran shows openReferrals; propose_follow_up with an outcome per resource.
-7. A concrete win (job, housing, SNAP…): propose_win.
+7. A concrete win (job, housing, SNAP…): propose_win, saying whether WTW helped.
+8. Concrete things they still need (bus pass, ID, phone, supplies), or got: propose_checklist — add new needs, tick off what they now have. get_veteran shows the current checklist.
 Only record what was actually said. Ask the user when something is unclear rather than guessing. ${NEVER_STORED}
 The system never assesses a VA claim or says what to file — WTW is not VA-accredited. Route claims questions to an accredited VSO.`;
 
@@ -464,6 +467,25 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     },
     async ({ veteranId, reason, group, ...input }) =>
       queued(await proposeOutcome(user, veteranId, input, reason, group)),
+  );
+
+  server.registerTool(
+    "propose_checklist",
+    {
+      title: "Update the needs checklist",
+      description: `Change a veteran's "Still needs" checklist — the concrete things to get them. add: new items, short labels (common ones: ${CHECKLIST_PRESETS.join(", ")}). done: items they now have. reopen: items ticked by mistake. remove: items added by mistake or no longer needed. Name existing items by label or id (get_veteran → veteran.checklist). Several at once is fine. A new veteran ("${PENDING_PREFIX}<id>") can only take adds.`,
+      inputSchema: {
+        veteranId: VETERAN_ID,
+        add: z.array(z.string().min(1).max(80)).max(20).optional(),
+        done: z.array(z.string().min(1)).max(20).optional(),
+        reopen: z.array(z.string().min(1)).max(20).optional(),
+        remove: z.array(z.string().min(1)).max(20).optional(),
+        reason: REASON,
+        group: GROUP,
+      },
+    },
+    async ({ veteranId, reason, group, ...input }) =>
+      queued(await proposeChecklist(user, veteranId, input, reason, group)),
   );
 
   // -------------------------------------------------------------------- VSOs

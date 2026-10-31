@@ -52,6 +52,11 @@ import {
 } from "@/lib/ops/concierge";
 import { followUpInputSchema, recordFollowUp } from "@/lib/ops/follow-up";
 import { logOutcome } from "@/lib/ops/outcome";
+import {
+  applyChecklistEdit,
+  checklistEditSchema,
+  type StoredChecklistItem,
+} from "@/lib/checklist";
 import { createResource, editResource } from "@/lib/ops/resources";
 import { loadCategory, saveTransaction } from "@/lib/ops/transactions";
 import type { Actor, OnCommit } from "@/lib/ops/actor";
@@ -538,6 +543,56 @@ export async function proposeOutcome(
   );
 }
 
+/**
+ * Changes to the "Still needs" checklist: add items, tick them off, reopen or
+ * remove them. Checked against the checklist as it is now, so a reference to
+ * an item that isn't there fails at propose time, not at approval.
+ */
+export async function proposeChecklist(
+  proposer: Proposer,
+  veteranId: string,
+  input: unknown,
+  reason: string,
+  group?: string,
+): Promise<ProposeResult> {
+  const v = await veteranForPropose(veteranId);
+  if (!v.ok) return v;
+  const parsed = checklistEditSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join(".") || "edit"}: ${i.message}`).join("; ") };
+  // A proposed new veteran has no checklist yet, only what this adds.
+  const current = pendingRequestId(v.targetId) ? [] : storedChecklist(v.data);
+  const plan = applyChecklistEdit(current, parsed.data, MCP_UID, new Date(), () => "planned");
+  if (!plan.ok) return { ok: false, error: plan.error };
+  const changes: FieldChanges = {};
+  if (plan.added.length) changes.add = { before: null, after: plan.added };
+  if (plan.done.length) changes.done = { before: null, after: plan.done };
+  if (plan.reopened.length) changes.reopen = { before: null, after: plan.reopened };
+  if (plan.removed.length) changes.remove = { before: null, after: plan.removed };
+  return queue(
+    proposer,
+    {
+      kind: "checklist.update",
+      targetId: v.targetId,
+      targetLabel: v.label,
+      changes,
+      payload: parsed.data as unknown as Record<string, unknown>,
+    },
+    reason,
+    group,
+  );
+}
+
+function storedChecklist(data: FirebaseFirestore.DocumentData): StoredChecklistItem[] {
+  return ((data.checklist ?? []) as Array<Record<string, unknown>>).map((c) => ({
+    id: String(c.id ?? ""),
+    label: String(c.label ?? ""),
+    done: c.done === true,
+    doneAt: tsToDate(c.doneAt),
+    addedBy: String(c.addedBy ?? ""),
+    addedAt: tsToDate(c.addedAt) ?? new Date(0),
+  }));
+}
+
 /** Claude taking back its own proposal. Only a pending one. */
 export async function withdrawChange(proposer: Proposer, id: string): Promise<Result> {
   if (!id || id.includes("/")) return { ok: false, error: "Change request not found." };
@@ -636,6 +691,7 @@ const FIELD_KINDS = new Set<ChangeRequestKind>([
   "vso.create",
   "vso.update",
   "encounter.create",
+  "checklist.update",
 ]);
 
 async function applyFields(tx: Transaction, cr: ChangeRequest, actor: Actor, now: Date): Promise<Applied> {
@@ -742,6 +798,19 @@ async function applyFields(tx: Transaction, cr: ChangeRequest, actor: Actor, now
         resourceType: "encounter",
         resourceId: `${veteranRef.id}/${encounterRef.id}`,
       };
+    }
+
+    case "checklist.update": {
+      const veteranId = await resolveVeteranTarget(cr.targetId!, tx);
+      const ref = adminDb.collection("veterans").doc(veteranId);
+      const snap = await tx.get(ref);
+      if (!snap.exists) throw new Stale("The veteran has been deleted.");
+      const edit = checklistEditSchema.safeParse(cr.payload);
+      if (!edit.success) throw new Blocked("The checklist change is malformed.");
+      const next = applyChecklistEdit(storedChecklist(snap.data()!), edit.data, actor.uid, now);
+      if (!next.ok) throw new Stale(`The checklist changed since: ${next.error}`);
+      tx.update(ref, { checklist: next.items, updatedBy: actor.uid, updatedAt: now });
+      return { appliedId: null, resourceType: "veteran", resourceId: ref.id };
     }
 
     default:

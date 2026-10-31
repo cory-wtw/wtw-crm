@@ -10,6 +10,12 @@ import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import { logOutcome } from "@/lib/ops/outcome";
 import {
+  applyChecklistEdit,
+  checklistEditSchema,
+  describeChecklistChange,
+  type StoredChecklistItem,
+} from "@/lib/checklist";
+import {
   canAccessCrm,
   canEditVeteran,
   canReassignVeteran,
@@ -20,7 +26,6 @@ import {
   type PipelineHistoryEntry,
   type PipelineStage,
   pipelineStageSchema,
-  checklistLabelSchema,
   veteranInputSchema,
   wtwRoleSchema,
 } from "@/lib/schemas";
@@ -496,58 +501,56 @@ export async function setOutcomeRoleAction(
   return { ok: true };
 }
 
-type StoredChecklistItem = {
-  id: string;
-  label: string;
-  done: boolean;
-  doneAt: Date | null;
-  addedBy: string;
-  addedAt: Date;
-};
-
 /**
  * Read-modify-write on the checklist in a transaction, so two people ticking
- * boxes at once don't drop each other's change.
+ * boxes at once don't drop each other's change. The rules are in
+ * lib/checklist.ts, shared with Claude's approved change requests.
  */
 async function updateChecklist(
   veteranId: string,
-  change: (
-    items: StoredChecklistItem[],
-    uid: string,
-  ) => { items: StoredChecklistItem[]; audit: { before: unknown; after: unknown } } | { error: string },
+  rawEdit: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Not signed in." };
   if (!canAccessCrm(session))
     return { ok: false, error: "Your account doesn't have access to this." };
+  const edit = checklistEditSchema.safeParse(rawEdit);
+  if (!edit.success) {
+    return { ok: false, error: edit.error.issues[0]?.message ?? "Say what they need." };
+  }
 
   const veteranRef = adminDb.collection("veterans").doc(veteranId);
-  const result = await adminDb.runTransaction<
-    { error: string } | { audit: { before: unknown; after: unknown } }
-  >(async (tx) => {
-    const snap = await tx.get(veteranRef);
-    if (!snap.exists) return { error: "Veteran not found." };
-    const data = snap.data()!;
-    if (!canEditVeteran(session, data as { assigneeUid: string | null }))
-      return { error: "Your account can't edit this veteran." };
+  const result = await adminDb.runTransaction<{ error: string } | { audit: string }>(
+    async (tx) => {
+      const snap = await tx.get(veteranRef);
+      if (!snap.exists) return { error: "Veteran not found." };
+      const data = snap.data()!;
+      if (!canEditVeteran(session, data as { assigneeUid: string | null }))
+        return { error: "Your account can't edit this veteran." };
 
-    const items = (data.checklist ?? []) as StoredChecklistItem[];
-    const next = change(items, session.uid);
-    if ("error" in next) return next;
-    tx.update(veteranRef, {
-      checklist: next.items,
-      updatedAt: new Date(),
-      updatedBy: session.uid,
-    });
-    return { audit: next.audit };
-  });
+      const now = new Date();
+      const next = applyChecklistEdit(
+        (data.checklist ?? []) as StoredChecklistItem[],
+        edit.data,
+        session.uid,
+        now,
+      );
+      if (!next.ok) return { error: next.error };
+      tx.update(veteranRef, {
+        checklist: next.items,
+        updatedAt: now,
+        updatedBy: session.uid,
+      });
+      return { audit: describeChecklistChange(next) };
+    },
+  );
   if ("error" in result) return { ok: false, error: result.error };
 
   await logAudit({
     action: "update",
     resourceType: "veteran",
     resourceId: veteranId,
-    diff: { checklist: result.audit },
+    diff: { checklist: { before: null, after: result.audit } },
   });
   revalidatePath(`/veterans/${veteranId}`);
   revalidatePath("/veterans");
@@ -559,25 +562,7 @@ export async function addChecklistItemAction(
   veteranId: string,
   rawLabel: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const label = checklistLabelSchema.safeParse(rawLabel);
-  if (!label.success) {
-    return { ok: false, error: label.error.issues[0]?.message ?? "Say what they need." };
-  }
-  return updateChecklist(veteranId, (items, uid) => {
-    const key = label.data.toLowerCase();
-    if (items.some((i) => !i.done && i.label.toLowerCase() === key)) {
-      return { error: `"${label.data}" is already on the list.` };
-    }
-    const item: StoredChecklistItem = {
-      id: crypto.randomUUID(),
-      label: label.data,
-      done: false,
-      doneAt: null,
-      addedBy: uid,
-      addedAt: new Date(),
-    };
-    return { items: [...items, item], audit: { before: null, after: `+ ${item.label}` } };
-  });
+  return updateChecklist(veteranId, { add: [rawLabel] });
 }
 
 /** Tick an item off, or reopen it. */
@@ -586,19 +571,7 @@ export async function setChecklistItemDoneAction(
   itemId: string,
   done: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  return updateChecklist(veteranId, (items) => {
-    const target = items.find((i) => i.id === itemId);
-    if (!target) return { error: "That item is no longer on the list." };
-    return {
-      items: items.map((i) =>
-        i.id === itemId ? { ...i, done, doneAt: done ? new Date() : null } : i,
-      ),
-      audit: {
-        before: `${target.label}: ${target.done ? "done" : "open"}`,
-        after: `${target.label}: ${done ? "done" : "open"}`,
-      },
-    };
-  });
+  return updateChecklist(veteranId, done ? { done: [itemId] } : { reopen: [itemId] });
 }
 
 /** Take an item off the list entirely — added by mistake, or no longer needed. */
@@ -606,12 +579,5 @@ export async function removeChecklistItemAction(
   veteranId: string,
   itemId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  return updateChecklist(veteranId, (items) => {
-    const target = items.find((i) => i.id === itemId);
-    if (!target) return { error: "That item is no longer on the list." };
-    return {
-      items: items.filter((i) => i.id !== itemId),
-      audit: { before: target.label, after: null },
-    };
-  });
+  return updateChecklist(veteranId, { remove: [itemId] });
 }

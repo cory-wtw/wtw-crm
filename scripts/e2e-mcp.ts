@@ -112,12 +112,25 @@ const check = (name: string, ok: boolean, info?: unknown) => { ok ? pass++ : fai
   check("approve works whatever order keys come back in", (await cra.decideChange(up.request.id, "approve", admin)).ok);
 
   // --- abandoned 'applying' claim can be retried
-  const w = await call("propose_win", { veteranId: "vet1", kind: "job", achievedAt: "2026-10-20", amount: 2000, reason: "x" });
+  const w = await call("propose_win", { veteranId: "vet1", kind: "job", achievedAt: "2026-10-20", amount: 2000, wtwRole: "helped", reason: "x" });
   await adminDb.collection("changeRequests").doc(w.request.id).update({ status: "applying", claimedAt: new Date(Date.now() - 10 * 60 * 1000) });
   check("abandoned claim retried", (await cra.decideChange(w.request.id, "approve", admin)).ok);
-  const w2 = await call("propose_win", { veteranId: "vet1", kind: "snap", achievedAt: "2026-10-20", reason: "x" });
+  const w2 = await call("propose_win", { veteranId: "vet1", kind: "snap", achievedAt: "2026-10-20", wtwRole: "led", reason: "x" });
   await adminDb.collection("changeRequests").doc(w2.request.id).update({ status: "applying", claimedAt: new Date() });
   check("fresh claim not stolen", !(await cra.decideChange(w2.request.id, "approve", admin)).ok);
+
+  // --- needs checklist: add, then tick off by label; stale if it moved
+  const c1 = await call("propose_checklist", { veteranId: "vet1", add: ["Bus pass", "State ID"], reason: "x" });
+  check("checklist add approves", (await cra.decideChange(c1.request.id, "approve", admin)).ok, c1);
+  const c2 = await call("propose_checklist", { veteranId: "vet1", done: ["bus pass"], reason: "x" });
+  check("checklist tick approves", (await cra.decideChange(c2.request.id, "approve", admin)).ok, c2);
+  const items = (await adminDb.collection("veterans").doc("vet1").get()).data()!.checklist as { label: string; done: boolean }[];
+  check("checklist stored", items.length === 2 && items.find((i) => i.label === "Bus pass")!.done && !items.find((i) => i.label === "State ID")!.done, items);
+  check("unknown item refused at propose", !!(await call("propose_checklist", { veteranId: "vet1", done: ["Phone"], reason: "x" })).isError);
+  const c3 = await call("propose_checklist", { veteranId: "vet1", remove: ["State ID"], reason: "x" });
+  await adminDb.collection("veterans").doc("vet1").update({ checklist: items.filter((i) => i.label !== "State ID") });
+  const d3 = await cra.decideChange(c3.request.id, "approve", admin);
+  check("checklist change on a moved list goes stale", !d3.ok && d3.status === "stale", d3);
 
   // --- refresh reuse revokes the grant
   const r1 = await tokenReq({ grant_type: "refresh_token", refresh_token: tok.refresh_token, client_id: client.client_id });
