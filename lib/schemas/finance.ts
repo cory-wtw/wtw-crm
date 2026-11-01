@@ -13,6 +13,10 @@ export const CATEGORIES_COLLECTION = "transactionCategories";
 export const RECORDS_COLLECTION = "financeRecords";
 export const VENDOR_ALIASES_COLLECTION = "vendorAliases";
 export const VENDOR_MONTHLY_COLLECTION = "vendorMonthly";
+/** SimpleFIN link: one doc, server-only (it holds the access URL). */
+export const BANK_CONNECTIONS_COLLECTION = "bankConnections";
+/** Synced bank rows waiting for someone to categorise or dismiss them. */
+export const BANK_INBOX_COLLECTION = "bankInbox";
 
 export const TRANSACTION_TYPES = ["income", "expense"] as const;
 export const transactionTypeSchema = z.enum(TRANSACTION_TYPES);
@@ -24,7 +28,7 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
 };
 
 /** Where a row came from. Drives nothing but the badge and the audit trail. */
-export const TRANSACTION_SOURCES = ["manual", "bank_csv", "zeffy", "qb"] as const;
+export const TRANSACTION_SOURCES = ["manual", "bank_csv", "zeffy", "qb", "bank_sync"] as const;
 export const transactionSourceSchema = z.enum(TRANSACTION_SOURCES);
 export type TransactionSource = z.infer<typeof transactionSourceSchema>;
 
@@ -33,6 +37,7 @@ export const TRANSACTION_SOURCE_LABELS: Record<TransactionSource, string> = {
   bank_csv: "Bank CSV",
   zeffy: "Zeffy",
   qb: "QuickBooks",
+  bank_sync: "Bank sync",
 };
 
 /** YYYY-MM-DD. Stored as a string so date-range filters never hit a timezone. */

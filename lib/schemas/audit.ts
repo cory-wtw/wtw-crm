@@ -35,6 +35,8 @@ export const RESOURCE_TYPES = [
   "vendorAlias",
   "vendorMonthly",
   "changeRequest",
+  "bankConnection",
+  "bankInboxItem",
 ] as const;
 export const resourceTypeSchema = z.enum(RESOURCE_TYPES);
 export type ResourceType = z.infer<typeof resourceTypeSchema>;
@@ -56,6 +58,8 @@ export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {
   vendorAlias: "Vendor Name",
   vendorMonthly: "Vendor Monthly Amount",
   changeRequest: "Claude Change Request",
+  bankConnection: "Bank Connection",
+  bankInboxItem: "Bank Inbox Item",
 };
 
 export const auditDiffEntrySchema = z.object({

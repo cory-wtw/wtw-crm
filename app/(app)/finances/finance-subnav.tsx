@@ -8,6 +8,7 @@ const TABS = [
   { href: "/finances/impact", label: "Impact" },
   { href: "/finances/spending", label: "Spending" },
   { href: "/finances/transactions", label: "Transactions" },
+  { href: "/finances/bank", label: "Bank" },
   { href: "/finances/import", label: "Import CSV" },
   { href: "/finances/categories", label: "Categories" },
   { href: "/finances/records", label: "Records" },

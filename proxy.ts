@@ -8,9 +8,10 @@ export function proxy(request: NextRequest) {
 
   // The MCP endpoint and the connector sign-in endpoints authenticate with
   // bearer tokens and PKCE (lib/mcp/oauth.ts), not a session cookie, and must
-  // not be bounced to /login.
+  // not be bounced to /login. The scheduled bank sync checks its own secret.
   if (
     pathname === "/api/mcp" ||
+    pathname === "/api/finances/bank-sync" ||
     pathname.startsWith("/api/oauth/") ||
     pathname.startsWith("/.well-known/")
   ) {

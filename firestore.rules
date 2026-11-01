@@ -131,6 +131,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /bankConnections/{id} {
+      // SimpleFIN link (lib/finance/bank-sync.ts). Holds the access URL —
+      // a bank-read credential — so no client may read it, ever.
+      allow read, write: if false;
+    }
+
+    match /bankInbox/{id} {
+      // Synced bank rows waiting for review. Server writes only.
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /changeRequests/{id} {
       // Claude's proposed edits (the Roster MCP server). Written only by the
       // server: proposals from /api/mcp, decisions from Admin → Claude
