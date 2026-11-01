@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { BankConnectionView, InboxItem } from "@/lib/finance/bank-sync";
-import { formatDate, formatShortDate, formatUsdCents } from "@/lib/format";
+import { formatShortDate, formatUsdCents } from "@/lib/format";
 import { TRANSACTION_SOURCE_LABELS, type Category, type TransactionSource } from "@/lib/schemas";
 import {
   addInboxItemAction,
@@ -21,9 +22,18 @@ const secondary =
   "inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold hover:bg-secondary disabled:opacity-50";
 const card = "rounded-lg border border-border bg-card p-4 sm:p-5";
 
-function startOfYear(): string {
-  return `${new Date().getFullYear()}-01-01`;
+/** Banks share about 90 days; start there by default. */
+function ninetyDaysAgo(): string {
+  return new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
 }
+
+const syncedAt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "America/New_York",
+});
 
 export function BankPanel({
   connection,
@@ -34,6 +44,14 @@ export function BankPanel({
   inbox: InboxItem[];
   categories: Category[];
 }) {
+  if (categories.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-border p-6 text-sm">
+        Set up <Link href="/finances/categories" className="font-bold underline">categories</Link> first —
+        synced transactions need somewhere to go.
+      </p>
+    );
+  }
   if (!connection) return <ConnectForm />;
   const picked = connection.selectedAccountIds.length > 0 && connection.syncFrom;
   return (
@@ -102,7 +120,7 @@ function ConnectForm() {
 
 function AccountPicker({ connection }: { connection: BankConnectionView }) {
   const [ids, setIds] = useState<Set<string>>(new Set(connection.selectedAccountIds));
-  const [syncFrom, setSyncFrom] = useState(connection.syncFrom || startOfYear());
+  const [syncFrom, setSyncFrom] = useState(connection.syncFrom || ninetyDaysAgo());
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const toggle = (id: string) => {
@@ -129,7 +147,9 @@ function AccountPicker({ connection }: { connection: BankConnectionView }) {
                 <span className="font-bold">{a.name}</span>
                 {a.org && <span className="text-muted-foreground"> · {a.org}</span>}
               </span>
-              <span className="text-sm tabular-nums text-muted-foreground">{formatUsdCents(a.balance)}</span>
+              {a.balance != null && (
+                <span className="text-sm tabular-nums text-muted-foreground">{formatUsdCents(a.balance)}</span>
+              )}
             </label>
           </li>
         ))}
@@ -138,8 +158,9 @@ function AccountPicker({ connection }: { connection: BankConnectionView }) {
         <span className="font-bold">Bring in transactions from</span>
         <input type="date" value={syncFrom} onChange={(e) => setSyncFrom(e.target.value)} className={control} />
         <span className="block text-xs text-muted-foreground">
-          Banks usually share the last 90 days. Anything already on file from a
-          CSV import is caught and held for you to check, not doubled.
+          Banks usually share the last 90 days (a year at most). Anything
+          already on file from a CSV import is held for you to check, not
+          doubled.
         </span>
       </label>
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -165,7 +186,12 @@ function AccountPicker({ connection }: { connection: BankConnectionView }) {
           disabled={pending}
           className={secondary}
           onClick={() => {
-            if (!confirm("Disconnect the bank? Transactions already in the books stay.")) return;
+            if (
+              !confirm(
+                "Disconnect the bank? Transactions already in the books stay. To fully revoke access, also remove the Roster under Apps in SimpleFIN Bridge.",
+              )
+            )
+              return;
             start(async () => {
               const res = await disconnectBankAction();
               if (!res.ok) setError(res.error);
@@ -188,17 +214,27 @@ function SyncStatus({ connection }: { connection: BankConnectionView }) {
     <div className={`${card} flex flex-wrap items-center gap-4`}>
       <div className="flex-1 space-y-1">
         <p className="text-sm font-bold">
-          {accounts.map((a) => `${a.org ? `${a.org} ` : ""}${a.name} · ${formatUsdCents(a.balance)}`).join(" · ")}
+          {accounts
+            .map((a) => `${a.org ? `${a.org} ` : ""}${a.name}${a.balance != null ? ` · ${formatUsdCents(a.balance)}` : ""}`)
+            .join(" · ")}
         </p>
         <p className="text-sm text-muted-foreground">
-          {connection.lastSyncAt ? `Last synced ${formatDate(connection.lastSyncAt)}` : "Not synced yet"}
-          {r && ` · ${r.added} added, ${r.inbox} to review, ${r.alreadyHad} already on file`}
+          {connection.lastSyncAt ? `Last synced ${syncedAt.format(connection.lastSyncAt)}` : "Not synced yet"}
+          {r && (
+            <>
+              {" · "}
+              <Link href="/finances/transactions" className="underline">
+                {r.added} added
+              </Link>
+              {`, ${r.inbox} to review, ${r.alreadyHad} already on file`}
+            </>
+          )}
         </p>
         {connection.lastError && (
           <p className="text-sm text-destructive">Last sync failed: {connection.lastError}</p>
         )}
         {r?.warnings.map((w) => (
-          <p key={w} className="text-sm text-[color:var(--wtw-deep-gold)]">SimpleFIN: {w}</p>
+          <p key={w} className="text-sm text-[color:var(--wtw-deep-gold)]">{w}</p>
         ))}
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
@@ -245,9 +281,13 @@ function InboxRow({ item, categories }: { item: InboxItem; categories: Category[
   const [vendor, setVendor] = useState(item.suggestedVendor);
   const [categoryId, setCategoryId] = useState(item.suggestedCategoryId ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [needsForce, setNeedsForce] = useState(false);
   const [pending, start] = useTransition();
-  const options = categories.filter((c) => c.type === item.type);
+  // Money in from a vendor is usually a refund of an expense, and vice versa.
+  const same = categories.filter((c) => c.type === item.type);
+  const opposite = categories.filter((c) => c.type !== item.type);
   const dup = item.duplicateOf;
+  const force = Boolean(dup) || needsForce;
   return (
     <li className="space-y-2 p-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -268,9 +308,16 @@ function InboxRow({ item, categories }: { item: InboxItem; categories: Category[
         <input value={vendor} onChange={(e) => setVendor(e.target.value)} aria-label="Vendor" placeholder="Vendor" className={control} />
         <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="Category" className={control}>
           <option value="">Pick a category…</option>
-          {options.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
+          <optgroup label={item.type === "income" ? "Income" : "Expense"}>
+            {same.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label={item.type === "income" ? "Refund of an expense" : "Reversal of income"}>
+            {opposite.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </optgroup>
         </select>
         <button
           type="button"
@@ -279,18 +326,21 @@ function InboxRow({ item, categories }: { item: InboxItem; categories: Category[
           onClick={() =>
             start(async () => {
               setError(null);
-              const res = await addInboxItemAction({ syncId: item.syncId, vendor, categoryId });
-              if (!res.ok) setError(res.error);
+              const res = await addInboxItemAction({ syncId: item.syncId, vendor, categoryId, force });
+              if (!res.ok) {
+                setError(res.error);
+                if (res.duplicate) setNeedsForce(true);
+              }
             })
           }
         >
-          {dup ? "Add anyway" : "Add to books"}
+          {force ? "Add anyway" : "Add to books"}
         </button>
         <button
           type="button"
           disabled={pending}
           className={secondary}
-          title={dup ? "It's the same money — skip it" : "Not WTW money — skip it"}
+          title={force ? "It's the same money — skip it" : "Not WTW money — skip it"}
           onClick={() =>
             start(async () => {
               setError(null);
@@ -299,7 +349,7 @@ function InboxRow({ item, categories }: { item: InboxItem; categories: Category[
             })
           }
         >
-          {dup ? "Duplicate — skip" : "Skip"}
+          {force ? "Duplicate — skip" : "Skip"}
         </button>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}

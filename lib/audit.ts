@@ -8,6 +8,11 @@ export type AuditEntry = {
   resourceType: ResourceType;
   resourceId: string;
   diff?: AuditDiff;
+  /**
+   * Who did it, when there's no request to read a session from — e.g. a
+   * background job in after(), where cookies() throws.
+   */
+  actor?: { uid: string; email: string };
 };
 
 /**
@@ -19,9 +24,9 @@ export type AuditEntry = {
  */
 export async function logAudit(input: AuditEntry): Promise<void> {
   try {
-    const session = await getSession();
-    const actorUid = session?.uid ?? "system";
-    const actorEmail = session?.email ?? "system";
+    const session = input.actor ? null : await getSession();
+    const actorUid = input.actor?.uid ?? session?.uid ?? "system";
+    const actorEmail = input.actor?.email ?? session?.email ?? "system";
     const doc: Record<string, unknown> = {
       actorUid,
       actorEmail,

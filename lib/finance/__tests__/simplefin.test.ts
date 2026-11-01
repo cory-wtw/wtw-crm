@@ -5,6 +5,7 @@ import {
   claimAccessUrl,
   decodeSetupToken,
   fetchAccountSet,
+  isSimplefinHost,
   parseAccessUrl,
   parseAccountSet,
   syncWindows,
@@ -16,8 +17,8 @@ const b64 = (s: string) => Buffer.from(s).toString("base64");
 
 describe("decodeSetupToken", () => {
   it("decodes the claim URL", () => {
-    expect(decodeSetupToken(` ${b64("https://bridge.example/claim/abc")}\n`)).toBe(
-      "https://bridge.example/claim/abc",
+    expect(decodeSetupToken(` ${b64("https://beta-bridge.simplefin.org/claim/abc")}\n`)).toBe(
+      "https://beta-bridge.simplefin.org/claim/abc",
     );
   });
   it("rejects junk", () => {
@@ -26,28 +27,45 @@ describe("decodeSetupToken", () => {
   });
 });
 
+describe("isSimplefinHost", () => {
+  it("only allows SimpleFIN over https", () => {
+    expect(isSimplefinHost("https://beta-bridge.simplefin.org/simplefin")).toBe(true);
+    expect(isSimplefinHost("https://simplefin.org/x")).toBe(true);
+    expect(isSimplefinHost("https://evil.example/simplefin.org")).toBe(false);
+    expect(isSimplefinHost("https://simplefin.org.evil.example/")).toBe(false);
+    expect(isSimplefinHost("http://bridge.simplefin.org/")).toBe(false);
+    expect(isSimplefinHost("https://169.254.169.254/")).toBe(false);
+  });
+  it("rejects a setup token for another host", () => {
+    expect(() => decodeSetupToken(b64("https://internal.example/claim"))).toThrow(/SimpleFIN Bridge/);
+  });
+  it("rejects an access URL for another host", () => {
+    expect(() => parseAccessUrl("https://u:p@internal.example/simplefin")).toThrow(/SimpleFIN/);
+  });
+});
+
 describe("parseAccessUrl", () => {
   it("splits credentials into a Basic header", () => {
-    const { base, authorization } = parseAccessUrl("https://us%40r:p%3Ass@bridge.example/simplefin/");
-    expect(base).toBe("https://bridge.example/simplefin");
+    const { base, authorization } = parseAccessUrl("https://us%40r:p%3Ass@beta-bridge.simplefin.org/simplefin/");
+    expect(base).toBe("https://beta-bridge.simplefin.org/simplefin");
     expect(authorization).toBe(`Basic ${b64("us@r:p:ss")}`);
   });
   it("needs credentials", () => {
-    expect(() => parseAccessUrl("https://bridge.example/simplefin")).toThrow();
+    expect(() => parseAccessUrl("https://beta-bridge.simplefin.org/simplefin")).toThrow();
   });
 });
 
 describe("claimAccessUrl", () => {
   it("POSTs to the claim URL and returns the access URL", async () => {
-    const fetchImpl = vi.fn(async () => new Response("https://u:p@bridge.example/simplefin\n"));
-    await expect(claimAccessUrl(b64("https://bridge.example/claim/x"), fetchImpl)).resolves.toBe(
-      "https://u:p@bridge.example/simplefin",
+    const fetchImpl = vi.fn(async () => new Response("https://u:p@beta-bridge.simplefin.org/simplefin\n"));
+    await expect(claimAccessUrl(b64("https://beta-bridge.simplefin.org/claim/x"), fetchImpl)).resolves.toBe(
+      "https://u:p@beta-bridge.simplefin.org/simplefin",
     );
-    expect(fetchImpl).toHaveBeenCalledWith("https://bridge.example/claim/x", expect.objectContaining({ method: "POST" }));
+    expect(fetchImpl).toHaveBeenCalledWith("https://beta-bridge.simplefin.org/claim/x", expect.objectContaining({ method: "POST" }));
   });
   it("explains a used token", async () => {
     const fetchImpl = vi.fn(async () => new Response("", { status: 403 }));
-    await expect(claimAccessUrl(b64("https://bridge.example/claim/x"), fetchImpl)).rejects.toThrow(/already used/);
+    await expect(claimAccessUrl(b64("https://beta-bridge.simplefin.org/claim/x"), fetchImpl)).rejects.toThrow(/already used/);
   });
 });
 
@@ -65,9 +83,9 @@ describe("accountsUrl", () => {
 describe("fetchAccountSet", () => {
   it("sends Basic auth without credentials in the URL", async () => {
     const fetchImpl = vi.fn(async () => Response.json({ errors: [], accounts: [] }));
-    await fetchAccountSet("https://u:p@b.example/simplefin", { balancesOnly: true }, fetchImpl);
+    await fetchAccountSet("https://u:p@bridge.simplefin.org/simplefin", { balancesOnly: true }, fetchImpl);
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://b.example/simplefin/accounts?balances-only=1");
+    expect(url).toBe("https://bridge.simplefin.org/simplefin/accounts?balances-only=1");
     expect((init.headers as Record<string, string>).Authorization).toBe(`Basic ${b64("u:p")}`);
   });
 });
@@ -89,6 +107,15 @@ describe("parseAccountSet", () => {
     expect(set.errors).toEqual([]);
     expect(set.accounts[0].balance).toBe(1234.56);
     expect(set.accounts[0].transactions[0].amount).toBe(-12.5);
+  });
+  it("merges structured errlist errors and notes which accounts they hit", () => {
+    const set = parseAccountSet({
+      errors: ["Login needed"],
+      errlist: [{ code: "con.auth", msg: "Login needed", account_id: "acct1" }, { msg: "Other" }],
+      accounts: [],
+    });
+    expect(set.errors).toEqual(["Login needed", "Other"]);
+    expect(set.erroredAccountIds).toEqual(["acct1"]);
   });
 });
 

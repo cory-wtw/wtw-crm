@@ -6,7 +6,10 @@
 
 import { adminDb } from "@/lib/firebase/admin";
 import { placeForCity } from "@/lib/geo/counties";
-import { TRANSACTIONS_COLLECTION as TRANSACTIONS } from "@/lib/schemas";
+import {
+  BANK_INBOX_COLLECTION,
+  TRANSACTIONS_COLLECTION as TRANSACTIONS,
+} from "@/lib/schemas";
 import {
   buildDedupeIndex,
   DEDUPE_FIELDS,
@@ -24,17 +27,41 @@ const isCity = (words: string, state: string) => placeForCity(words, state) !== 
  */
 export async function loadDedupeIndex(
   dates: readonly string[],
-  options: { excludeSource?: string } = {},
+  options: {
+    excludeSource?: string;
+    /** Also count synced bank rows still waiting in the review inbox — money
+     *  that's on its way into the books even though it isn't there yet. */
+    includeBankInbox?: boolean;
+  } = {},
 ): Promise<DedupeIndex> {
   const { from, to } = dateRange(dates);
-  const snap = await adminDb
-    .collection(TRANSACTIONS)
-    .where("date", ">=", from)
-    .where("date", "<=", to)
-    .select(...DEDUPE_FIELDS)
-    .get();
+  const [snap, inbox] = await Promise.all([
+    adminDb
+      .collection(TRANSACTIONS)
+      .where("date", ">=", from)
+      .where("date", "<=", to)
+      .select(...DEDUPE_FIELDS)
+      .get(),
+    options.includeBankInbox
+      ? adminDb.collection(BANK_INBOX_COLLECTION).where("status", "==", "pending").get()
+      : null,
+  ]);
   const existing = snap.docs
     .map((d) => toExistingTransaction(d.id, d.data()))
     .filter((t) => t.source !== options.excludeSource);
+  for (const d of inbox?.docs ?? []) {
+    const x = d.data();
+    if (x.date < from || x.date > to) continue;
+    existing.push(
+      toExistingTransaction(d.id, {
+        date: x.date,
+        amount: x.amount,
+        type: x.type,
+        vendor: x.suggestedVendor ?? "",
+        description: x.description,
+        source: "bank_sync",
+      }),
+    );
+  }
   return buildDedupeIndex(existing, isCity);
 }

@@ -19,6 +19,23 @@ export const SYNC_WINDOW_DAYS = 60;
 // ---------------------------------------------------------------------------
 // Setup token → access URL
 
+/**
+ * Only ever talk to SimpleFIN. The setup token is an arbitrary URL the server
+ * POSTs to, and the access URL it returns is fetched with credentials daily —
+ * without this, a crafted token could point either at any host.
+ */
+export function isSimplefinHost(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.protocol === "https:" &&
+      (u.hostname === "simplefin.org" || u.hostname.endsWith(".simplefin.org"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** The setup token is a base64-encoded claim URL. */
 export function decodeSetupToken(token: string): string {
   const trimmed = token.trim();
@@ -30,6 +47,9 @@ export function decodeSetupToken(token: string): string {
   }
   if (!/^https:\/\/\S+$/.test(url)) {
     throw new Error("That doesn't look like a SimpleFIN setup token.");
+  }
+  if (!isSimplefinHost(url)) {
+    throw new Error("That token isn't from SimpleFIN Bridge (simplefin.org).");
   }
   return url;
 }
@@ -43,6 +63,7 @@ export async function claimAccessUrl(
   const res = await fetchImpl(claimUrl, {
     method: "POST",
     headers: { "Content-Length": "0" },
+    redirect: "error",
   });
   if (res.status === 403) {
     throw new Error(
@@ -68,6 +89,9 @@ export function parseAccessUrl(accessUrl: string): { base: string; authorization
   }
   if (u.protocol !== "https:" || !u.username) {
     throw new Error("SimpleFIN returned an access URL we can't read.");
+  }
+  if (!isSimplefinHost(accessUrl)) {
+    throw new Error("The access URL doesn't point at SimpleFIN. Reconnect with a token from SimpleFIN Bridge.");
   }
   const user = decodeURIComponent(u.username);
   const pass = decodeURIComponent(u.password);
@@ -111,14 +135,39 @@ export type SimplefinAccount = z.infer<typeof sfAccountSchema>;
 
 const accountSetSchema = z.object({
   errors: z.array(z.string()).default([]),
+  // Newer servers also send structured errors, some tied to one account.
+  errlist: z
+    .array(
+      z
+        .object({
+          msg: z.string().optional(),
+          message: z.string().optional(),
+          account_id: z.string().optional(),
+        })
+        .passthrough(),
+    )
+    .default([]),
   accounts: z.array(sfAccountSchema).default([]),
 });
-export type AccountSet = z.infer<typeof accountSetSchema>;
+
+export type AccountSet = {
+  /** Every error, from either field. */
+  errors: string[];
+  /** Accounts an error was specifically about. */
+  erroredAccountIds: string[];
+  accounts: SimplefinAccount[];
+};
 
 export function parseAccountSet(json: unknown): AccountSet {
   const parsed = accountSetSchema.safeParse(json);
   if (!parsed.success) throw new Error("SimpleFIN sent data we couldn't read.");
-  return parsed.data;
+  const { errors, errlist, accounts } = parsed.data;
+  const listed = errlist.map((e) => e.msg ?? e.message ?? "Connection error");
+  return {
+    errors: [...new Set([...errors, ...listed])],
+    erroredAccountIds: errlist.map((e) => e.account_id).filter((id): id is string => !!id),
+    accounts,
+  };
 }
 
 export type FetchOptions = {
@@ -150,6 +199,7 @@ export async function fetchAccountSet(
   const res = await fetchImpl(accountsUrl(base, opts), {
     headers: { Authorization: authorization, Accept: "application/json" },
     cache: "no-store",
+    redirect: "error",
   });
   if (res.status === 403) {
     throw new Error("SimpleFIN refused the connection. It may have been revoked — reconnect the bank.");

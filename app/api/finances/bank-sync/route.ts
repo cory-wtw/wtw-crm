@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { runBankSync } from "@/lib/finance/bank-sync";
+import { SYSTEM_ACTOR, runBankSync } from "@/lib/finance/bank-sync";
 
 /**
  * Daily bank sync for a scheduler (Cloud Scheduler → POST with
@@ -21,8 +21,8 @@ export async function POST(req: Request) {
   if (!process.env.BANK_SYNC_SECRET) return new Response("Not found", { status: 404 });
   if (!authorized(req)) return new Response("Unauthorized", { status: 401 });
   try {
-    const result = await runBankSync("system");
-    return Response.json({ ok: true, result });
+    const outcome = await runBankSync(SYSTEM_ACTOR);
+    return Response.json({ ok: true, ...outcome });
   } catch (err) {
     return Response.json(
       { ok: false, error: err instanceof Error ? err.message : "Bank sync failed." },

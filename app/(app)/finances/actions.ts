@@ -10,8 +10,7 @@ import { importIdentity } from "@/lib/finance/bank-import";
 import { findLikelyDuplicate, toIncomingTransaction } from "@/lib/finance/dedupe";
 import { loadDedupeIndex } from "@/lib/finance/dedupe-db";
 import { adminDb } from "@/lib/firebase/admin";
-import { getSession, type Session } from "@/lib/firebase/session";
-import { canManageFinances } from "@/lib/permissions";
+import { requireFinanceSession } from "@/lib/finance/require-session";
 import { saveTransaction } from "@/lib/ops/transactions";
 import {
   DEFAULT_CATEGORIES,
@@ -43,16 +42,6 @@ function formatIssues(
         `${i.path.map((p) => String(p)).join(".") || "form"}: ${i.message}`,
     )
     .join("; ");
-}
-
-async function requireFinanceSession(): Promise<
-  { session: Session } | { error: string }
-> {
-  const session = await getSession();
-  if (!session) return { error: "Not signed in." };
-  if (!canManageFinances(session))
-    return { error: "Only admins can manage finances." };
-  return { session };
 }
 
 function revalidateFinances() {
@@ -215,7 +204,7 @@ export async function importTransactionsAction(
   const held: HeldRow[] = [];
   let toWrite = fresh;
   if (!force && fresh.length > 0) {
-    const index = await loadDedupeIndex(fresh.map((c) => c.row.date));
+    const index = await loadDedupeIndex(fresh.map((c) => c.row.date), { includeBankInbox: true });
     const taken = new Set(claimed);
     toWrite = fresh.filter((c) => {
       const match = findLikelyDuplicate(toIncomingTransaction(c.data), index, {
