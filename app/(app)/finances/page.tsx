@@ -19,9 +19,9 @@ import { SeedCategoriesButton } from "./seed-categories-button";
 export const dynamic = "force-dynamic";
 
 const buttonClasses =
-  "inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary";
+  "inline-flex h-10 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary";
 const primaryClasses =
-  "inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white";
+  "inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white";
 
 export default async function FinancesPage({
   searchParams,
@@ -180,7 +180,7 @@ function Header() {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Finances</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Finances</h1>
         <p className="text-sm text-muted-foreground">
           Money in, money out, and how it splits across program, management
           and fundraising.

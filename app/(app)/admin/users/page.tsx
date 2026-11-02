@@ -45,7 +45,7 @@ export default async function AdminUsersPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Users</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Users</h1>
         <p className="text-sm text-muted-foreground">
           Invite teammates, change their role, or deactivate accounts.
           Sign-in is gated by an allowlist — only users below or holding a

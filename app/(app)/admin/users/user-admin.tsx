@@ -109,7 +109,7 @@ export function UserAdmin({
           <button
             type="submit"
             disabled={isPending}
-            className="inline-flex h-[38px] items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+            className="inline-flex h-[38px] items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
           >
             Send invite
           </button>

@@ -30,7 +30,7 @@ export default async function EditVeteranPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
           Edit {formatShortName(veteran.firstName, veteran.lastInitial)}
         </h1>
         <p className="text-sm text-muted-foreground">

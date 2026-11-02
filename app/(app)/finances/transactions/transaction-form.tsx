@@ -153,13 +153,13 @@ export function TransactionForm({ categories, vendors, campaigns, today, initial
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
-      <div className="inline-flex rounded-md border border-border bg-card p-1">
+      <div className="inline-flex rounded-full border border-border bg-card p-1">
         {(["expense", "income"] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => switchType(t)}
-            className={`h-9 rounded px-4 text-sm font-bold transition-colors ${
+            className={`h-11 sm:h-9 rounded-md px-4 text-sm font-bold transition-colors ${
               type === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -271,7 +271,7 @@ export function TransactionForm({ categories, vendors, campaigns, today, initial
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+          className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
         >
           {busy ? "Saving…" : initial ? "Save changes" : "Save transaction"}
         </button>

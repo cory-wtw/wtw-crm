@@ -235,7 +235,7 @@ export function IntakeResults({
             <button
               type="button"
               onClick={copyText}
-              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               {copied ? "Copied" : "Copy text"}
             </button>
@@ -248,7 +248,7 @@ export function IntakeResults({
         <div className="flex items-center gap-3 border-t border-border pt-6">
           <Link
             href={`/veterans/${veteranId}`}
-            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary"
+            className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary"
           >
             Back to the record
           </Link>
@@ -417,7 +417,7 @@ export function IntakeResults({
                         setAddedIds((ids) => [...ids, r.id]);
                         setSelected((ids) => [...ids, r.id]);
                       }}
-                      className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-border bg-card px-3 text-xs font-bold transition-colors hover:bg-secondary"
+                      className="inline-flex h-11 sm:h-8 shrink-0 items-center justify-center rounded-full border border-border bg-card px-3 text-xs font-bold transition-colors hover:bg-secondary"
                     >
                       Add anyway
                     </button>
@@ -454,7 +454,7 @@ export function IntakeResults({
               type="button"
               onClick={approve}
               disabled={selected.length === 0 || approving}
-              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
             >
               {approving
                 ? "Recording…"

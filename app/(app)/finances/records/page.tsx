@@ -9,7 +9,7 @@ export default async function RecordsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Records</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Records</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           The paper trail behind the numbers: ledger exports, bank statements,
           receipts, filed 990s, letters from the accountant. Only admins can

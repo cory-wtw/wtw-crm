@@ -25,7 +25,7 @@ export function SeedCategoriesButton() {
         type="button"
         onClick={onClick}
         disabled={isPending}
-        className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+        className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
       >
         {isPending ? "Loading…" : "Load starter categories"}
       </button>

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 const TABS = [
-  { href: "/admin/changes", label: "Claude changes" },
+  { href: "/admin/changes", label: "Approvals" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/resources/enrich", label: "Draft resources" },
   { href: "/admin/resources/import", label: "Load JSON" },
@@ -27,7 +27,7 @@ export function AdminSubnav() {
   return (
     // One row that scrolls sideways on a phone instead of wrapping each label
     // onto three lines. The negative margin lets it run to the screen edge.
-    <nav className="-mx-4 flex items-center gap-1 overflow-x-auto border-b border-border px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+    <nav className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
       {TABS.map((tab) => {
         const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         return (
@@ -35,10 +35,10 @@ export function AdminSubnav() {
             key={tab.href}
             href={tab.href}
             ref={active ? activeRef : undefined}
-            className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${
+            className={`inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-sm font-bold transition-colors ${
               active
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                ? "border-foreground bg-foreground text-background"
+                : "border-border bg-card text-foreground hover:bg-secondary"
             }`}
           >
             {tab.label}

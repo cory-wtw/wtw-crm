@@ -73,9 +73,9 @@ const COLUMN_LABELS: Record<ImportMode, [keyof ColumnMap, string][]> = {
 };
 
 const control =
-  "h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+  "h-11 sm:h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 const primary =
-  "inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50";
+  "inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50";
 
 export function ImportPanel({
   categories,
@@ -460,7 +460,7 @@ export function ImportPanel({
               type="button"
               onClick={() => importAnyway(result.held.filter((h) => picked.has(h)))}
               disabled={forcing || picked.size === 0}
-              className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold hover:bg-secondary disabled:opacity-50"
+              className="inline-flex h-10 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold hover:bg-secondary disabled:opacity-50"
             >
               {forcing ? "Importing…" : `Import ${picked.size} ticked anyway`}
             </button>
@@ -488,7 +488,7 @@ export function ImportPanel({
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <div className="inline-flex rounded-md border border-border bg-card p-1">
+        <div className="inline-flex rounded-full border border-border bg-card p-1">
           {(["bank", "zeffy"] as const).map((m) => (
             <button
               key={m}
@@ -497,7 +497,7 @@ export function ImportPanel({
                 setMode(m);
                 reset();
               }}
-              className={`h-9 rounded px-4 text-sm font-bold ${
+              className={`h-11 sm:h-9 rounded-md px-4 text-sm font-bold ${
                 mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -538,7 +538,7 @@ export function ImportPanel({
           type="file"
           accept=".csv,text/csv"
           onChange={(e) => onFile(e.target.files?.[0])}
-          className="block text-sm file:mr-3 file:h-9 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:text-sm file:font-bold"
+          className="block text-sm file:mr-3 file:h-11 sm:file:h-9 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:text-sm file:font-bold"
         />
         <textarea
           value={text}
@@ -620,7 +620,7 @@ export function ImportPanel({
               {rows.filter((r) => r.matched).length} matched · {rows.filter((r) => !r.matched).length} new ·{" "}
               in {formatUsdCents(totals.in / 100)} · out {formatUsdCents(totals.out / 100)}
             </span>
-            <div className="ml-auto inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
+            <div className="ml-auto inline-flex rounded-full border border-border bg-card p-0.5 text-xs">
               {(["review", "all"] as const).map((f) => (
                 <button
                   key={f}

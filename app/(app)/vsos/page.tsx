@@ -23,7 +23,7 @@ export default async function VsosPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">VSOs</h1>
+          <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">VSOs</h1>
           <p className="text-sm text-muted-foreground">
             The national rolodex of VA-accredited partners we hand veterans
             off to.
@@ -32,7 +32,7 @@ export default async function VsosPage() {
         {canEdit && (
           <Link
             href="/vsos/new"
-            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
           >
             Add VSO
           </Link>
@@ -45,7 +45,7 @@ export default async function VsosPage() {
           {canEdit && (
             <Link
               href="/vsos/new"
-              className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Add the first VSO
             </Link>

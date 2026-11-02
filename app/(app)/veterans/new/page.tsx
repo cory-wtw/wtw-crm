@@ -17,7 +17,7 @@ export default async function NewVeteranPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Add veteran</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Add veteran</h1>
         <p className="text-sm text-muted-foreground">
           The only required field is First name. Fill in what you know now —
           the rest can come from later encounters.

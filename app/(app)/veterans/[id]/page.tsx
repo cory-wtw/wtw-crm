@@ -39,11 +39,10 @@ import { StageChanger } from "./stage-changer";
 export const dynamic = "force-dynamic";
 
 const STAGE_TINT: Record<PipelineStage, string> = {
-  found: "bg-secondary text-foreground",
-  connected:
-    "bg-[color:var(--wtw-deep-gold)]/15 text-[color:var(--wtw-deep-gold)]",
-  filed: "bg-primary/20 text-foreground",
-  won: "bg-primary text-primary-foreground",
+  found: "bg-amber-100 text-amber-900 dark:bg-amber-400/15 dark:text-amber-200",
+  connected: "bg-sky-100 text-sky-900 dark:bg-sky-400/15 dark:text-sky-200",
+  filed: "bg-violet-100 text-violet-900 dark:bg-violet-400/15 dark:text-violet-200",
+  won: "bg-emerald-100 text-emerald-900 dark:bg-emerald-400/15 dark:text-emerald-200",
   lost: "bg-muted text-muted-foreground",
 };
 
@@ -96,25 +95,34 @@ export default async function VeteranDetailPage({
   );
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+    <div className="space-y-5">
+      <div className="space-y-4">
+        <Link href="/veterans" className="inline-flex h-10 items-center text-sm font-bold text-muted-foreground hover:text-foreground">
+          ← Veterans
+        </Link>
+        <div className="flex items-center gap-4">
+          <span
+            aria-hidden
+            className={`inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-black ${STAGE_TINT[veteran.pipelineStage]}`}
+          >
+            {(veteran.firstName[0] ?? "") + (veteran.lastInitial?.[0] ?? "")}
+          </span>
+          <div className="min-w-0 space-y-1">
+            <h1 className="truncate text-[28px] leading-tight font-black tracking-tight sm:text-4xl">
               {shortName}
             </h1>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STAGE_TINT[veteran.pipelineStage]}`}
+              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${STAGE_TINT[veteran.pipelineStage]}`}
             >
               {PIPELINE_LABELS[veteran.pipelineStage]}
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1 sm:[&>*]:flex-none">
           {canIntake && (
             <Link
               href={`/veterans/${veteran.id}/intake`}
-              className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
             >
               Start intake
             </Link>
@@ -122,7 +130,7 @@ export default async function VeteranDetailPage({
           {canEdit && (
             <Link
               href={`/veterans/${veteran.id}/edit`}
-              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
             >
               Edit
             </Link>
@@ -304,7 +312,7 @@ export default async function VeteranDetailPage({
         }))}
       />
 
-      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:p-6">
         <div className="mb-4 flex items-baseline justify-between gap-3">
           <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
             Contact history ({encounters.length})
@@ -316,7 +324,7 @@ export default async function VeteranDetailPage({
                 href={eight00Url(veteran.eight00ThreadId)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
               >
                 Text on 800.com
               </a>
@@ -475,7 +483,7 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:p-6">
       <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
         {title}
       </h2>
@@ -494,14 +502,14 @@ function Details({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group rounded-lg border border-border bg-card shadow-sm">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-6 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)] [&::-webkit-details-marker]:hidden">
+    <details className="group rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-xs sm:p-6 font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)] [&::-webkit-details-marker]:hidden">
         {title}
         <span aria-hidden className="text-sm transition-transform group-open:rotate-180">
           ▾
         </span>
       </summary>
-      <div className="grid gap-3 px-6 pb-6 md:grid-cols-2">{children}</div>
+      <div className="grid gap-3 px-5 pb-5 sm:px-6 sm:pb-6 md:grid-cols-2">{children}</div>
     </details>
   );
 }
@@ -518,7 +526,7 @@ function Row({
       <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
         {label}
       </p>
-      <p className="text-sm">{value || "—"}</p>
+      <p className="text-[15px]">{value || "—"}</p>
     </div>
   );
 }

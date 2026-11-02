@@ -46,9 +46,9 @@ function byCall(pending: ChangeRequest[]): { label: string | null; items: Change
 
 function PendingCard({ cr }: { cr: ChangeRequest }) {
   return (
-    <li className="space-y-3 rounded-lg border border-border bg-card p-4">
+    <li className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(29_25_18/0.04)]">
       <Header cr={cr} />
-      <p className="text-sm text-[color:var(--wtw-deep-gold)]">{cr.reason}</p>
+      <p className="rounded-xl bg-secondary/70 px-3 py-2 text-sm">{cr.reason}</p>
       <Changes cr={cr} />
       {cr.lastError && <p className="text-sm text-destructive">Last try: {cr.lastError}</p>}
       {isExpired(cr.proposedAt) ? (
@@ -83,7 +83,7 @@ function Header({ cr }: { cr: ChangeRequest }) {
   const href = targetHref(cr);
   return (
     <div className="flex flex-wrap items-baseline gap-x-2">
-      <span className="rounded bg-secondary px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-900 dark:bg-amber-400/15 dark:text-amber-200">
         {CHANGE_REQUEST_KIND_LABELS[cr.kind]}
       </span>
       {href ? (
@@ -110,29 +110,37 @@ export default async function ClaudeChangesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Claude changes</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
+      <div className="space-y-2">
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Approvals</h1>
+        <p className="text-[15px] text-muted-foreground">
+          {pending.length === 0
+            ? "You're all caught up."
+            : `${pending.length} ${pending.length === 1 ? "change is" : "changes are"} waiting. Nothing is saved until you approve.`}
+        </p>
+        <details className="max-w-2xl text-sm text-muted-foreground">
+          <summary className="cursor-pointer font-bold text-foreground">How this works</summary>
+          <p className="mt-2">
           Changes Claude has asked to make through the Roster connector —
           records, intakes, referrals, follow-ups, wins, resources and the
           books. Nothing below has touched a record yet. Approving saves exactly the values
           shown — if anyone has edited the record since Claude looked, it&rsquo;s
           marked out of date instead and nothing is saved. Requests older
           than {CHANGE_REQUEST_EXPIRY_DAYS} days can&rsquo;t be approved.
-        </p>
+          </p>
+        </details>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-black">Waiting for you ({pending.length})</h2>
+        <h2 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">Waiting for you · {pending.length}</h2>
         {pending.length === 0 ? (
-          <p className="text-sm">Nothing waiting.</p>
+          <p className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">Nothing waiting. 🙌</p>
         ) : (
           <div className="space-y-6">
             {calls.map(({ label, items }) =>
               label ? (
-                <div key={label} className="space-y-3 rounded-lg border-2 border-[color:var(--wtw-deep-gold)]/40 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-black">{label} ({items.length})</h3>
+                <div key={label} className="space-y-3 rounded-3xl bg-secondary/60 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-1">
+                    <h3 className="text-base font-black">{label} <span className="text-muted-foreground">· {items.length}</span></h3>
                     {items.length > 1 && (
                       <ActionButton
                         primary
@@ -160,10 +168,10 @@ export default async function ClaudeChangesPage() {
 
       {decided.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-lg font-black">Recently decided</h2>
-          <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+          <h2 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">Recently decided</h2>
+          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
             {decided.map((cr) => (
-              <li key={cr.id} className="space-y-1 p-3">
+              <li key={cr.id} className="space-y-1 p-4">
                 <Header cr={cr} />
                 <p className="text-xs">
                   <span className="font-bold">{CHANGE_REQUEST_STATUS_LABELS[cr.status]}</span>
@@ -186,7 +194,7 @@ export default async function ClaudeChangesPage() {
       )}
 
       <section className="space-y-3">
-        <h2 className="text-lg font-black">Connected Claude ({grants.length})</h2>
+        <h2 className="text-xs font-bold tracking-[0.14em] text-muted-foreground uppercase">Connected Claude · {grants.length}</h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Each one is a Claude app an admin signed in to the Roster. It can read
           records and propose changes, never approve them. Disconnect one and its
@@ -195,9 +203,9 @@ export default async function ClaudeChangesPage() {
         {grants.length === 0 ? (
           <p className="text-sm">None connected.</p>
         ) : (
-          <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
             {grants.map((g) => (
-              <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+              <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm">
                 <div>
                   <p className="font-bold">{g.clientName} · {g.email}</p>
                   <p className="text-xs text-muted-foreground">

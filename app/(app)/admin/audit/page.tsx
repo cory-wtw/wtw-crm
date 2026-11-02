@@ -43,7 +43,7 @@ export default async function AuditLogPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Audit log</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Audit log</h1>
         <p className="text-sm text-muted-foreground">
           Every read of a veteran record + every create / update / delete
           across the system. Showing the most recent {logs.length} entries.

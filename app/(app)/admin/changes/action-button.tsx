@@ -45,8 +45,8 @@ export function ActionButton({
         disabled={saving}
         className={
           primary
-            ? "inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
-            : "inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-sm font-bold transition-colors hover:bg-secondary disabled:opacity-50"
+            ? "inline-flex h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+            : "inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary disabled:opacity-50 sm:h-9"
         }
       >
         {saving ? "Saving…" : label}
@@ -69,7 +69,7 @@ export function CopyText({ text }: { text: string }) {
           await navigator.clipboard.writeText(text);
           setCopied(true);
         }}
-        className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-sm font-bold transition-colors hover:bg-secondary"
+        className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-4 text-sm font-bold transition-colors hover:bg-secondary sm:h-9"
       >
         {copied ? "Copied" : "Copy packet text"}
       </button>

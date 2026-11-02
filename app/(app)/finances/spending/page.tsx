@@ -66,7 +66,7 @@ export default async function SpendingPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Spending</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Spending</h1>
         <p className="text-sm text-muted-foreground">What WTW pays for: ongoing costs, every vendor, and month by month.</p>
       </div>
 

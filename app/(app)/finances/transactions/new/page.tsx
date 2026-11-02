@@ -13,7 +13,7 @@ export default async function NewTransactionPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Add transaction</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Add transaction</h1>
         <p className="text-sm text-muted-foreground">
           For anything that isn&apos;t in a bank or Zeffy export — cash, checks,
           in-kind reimbursements.
