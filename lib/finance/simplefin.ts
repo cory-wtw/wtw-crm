@@ -78,3 +78,29 @@ export async function fetchSimplefin(
   if (!res.ok) throw new Error(`SimpleFIN answered ${res.status}.`);
   return (await res.json()) as SimplefinResponse;
 }
+
+/**
+ * Trades a one-time SimpleFIN setup token (from the Bridge site) for the
+ * long-lived access URL. The token is base64 of a claim URL on simplefin.org.
+ */
+export async function claimSetupToken(token: string): Promise<string> {
+  let claim: string;
+  try {
+    claim = Buffer.from(token.trim(), "base64").toString("utf8").trim();
+  } catch {
+    throw new Error("That doesn't look like a SimpleFIN setup token.");
+  }
+  if (!/^https:\/\/([a-z0-9-]+\.)*simplefin\.org\/\S*$/i.test(claim)) {
+    throw new Error("That doesn't look like a SimpleFIN setup token. Copy the whole token again.");
+  }
+  const res = await fetch(claim, { method: "POST", headers: { "Content-Length": "0" }, cache: "no-store" });
+  if (res.status === 403) {
+    throw new Error("SimpleFIN says this token was already used. Make a new one.");
+  }
+  if (!res.ok) throw new Error(`SimpleFIN claim failed (${res.status}).`);
+  const access = (await res.text()).trim();
+  if (!/^https:\/\/[^:@/\s]+:[^@\s]+@/.test(access)) {
+    throw new Error("SimpleFIN returned something unexpected. Try a new token.");
+  }
+  return access;
+}

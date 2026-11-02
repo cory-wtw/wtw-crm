@@ -26,6 +26,7 @@ import {
   type TransactionSource,
 } from "@/lib/schemas";
 import {
+  connectFoundAction,
   importTransactionsAction,
   pullFoundAction,
   type HeldRow,
@@ -126,6 +127,24 @@ export function ImportPanel({
   }
 
   const [pulling, setPulling] = useState(false);
+  const [foundConnected, setFoundConnected] = useState(canPullFound);
+  const [setupToken, setSetupToken] = useState("");
+
+  async function connectFound() {
+    setPulling(true);
+    setError(null);
+    try {
+      const response = await connectFoundAction({ token: setupToken });
+      if (!response.ok) {
+        setError(response.error);
+        return;
+      }
+      setSetupToken("");
+      setFoundConnected(true);
+    } finally {
+      setPulling(false);
+    }
+  }
 
   async function pullFound() {
     setPulling(true);
@@ -479,10 +498,29 @@ export function ImportPanel({
             ? "Download transactions from online banking as CSV. Any bank's layout works — you'll confirm which column is which."
             : "In Zeffy: Payments → Export. Each payment becomes one income row tagged with the donor and campaign."}
         </p>
-        {mode === "bank" && canPullFound && (
+        {mode === "bank" && foundConnected && (
           <button type="button" onClick={pullFound} disabled={pulling} className={primary}>
             {pulling ? "Pulling from Found…" : "Pull last 45 days from Found"}
           </button>
+        )}
+        {mode === "bank" && !foundConnected && (
+          <div className="space-y-2 rounded-lg border border-border bg-card p-4">
+            <p className="text-sm font-bold">Connect Found</p>
+            <p className="text-xs text-muted-foreground">
+              In SimpleFIN Bridge, create a setup token and paste it here. It&apos;s used once and never shown again.
+            </p>
+            <input
+              type="password"
+              autoComplete="off"
+              value={setupToken}
+              onChange={(e) => setSetupToken(e.target.value)}
+              placeholder="SimpleFIN setup token"
+              className={control}
+            />
+            <button type="button" onClick={connectFound} disabled={pulling || !setupToken.trim()} className={primary}>
+              {pulling ? "Connecting…" : "Connect Found"}
+            </button>
+          </div>
         )}
         <input
           type="file"
