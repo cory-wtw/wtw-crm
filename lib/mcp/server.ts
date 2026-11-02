@@ -13,6 +13,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { listEncounters } from "@/lib/db/encounters";
 import { listCategories, listTransactions } from "@/lib/db/finance";
+import { listFoundTransactions } from "@/lib/finance/found-feed";
 import { getResource, listResources } from "@/lib/db/resources";
 import { listUsers } from "@/lib/db/users";
 import { getVeteran, listVeterans } from "@/lib/db/veterans";
@@ -622,6 +623,29 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
         totalExpense: total("expense"),
         transactions: matched.slice(0, limit),
       });
+    },
+  );
+
+  server.registerTool(
+    "list_found_transactions",
+    {
+      title: "List Found bank transactions",
+      description:
+        "WTW's Found bank account, live from SimpleFIN: posted transactions from the last `days` days (default 45). Each row says whether it's already in the books (onFile) and suggests a vendor and category from past ones. Read only — to add the ones not on file, queue propose_transaction_create with source details in notes.",
+      inputSchema: { days: z.number().int().min(1).max(90).default(45) },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ days }) => {
+      try {
+        const rows = await listFoundTransactions(days);
+        return json({
+          count: rows.length,
+          notOnFile: rows.filter((r) => !r.onFile).length,
+          transactions: rows,
+        });
+      } catch (e) {
+        return fail(e instanceof Error ? e.message : "Couldn't read Found.");
+      }
     },
   );
 
