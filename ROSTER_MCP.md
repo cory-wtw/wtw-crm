@@ -13,7 +13,9 @@ talked to Maria, she got the job at Amazon." Claude looks up the records and
   Claude can fetch it to draft the email). Nothing is ever sent automatically.
 - Follow-ups on referrals, and wins (job, housing, SNAP…)
 - VSOs, community resources: new and edit
-- Finances: new transaction, edit transaction
+- Finances: new transaction, edit transaction. Claude can read Found's bank
+  transactions live (`list_found_transactions`, once Found is connected on
+  Finances → Import) and queue the ones not yet in the books.
 
 A whole call shares one label, so the review page groups it with an
 **Approve all** button (in order, stopping at the first problem). A new veteran
