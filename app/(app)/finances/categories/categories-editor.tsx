@@ -162,19 +162,19 @@ function CategoryRow({
         </div>
         {split && (
           <div className="grid grid-cols-3 gap-2 sm:contents">
-            <input type="number" min="0" max="100" value={draft.program} onChange={set("program")} className={cellInput} aria-label="Program %" />
-            <input type="number" min="0" max="100" value={draft.mgmt} onChange={set("mgmt")} className={cellInput} aria-label="Management %" />
-            <input type="number" min="0" max="100" value={draft.fundraising} onChange={set("fundraising")} className={cellInput} aria-label="Fundraising %" />
+            <label className="block min-w-0"><span className="mb-0.5 block text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase sm:hidden">Program</span><input type="number" min="0" max="100" value={draft.program} onChange={set("program")} className={cellInput} aria-label="Program %" /></label>
+            <label className="block min-w-0"><span className="mb-0.5 block text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase sm:hidden">Management</span><input type="number" min="0" max="100" value={draft.mgmt} onChange={set("mgmt")} className={cellInput} aria-label="Management %" /></label>
+            <label className="block min-w-0"><span className="mb-0.5 block text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase sm:hidden">Fundraising</span><input type="number" min="0" max="100" value={draft.fundraising} onChange={set("fundraising")} className={cellInput} aria-label="Fundraising %" /></label>
           </div>
         )}
-        <div className="flex w-36 items-center justify-end gap-2">
+        <div className="flex w-full items-center justify-end gap-2 sm:w-36">
           {id && <span className="text-xs text-muted-foreground">{count} txns</span>}
           {(dirty || !id) && (
             <button
               type="button"
               onClick={save}
               disabled={busy || !draft.name.trim() || (split && Math.abs(sum - 100) > 0.01)}
-              className="h-9 rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-40"
+              className="h-11 rounded-md bg-primary px-4 text-xs font-bold sm:h-9 sm:px-3 text-primary-foreground disabled:opacity-40"
             >
               {id ? "Save" : "Add"}
             </button>
@@ -184,7 +184,7 @@ function CategoryRow({
               type="button"
               onClick={remove}
               disabled={busy}
-              className="h-9 rounded-md border border-destructive/40 px-3 text-xs font-bold text-destructive hover:bg-destructive/10"
+              className="h-11 sm:h-9 rounded-md border border-destructive/40 px-3 text-xs font-bold text-destructive hover:bg-destructive/10"
             >
               Delete
             </button>

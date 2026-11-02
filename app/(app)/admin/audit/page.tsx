@@ -51,13 +51,14 @@ export default async function AuditLogPage() {
       </div>
 
       {logs.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
           No audit entries yet.
         </div>
       ) : (
-        <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full min-w-[48rem] text-sm">
-            <thead className="bg-secondary/60">
+        <div className="mobile-touch-scroll overflow-x-auto rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)]">
+          {/* Phones stack each entry as a card; wider screens get the table. */}
+          <table className="block w-full text-sm sm:table sm:min-w-[48rem]">
+            <thead className="hidden bg-secondary/50 sm:table-header-group">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.15em] text-[color:var(--wtw-deep-gold)]">
                 <th className="px-4 py-3">When</th>
                 <th className="px-4 py-3">Actor</th>
@@ -66,31 +67,31 @@ export default async function AuditLogPage() {
                 <th className="px-4 py-3">Changes</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block sm:table-row-group">
               {logs.map((entry) => {
                 const link = resourceLink(entry.resourceType, entry.resourceId);
                 return (
                   <tr
                     key={entry.id}
-                    className="border-t border-border align-top"
+                    className="block border-t border-border py-2 align-top first:border-t-0 sm:table-row sm:py-0 sm:first:border-t"
                   >
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="block px-4 py-1 sm:table-cell sm:py-2.5 text-xs text-muted-foreground">
                       {formatDate(entry.at)}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="block px-4 py-1 sm:table-cell sm:py-2.5">
                       <p className="font-bold">{entry.actorEmail}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {entry.actorUid}
                       </p>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="block px-4 py-1 sm:table-cell sm:py-2.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] ${ACTION_TINT[entry.action]}`}
                       >
                         {AUDIT_ACTION_LABELS[entry.action]}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="block px-4 py-1 sm:table-cell sm:py-2.5">
                       <p className="font-bold">
                         {RESOURCE_TYPE_LABELS[entry.resourceType]}
                       </p>
@@ -107,7 +108,7 @@ export default async function AuditLogPage() {
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="block px-4 py-1 sm:table-cell sm:py-2.5">
                       {entry.diff && Object.keys(entry.diff).length > 0 ? (
                         <ul className="space-y-0.5 text-[11px]">
                           {Object.entries(entry.diff).map(([field, change]) => (

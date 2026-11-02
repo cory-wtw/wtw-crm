@@ -102,7 +102,7 @@ export default async function SpendingPage({
               <Link
                 key={p.label}
                 href={`/finances/spending?${q}`}
-                className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
+                className={`inline-flex h-10 items-center rounded-full px-4 text-xs font-bold transition-colors sm:h-8 sm:px-3 ${
                   q === query ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -119,7 +119,31 @@ export default async function SpendingPage({
         {months.length === 0 ? (
           <p className="text-xs text-muted-foreground">No spending in this range.</p>
         ) : (
-          <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
+          <>
+          {/* Phones: one row per month with a bar; the full table on wider screens. */}
+          <ul className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:hidden">
+            {months.map((m) => {
+              const top = topCats
+                .filter((id) => m.byCategory[id])
+                .slice(0, 2)
+                .map((id) => `${catName[id] ?? "Uncategorized"} ${formatUsdCents(m.byCategory[id])}`);
+              return (
+                <li key={m.month} className="border-b border-border px-4 py-3.5 last:border-b-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[15px] font-bold">{formatMonth(m.month)}</span>
+                    <span className="font-black tabular-nums">{formatUsdCents(m.total)}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-secondary">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(0, (m.total / maxMonth) * 100)}%` }} />
+                  </div>
+                  {top.length > 0 && (
+                    <p className="mt-1.5 truncate text-xs text-muted-foreground">{top.join(" · ")}</p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mobile-touch-scroll hidden overflow-x-auto rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:block">
             <table className="w-full min-w-[44rem] text-sm">
               <thead className="bg-secondary/60">
                 <tr>
@@ -161,6 +185,7 @@ export default async function SpendingPage({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </section>
 

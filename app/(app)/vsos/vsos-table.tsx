@@ -68,7 +68,7 @@ const columns: ColumnDef<VsoRow>[] = [
       const s = row.original.partnershipStatus;
       return (
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STATUS_TINT[s]}`}
+          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${STATUS_TINT[s]}`}
         >
           {PARTNERSHIP_STATUS_LABELS[s]}
         </span>
@@ -118,27 +118,27 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
           placeholder="Search by name, affiliation, or location…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-11 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="h-12 w-full rounded-2xl border border-input bg-card px-4 text-sm shadow-[0_1px_2px_rgb(29_25_18/0.04)] focus:outline-none focus:ring-2 focus:ring-ring sm:max-w-sm"
         />
         <span className="shrink-0 text-xs text-muted-foreground">
           {filtered.length} of {rows.length}
         </span>
       </div>
       {/* Cards on phones/tablets, sortable table on desktop. */}
-      <ul className="space-y-2 lg:pointer-fine:hidden">
+      <ul className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] lg:pointer-fine:hidden">
         {table.getRowModel().rows.map((row) => {
           const v = row.original;
           const location = [v.city, v.state].filter(Boolean).join(", ");
           return (
-            <li key={row.id}>
+            <li key={row.id} className="border-b border-border last:border-b-0">
               <Link
                 href={`/vsos/${v.id}`}
-                className="block rounded-lg border border-border bg-card p-4 active:bg-secondary/40"
+                className="block px-4 py-3.5 active:bg-secondary/60"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-bold text-foreground">{v.fullName}</p>
+                  <p className="text-[15px] font-bold text-foreground">{v.fullName}</p>
                   <span
-                    className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STATUS_TINT[v.partnershipStatus]}`}
+                    className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${STATUS_TINT[v.partnershipStatus]}`}
                   >
                     {PARTNERSHIP_STATUS_LABELS[v.partnershipStatus]}
                   </span>
@@ -153,9 +153,9 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
         })}
       </ul>
 
-      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:pointer-fine:block">
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] lg:pointer-fine:block">
         <table className="w-full min-w-[48rem] text-sm">
-          <thead className="bg-secondary/60">
+          <thead className="bg-secondary/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -206,7 +206,7 @@ export function VsosTable({ rows }: { rows: VsoRow[] }) {
         </table>
       </div>
       {filtered.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+        <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           No matches for &ldquo;{query}&rdquo;.
         </p>
       )}

@@ -76,7 +76,7 @@ export default async function FinancesPage({
               <Link
                 key={p.label}
                 href={`/finances?${q}`}
-                className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
+                className={`inline-flex h-10 items-center rounded-full px-4 text-xs font-bold transition-colors sm:h-8 sm:px-3 ${
                   active
                     ? "bg-primary text-primary-foreground"
                     : "border border-border bg-card text-muted-foreground hover:text-foreground"
@@ -86,13 +86,13 @@ export default async function FinancesPage({
               </Link>
             );
           })}
-          <form method="get" className="flex flex-wrap items-center gap-2">
+          <form method="get" className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <input
               type="date"
               name="from"
               defaultValue={range.from}
               aria-label="From"
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              className="h-11 min-w-0 flex-1 rounded-md border border-input bg-card px-2 text-xs sm:h-8 sm:flex-none"
             />
             <span className="text-xs text-muted-foreground">to</span>
             <input
@@ -100,9 +100,9 @@ export default async function FinancesPage({
               name="to"
               defaultValue={range.to}
               aria-label="To"
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              className="h-11 min-w-0 flex-1 rounded-md border border-input bg-card px-2 text-xs sm:h-8 sm:flex-none"
             />
-            <button type="submit" className="h-8 rounded-md border border-border bg-card px-3 text-xs font-bold hover:bg-secondary">
+            <button type="submit" className="h-11 rounded-md border border-border bg-card px-4 text-xs font-bold hover:bg-secondary sm:h-8 sm:px-3">
               Apply
             </button>
           </form>
@@ -294,8 +294,8 @@ function PnlTable({
   const th = "px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] text-[color:var(--wtw-deep-gold)]";
   const num = "px-4 py-2 text-right tabular-nums";
   return (
-    <div className="mobile-touch-scroll overflow-x-auto rounded-lg border border-border bg-card">
-      <table className={`w-full text-sm ${showSplit ? "min-w-[40rem]" : ""}`}>
+    <div className="mobile-touch-scroll overflow-x-auto rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)]">
+      <table className={`w-full text-sm ${showSplit ? "sm:min-w-[40rem]" : ""}`}>
         <thead className="bg-secondary/60">
           <tr>
             <th className={`${th} text-left`}>{title}</th>

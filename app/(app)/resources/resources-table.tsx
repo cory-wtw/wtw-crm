@@ -187,7 +187,7 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
             placeholder="Search by need, service, org, or description…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-11 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="h-12 w-full rounded-2xl border border-input bg-card px-4 text-sm shadow-[0_1px_2px_rgb(29_25_18/0.04)] focus:outline-none focus:ring-2 focus:ring-ring sm:max-w-sm"
           />
           {gapCount > 0 && (
             <button
@@ -209,16 +209,16 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
         </span>
       </div>
       {/* Cards on phones/tablets, sortable table on desktop. */}
-      <ul className="space-y-2 lg:pointer-fine:hidden">
+      <ul className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] lg:pointer-fine:hidden">
         {table.getRowModel().rows.map((row) => {
           const r = row.original;
           return (
-            <li key={row.id}>
+            <li key={row.id} className="border-b border-border last:border-b-0">
               <Link
                 href={`/resources/${r.id}`}
-                className="block rounded-lg border border-border bg-card p-4 active:bg-secondary/40"
+                className="block px-4 py-3.5 active:bg-secondary/60"
               >
-                <p className="font-bold text-foreground">
+                <p className="text-[15px] font-bold text-foreground">
                   {r.organizationName}
                 </p>
                 {r.buckets.length === 0 ? (
@@ -248,9 +248,9 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
         })}
       </ul>
 
-      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:pointer-fine:block">
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] lg:pointer-fine:block">
         <table className="w-full min-w-[48rem] text-sm">
-          <thead className="bg-secondary/60">
+          <thead className="bg-secondary/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -301,7 +301,7 @@ export function ResourcesTable({ rows }: { rows: ResourceRow[] }) {
         </table>
       </div>
       {filtered.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+        <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           {query ? `No matches for “${query}”.` : "Every record is classified."}
         </p>
       )}
