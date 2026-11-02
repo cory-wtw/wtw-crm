@@ -18,6 +18,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Let the page run under the notch and home bar; the shell pads itself
+  // with the safe-area insets.
+  viewportFit: "cover",
+  themeColor: "#faf8f1",
 };
 
 export default function RootLayout({

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { signOutAction } from "@/app/login/actions";
 import { getSession } from "@/lib/firebase/session";
+import { getUser } from "@/lib/db/users";
 import { isSocialOnly, isSocialPath } from "@/lib/permissions";
 import { NavLink } from "./nav-link";
 import { MobileNav, type NavItem } from "./mobile-nav";
@@ -46,25 +47,27 @@ export default async function AuthenticatedLayout({
           : []),
       ];
 
+  // Four pages on the phone tab bar; everything else sits under "More".
+  const tabs: NavItem[] = socialOnly
+    ? navItems
+    : ["/veterans", "/outreach", "/resources", session.role === "admin" ? "/finances" : "/vsos"]
+        .map((href) => navItems.find((i) => i.href === href))
+        .filter((i): i is NavItem => Boolean(i));
+
+  const user = await getUser(session.uid).catch(() => null);
+  const initials = toInitials(user?.displayName ?? null, session.email);
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="sticky top-0 z-20 print:hidden border-b border-border bg-card/80 backdrop-blur">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">
-          <Link href="/veterans" className="flex min-w-0 items-center gap-2">
-            <Image
-              src="/wtw-logo.png"
-              alt=""
-              width={28}
-              height={28}
-              priority
-              className="shrink-0"
-            />
-            <span className="truncate text-sm font-bold tracking-tight">
-              <span className="sm:hidden">WTW Roster</span>
-              <span className="hidden sm:inline">
-                Worth Their Weight Roster
-              </span>
-              <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 pt-[env(safe-area-inset-top,0px)] backdrop-blur-xl print:hidden">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">
+          <Link href="/veterans" className="flex min-w-0 items-center gap-2.5">
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-foreground">
+              <Image src="/wtw-logo.png" alt="" width={22} height={22} priority />
+            </span>
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="truncate text-lg font-black tracking-tight">Roster</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">
                 v{version}
               </span>
             </span>
@@ -77,25 +80,28 @@ export default async function AuthenticatedLayout({
             ))}
           </nav>
           <div className="flex items-center gap-3 text-xs">
-            <span className="hidden text-muted-foreground lg:inline">
-              {session.email}
-            </span>
             <form action={signOutAction} className="hidden lg:pointer-fine:block">
               <button
                 type="submit"
-                className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 font-bold transition-colors hover:bg-secondary"
+                className="inline-flex h-9 items-center justify-center rounded-full border border-border bg-card px-4 font-bold transition-colors hover:bg-secondary"
               >
                 Sign out
               </button>
             </form>
-            <MobileNav items={navItems} email={session.email} />
+            <span
+              title={session.email}
+              className="hidden h-10 w-10 items-center justify-center rounded-full bg-foreground text-sm font-black text-background lg:pointer-fine:inline-flex"
+            >
+              {initials}
+            </span>
+            <MobileNav items={navItems} tabs={tabs} email={session.email} initials={initials} />
           </div>
         </div>
       </header>
-      <div className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
+      <div className="flex-1 px-4 py-5 sm:px-6 sm:py-8">
         <div className="mx-auto w-full max-w-6xl">{children}</div>
       </div>
-      <footer className="border-t border-border py-4 print:hidden">
+      <footer className="border-t border-border pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] print:hidden lg:pointer-fine:pb-4">
         <div className="mx-auto w-full max-w-6xl px-4 text-center text-[11px] leading-relaxed text-muted-foreground sm:px-6">
           <p>
             Worth Their Weight is not a law firm and does not provide legal
@@ -111,4 +117,11 @@ export default async function AuthenticatedLayout({
       </footer>
     </div>
   );
+}
+
+function toInitials(name: string | null, email: string): string {
+  const source = name?.trim() || email.split("@")[0].replace(/[._-]+/g, " ");
+  const parts = source.split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : source.slice(0, 2);
+  return letters.toUpperCase();
 }

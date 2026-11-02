@@ -8,13 +8,14 @@ import { formatUsd } from "@/lib/format";
 import {
   lifetimeBenefitsUnlocked,
   monthlyBenefitLift,
-  PIPELINE_LABELS,
   type PipelineStage,
 } from "@/lib/schemas";
 import { VeteransTable } from "./veterans-table";
 import { listChangeRequests } from "@/lib/change-requests-apply";
 import { getSession } from "@/lib/firebase/session";
 import { isAdmin } from "@/lib/permissions";
+import { getUser } from "@/lib/db/users";
+import { ChevronRight, Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,15 @@ const STAGE_ORDER: PipelineStage[] = [
 export default async function VeteransPage() {
   const session = await getSession();
   const admin = isAdmin(session);
-  const [veterans, counts, pending] = await Promise.all([
+  const [veterans, counts, pending, user] = await Promise.all([
     listVeterans(),
     countVeteransByStage(),
     admin ? listChangeRequests("pending", 200) : Promise.resolve([]),
+    session ? getUser(session.uid).catch(() => null) : Promise.resolve(null),
   ]);
-  const total = STAGE_ORDER.reduce((sum, s) => sum + counts[s], 0);
+  const active = counts.found + counts.connected + counts.filed;
+  const needTouch = countNeedingTouch(veterans);
+  const firstName = user?.displayName?.trim().split(/\s+/)[0] ?? null;
 
   const totalMonthlyLift = veterans.reduce(
     (sum, v) =>
@@ -64,106 +68,124 @@ export default async function VeteransPage() {
   }));
 
   return (
-    <div className="space-y-6">
-      {admin && (
-        <Link
-          href="/admin/changes"
-          className="flex min-h-16 w-full items-center justify-between gap-4 rounded-lg bg-primary px-5 py-4 text-lg font-black text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
-        >
-          <span>Admin approvals</span>
-          <span className="rounded-full bg-background/90 px-3 py-1 text-base font-black text-foreground">
-            {pending.length} waiting
-          </span>
-        </Link>
-      )}
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Veterans</h1>
-          <p className="text-sm text-muted-foreground">
-            Everyone WTW has identified.
+    <div className="space-y-5">
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
+            {greeting()}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="mt-1 text-[15px] text-muted-foreground">
+            {needTouch === 0
+              ? "Everyone's been touched this week. 🙌"
+              : `${needTouch} ${needTouch === 1 ? "veteran needs" : "veterans need"} a touch this week.`}
           </p>
         </div>
         <Link
           href="/veterans/new"
-          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+          aria-label="Add veteran"
+          className="inline-flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-black text-primary-foreground shadow-sm transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
         >
-          Add veteran
+          <Plus className="h-5 w-5" strokeWidth={2.75} aria-hidden />
+          <span className="hidden sm:inline">Add veteran</span>
         </Link>
-      </div>
+      </header>
 
-      <section>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
-          Impact
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              Monthly benefits unlocked
+      {admin && (
+        <Link
+          href="/admin/changes"
+          className="group flex items-center justify-between gap-4 rounded-2xl bg-[color:var(--wtw-near-black)] p-5 text-[color:var(--wtw-cream)] shadow-sm"
+        >
+          <div>
+            <p className="text-xs font-bold tracking-[0.18em] text-[color:var(--wtw-gold-light)] uppercase">
+              Admin approvals
             </p>
-            <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-              {formatUsd(totalMonthlyLift)}
+            <p className="mt-1 text-2xl font-black tracking-tight">
+              {pending.length} waiting
             </p>
           </div>
-          <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              Est. lifetime benefits unlocked
-            </p>
-            <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
-              {formatUsd(totalLifetimeLift)}
-            </p>
-          </div>
-        </div>
-      </section>
+          <span className="inline-flex h-11 shrink-0 items-center gap-1 rounded-full bg-[color:var(--wtw-gold-light)] px-4 text-sm font-black text-[color:var(--wtw-near-black)] transition-transform group-hover:translate-x-0.5">
+            Review
+            <ChevronRight className="h-4 w-4" strokeWidth={3} aria-hidden />
+          </span>
+        </Link>
+      )}
 
-      <section>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
-          Pipeline
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
-          {STAGE_ORDER.map((stage) => (
-            <StageCard key={stage} stage={stage} count={counts[stage]} />
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          {total === 0
-            ? "No veterans yet. Add the first one to start the pipeline."
-            : `${total} ${total === 1 ? "veteran" : "veterans"} total.`}
-        </p>
+      <section aria-label="Impact" className="grid grid-cols-2 gap-3">
+        <Stat
+          label="Benefits unlocked"
+          value={formatUsd(totalMonthlyLift)}
+          unit="/mo"
+          note={totalLifetimeLift > 0 ? `${formatUsd(totalLifetimeLift)} est. lifetime` : undefined}
+        />
+        <Stat
+          label="Active veterans"
+          value={String(active)}
+          note={`${counts.won} won · ${counts.found + counts.connected + counts.filed + counts.won + counts.lost} total`}
+        />
       </section>
 
       {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-10 text-center">
-          <p className="text-sm font-bold">No veterans yet.</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+          <p className="text-base font-bold">No veterans yet.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
             Add veterans as outreach identifies them.
           </p>
           <Link
             href="/veterans/new"
-            className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            className="mt-4 inline-flex h-12 items-center justify-center rounded-full bg-primary px-5 text-sm font-black text-primary-foreground"
           >
             Add the first veteran
           </Link>
         </div>
       ) : (
-        <VeteransTable rows={rows} />
+        <VeteransTable rows={rows} counts={counts} stageOrder={STAGE_ORDER} />
       )}
     </div>
   );
 }
 
-function StageCard({
-  stage,
-  count,
+/** Active veterans nobody has updated in the last week. */
+function countNeedingTouch(veterans: { pipelineStage: PipelineStage; updatedAt: Date }[]): number {
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  return veterans.filter(
+    (v) =>
+      (v.pipelineStage === "found" || v.pipelineStage === "connected" || v.pipelineStage === "filed") &&
+      v.updatedAt.getTime() < weekAgo,
+  ).length;
+}
+
+/** Time-of-day greeting in Eastern time, where the team works. */
+function greeting(): string {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: "America/New_York" }).format(new Date()),
+  );
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function Stat({
+  label,
+  value,
+  unit,
+  note,
 }: {
-  stage: PipelineStage;
-  count: number;
+  label: string;
+  value: string;
+  unit?: string;
+  note?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
-        {PIPELINE_LABELS[stage]}
+    <div className="min-w-0 rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(29_25_18/0.04)]">
+      <p className="text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
+        {label}
       </p>
-      <p className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">{count}</p>
+      <p className="mt-1.5 truncate text-[26px] leading-none font-black tracking-tight sm:text-3xl">
+        {value}
+        {unit && <span className="ml-0.5 text-sm font-bold text-muted-foreground">{unit}</span>}
+      </p>
+      {note && <p className="mt-2 truncate text-xs text-muted-foreground">{note}</p>}
     </div>
   );
 }
