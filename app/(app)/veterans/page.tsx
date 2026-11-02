@@ -12,6 +12,9 @@ import {
   type PipelineStage,
 } from "@/lib/schemas";
 import { VeteransTable } from "./veterans-table";
+import { listChangeRequests } from "@/lib/change-requests-apply";
+import { getSession } from "@/lib/firebase/session";
+import { isAdmin } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +27,12 @@ const STAGE_ORDER: PipelineStage[] = [
 ];
 
 export default async function VeteransPage() {
-  const [veterans, counts] = await Promise.all([
+  const session = await getSession();
+  const admin = isAdmin(session);
+  const [veterans, counts, pending] = await Promise.all([
     listVeterans(),
     countVeteransByStage(),
+    admin ? listChangeRequests("pending", 200) : Promise.resolve([]),
   ]);
   const total = STAGE_ORDER.reduce((sum, s) => sum + counts[s], 0);
 
@@ -59,6 +65,17 @@ export default async function VeteransPage() {
 
   return (
     <div className="space-y-6">
+      {admin && (
+        <Link
+          href="/admin/changes"
+          className="flex min-h-16 w-full items-center justify-between gap-4 rounded-lg bg-primary px-5 py-4 text-lg font-black text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+        >
+          <span>Admin approvals</span>
+          <span className="rounded-full bg-background/90 px-3 py-1 text-base font-black text-foreground">
+            {pending.length} waiting
+          </span>
+        </Link>
+      )}
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Veterans</h1>
