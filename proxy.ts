@@ -9,8 +9,10 @@ export function proxy(request: NextRequest) {
   // The MCP endpoint and the connector sign-in endpoints authenticate with
   // bearer tokens and PKCE (lib/mcp/oauth.ts), not a session cookie, and must
   // not be bounced to /login.
+  // /api/public/* serves the public website's totals and needs no session.
   if (
     pathname === "/api/mcp" ||
+    pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/oauth/") ||
     pathname.startsWith("/.well-known/")
   ) {
