@@ -76,7 +76,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
       </p>
       <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
         <li>It can read veterans, VSOs, resources and the books.</li>
-        <li>It can propose changes. Nothing is saved until an admin approves it on Admin → Claude changes.</li>
+        <li>It can propose changes. Nothing is saved until an admin approves it on Admin → Approvals.</li>
         <li>You can disconnect it there any time.</li>
       </ul>
       <form action={decideAuthorizeAction} className="flex gap-2">
@@ -87,14 +87,14 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         <button
           name="decision"
           value="allow"
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+          className="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
         >
           Allow
         </button>
         <button
           name="decision"
           value="deny"
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-md border border-border px-4 text-sm font-bold transition-colors hover:bg-secondary"
+          className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-border px-4 text-sm font-bold transition-colors hover:bg-secondary"
         >
           Deny
         </button>

@@ -39,7 +39,7 @@ export default async function RosterGapsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
           Roster gaps
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">

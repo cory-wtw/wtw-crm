@@ -25,7 +25,7 @@ export default async function ImportPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Import CSV</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Import CSV</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Paste or upload a bank statement or a Zeffy payments export. Rows
           from vendors you&apos;ve categorised before are filled in

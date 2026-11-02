@@ -63,7 +63,7 @@ export function LoginForm({ next = null }: { next?: string | null }) {
         onClick={onGoogleSignIn}
         disabled={busy}
         aria-busy={busy}
-        className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+        className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-full bg-[color:var(--wtw-near-black)] px-5 text-sm font-bold text-[color:var(--wtw-cream)] transition-colors hover:bg-[#3a3326] disabled:opacity-50"
       >
         {busy ? <Spinner /> : <GoogleMark />}
         {busy ? PHASE_LABEL[phase] : "Sign in with Google"}

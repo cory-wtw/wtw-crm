@@ -39,7 +39,7 @@ export function DecideButtons({ id }: { id: string }) {
           type="button"
           onClick={() => decide("approve")}
           disabled={saving !== null}
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50 sm:flex-none"
+          className="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50 sm:flex-none"
         >
           {saving === "approve" ? "Saving…" : "Approve"}
         </button>
@@ -47,7 +47,7 @@ export function DecideButtons({ id }: { id: string }) {
           type="button"
           onClick={() => decide("reject")}
           disabled={saving !== null}
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-md border border-border px-4 text-sm font-bold transition-colors hover:bg-secondary disabled:opacity-50 sm:flex-none"
+          className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-border bg-card px-5 text-sm font-bold transition-colors hover:bg-secondary disabled:opacity-50 sm:flex-none"
         >
           {saving === "reject" ? "Saving…" : "Reject"}
         </button>

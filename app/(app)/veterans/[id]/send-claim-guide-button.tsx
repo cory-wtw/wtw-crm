@@ -5,7 +5,7 @@ import { Info } from "lucide-react";
 import type { ClaimGuideSend } from "@/lib/claim-guide";
 
 const BUTTON =
-  "inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary";
+  "inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary";
 
 /**
  * Texts go out through 800.com, which has no way to prefill a message from

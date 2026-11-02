@@ -65,7 +65,7 @@ export default async function ImpactPage() {
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">Worth Their Weight</p>
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Impact report</h1>
+          <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Impact report</h1>
           <p className="text-sm text-muted-foreground">What our work has produced for veterans since {sinceLabel}, and what it cost.</p>
         </div>
         <PrintButton />

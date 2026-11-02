@@ -44,7 +44,7 @@ export function RecordsPanel({ records, thisYear }: { records: RecordRow[]; this
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+          className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
         >
           {adding ? "Cancel" : "Upload a record"}
         </button>
@@ -158,7 +158,7 @@ function UploadForm({ thisYear, onDone }: { thisYear: number; onDone: () => void
           ref={fileInput}
           type="file"
           onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm file:mr-3 file:h-9 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:text-sm file:font-bold"
+          className="block w-full text-sm file:mr-3 file:h-11 sm:file:h-9 file:rounded-md file:border file:border-border file:bg-card file:px-3 file:text-sm file:font-bold"
         />
         <p className="text-xs text-muted-foreground">Any file type, up to 25 MB. Kept exactly as uploaded.</p>
       </div>
@@ -185,7 +185,7 @@ function UploadForm({ thisYear, onDone }: { thisYear: number; onDone: () => void
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+        className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
       >
         {busy ? `Uploading… ${progress ?? 0}%` : "Upload"}
       </button>
@@ -224,14 +224,14 @@ function RecordItem({ record }: { record: RecordRow }) {
         </p>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
-      <a href={`/api/finances/records/${record.id}`} className="inline-flex h-9 items-center rounded-md border border-border bg-card px-3 text-xs font-bold hover:bg-secondary">
+      <a href={`/api/finances/records/${record.id}`} className="inline-flex h-11 sm:h-9 items-center rounded-full border border-border bg-card px-3 text-xs font-bold hover:bg-secondary">
         Download
       </a>
       <button
         type="button"
         onClick={onDelete}
         disabled={busy}
-        className="inline-flex h-9 items-center rounded-md border border-destructive/40 px-3 text-xs font-bold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+        className="inline-flex h-11 sm:h-9 items-center rounded-md border border-destructive/40 px-3 text-xs font-bold text-destructive hover:bg-destructive/10 disabled:opacity-50"
       >
         {busy ? "Deleting…" : "Delete"}
       </button>

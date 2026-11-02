@@ -15,7 +15,7 @@ export default async function CategoriesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Categories</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Categories</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Each expense category carries a default program / management /
           fundraising split. Transactions use it unless you override one by

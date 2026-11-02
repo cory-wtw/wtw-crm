@@ -230,7 +230,7 @@ function MediaCard({
           <a
             href={row.downloadUrl}
             download={row.fileName}
-            className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-xs font-bold transition-colors hover:bg-secondary"
+            className="inline-flex h-11 sm:h-8 items-center justify-center rounded-full border border-border px-3 text-xs font-bold transition-colors hover:bg-secondary"
           >
             Download
           </a>
@@ -238,7 +238,7 @@ function MediaCard({
             type="button"
             onClick={toggleUsed}
             disabled={isPending}
-            className={`inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-bold transition-colors disabled:opacity-50 ${
+            className={`inline-flex h-11 sm:h-8 items-center justify-center rounded-md px-3 text-xs font-bold transition-colors disabled:opacity-50 ${
               isUsed
                 ? "border border-border hover:bg-secondary"
                 : "bg-[color:var(--wtw-deep-gold)] text-white hover:opacity-90"
@@ -250,7 +250,7 @@ function MediaCard({
             <div className="ml-auto flex items-center gap-1">
               <Link
                 href={`/social/${row.id}/edit`}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-xs font-bold transition-colors hover:bg-secondary"
+                className="inline-flex h-11 sm:h-8 items-center justify-center rounded-full border border-border px-3 text-xs font-bold transition-colors hover:bg-secondary"
               >
                 Edit
               </Link>
@@ -258,7 +258,7 @@ function MediaCard({
                 type="button"
                 onClick={remove}
                 disabled={isPending}
-                className="inline-flex h-8 items-center justify-center rounded-md px-2 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                className="inline-flex h-11 sm:h-8 items-center justify-center rounded-md px-2 text-xs font-bold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
               >
                 Delete
               </button>

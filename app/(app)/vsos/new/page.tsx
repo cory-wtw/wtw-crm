@@ -11,7 +11,7 @@ export default async function NewVsoPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Add VSO</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Add VSO</h1>
         <p className="text-sm text-muted-foreground">
           The only required field is Full name. Fill in what you know now.
         </p>

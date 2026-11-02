@@ -86,7 +86,7 @@ export default async function ResourceDetailPage({
     <div className="space-y-8">
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+          <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
             {resource.organizationName}
           </h1>
           {resource.parentOrg && (
@@ -108,7 +108,7 @@ export default async function ResourceDetailPage({
         {canEdit && (
           <Link
             href={`/resources/${resource.id}/edit`}
-            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+            className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
           >
             Edit
           </Link>

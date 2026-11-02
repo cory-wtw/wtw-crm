@@ -99,7 +99,7 @@ function QueueSection({
                   </div>
                   <Link
                     href={row.actionHref}
-                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
                   >
                     {row.actionLabel}
                   </Link>
@@ -170,7 +170,7 @@ export default async function OutreachPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
           Outreach
         </h1>
         <p className="text-sm text-muted-foreground">

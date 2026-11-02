@@ -20,7 +20,7 @@ export default async function EditVsoPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
           Edit {vso.fullName}
         </h1>
       </div>

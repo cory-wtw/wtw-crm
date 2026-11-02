@@ -20,14 +20,16 @@ export default async function LoginPage({
     redirect(next ?? "/");
   }
   return (
-    <main className="flex flex-1 flex-col items-center justify-center px-6 py-16">
-      <div className="w-full max-w-sm space-y-6 rounded-lg border border-border bg-card p-8 shadow-sm">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <Image src="/wtw-logo.png" alt="" width={72} height={72} priority />
-          <h1 className="text-2xl font-black tracking-tight">
-            Worth Their Weight Roster
-          </h1>
-          <p className="text-sm text-muted-foreground">Sign in to continue.</p>
+    <main className="flex flex-1 flex-col items-center justify-center px-5 py-16">
+      <div className="w-full max-w-sm space-y-8 rounded-3xl border border-border bg-card p-8 shadow-[0_1px_2px_rgb(29_25_18/0.05),0_24px_48px_-24px_rgb(29_25_18/0.25)]">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <span className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[color:var(--wtw-near-black)]">
+            <Image src="/wtw-logo.png" alt="" width={40} height={40} priority />
+          </span>
+          <div className="space-y-1">
+            <h1 className="text-3xl font-black tracking-tight">Roster</h1>
+            <p className="text-sm text-muted-foreground">Worth Their Weight · sign in to continue</p>
+          </div>
         </div>
         <LoginForm next={next} />
       </div>

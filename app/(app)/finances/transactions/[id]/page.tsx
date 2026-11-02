@@ -23,7 +23,7 @@ export default async function EditTransactionPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Edit transaction</h1>
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Edit transaction</h1>
         <p className="text-sm text-muted-foreground">
           From {TRANSACTION_SOURCE_LABELS[tx.source]} · added {formatDate(tx.createdAt)}
         </p>

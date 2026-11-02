@@ -29,7 +29,7 @@ export default async function FollowUpPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+          <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
             Follow-up · {shortName}
           </h1>
           <p className="text-sm text-muted-foreground">

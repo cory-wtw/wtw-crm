@@ -37,7 +37,7 @@ export default async function EditMediaPage({
         >
           ← Back to Social
         </Link>
-        <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Edit media</h1>
+        <h1 className="mt-2 text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Edit media</h1>
         <p className="text-sm text-muted-foreground">
           Update the description and details. To change the photo or video
           itself, delete this item and upload a new one.

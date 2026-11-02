@@ -45,7 +45,7 @@ export default async function SocialPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Social</h1>
+          <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">Social</h1>
           <p className="text-sm text-muted-foreground">
             Photos and videos for the social media manager to pull from. Mark
             an item <strong>Used</strong> once it&rsquo;s posted, and delete it
@@ -54,7 +54,7 @@ export default async function SocialPage() {
         </div>
         <Link
           href="/social/new"
-          className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+          className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
         >
           Add media
         </Link>
@@ -68,7 +68,7 @@ export default async function SocialPage() {
           </p>
           <Link
             href="/social/new"
-            className="mt-4 inline-flex h-11 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
+            className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white"
           >
             Add media
           </Link>

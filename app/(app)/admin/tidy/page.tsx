@@ -16,7 +16,7 @@ export default async function TidyDataPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+        <h1 className="text-[28px] leading-tight font-black tracking-tight text-balance sm:text-4xl">
           Tidy data
         </h1>
         <p className="max-w-2xl text-sm text-muted-foreground">

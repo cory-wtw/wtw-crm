@@ -63,7 +63,7 @@ export function Attachments({
           {items.length > 1 && (
             <a
               href={`/api/veterans/${veteranId}/attachments/packet`}
-              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
             >
               Download all
             </a>
@@ -72,7 +72,7 @@ export function Attachments({
             <button
               type="button"
               onClick={() => setUploading((v) => !v)}
-              className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-border bg-card px-3 text-sm font-bold transition-colors hover:bg-secondary"
             >
               {uploading ? "Cancel" : "Add file"}
             </button>
@@ -292,7 +292,7 @@ function UploadForm({
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
+        className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-[color:var(--wtw-deep-gold)] hover:text-white disabled:opacity-50"
       >
         {converting ? "Converting…" : busy ? "Uploading…" : "Upload"}
       </button>
