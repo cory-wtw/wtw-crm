@@ -27,6 +27,7 @@ import {
 } from "@/lib/schemas";
 import {
   importTransactionsAction,
+  pullFoundAction,
   type HeldRow,
   type ImportResult,
 } from "../actions";
@@ -78,9 +79,11 @@ const primary =
 export function ImportPanel({
   categories,
   known,
+  canPullFound = false,
 }: {
   categories: Category[];
   known: KnownVendor[];
+  canPullFound?: boolean;
 }) {
   const [mode, setMode] = useState<ImportMode>("bank");
   const [text, setText] = useState("");
@@ -122,10 +125,34 @@ export function ImportPanel({
     reset();
   }
 
-  function readColumns() {
+  const [pulling, setPulling] = useState(false);
+
+  async function pullFound() {
+    setPulling(true);
     setError(null);
     setResult(null);
-    const parsed = parseCsv(text);
+    reset();
+    try {
+      const response = await pullFoundAction({ days: 45 });
+      if (!response.ok) {
+        setError(response.error);
+        return;
+      }
+      if (response.count === 0) {
+        setError("No posted Found transactions in the last 45 days.");
+        return;
+      }
+      setText(response.csv);
+      readColumns(response.csv);
+    } finally {
+      setPulling(false);
+    }
+  }
+
+  function readColumns(source: string = text) {
+    setError(null);
+    setResult(null);
+    const parsed = parseCsv(source);
     if (parsed.length < 2) {
       setError("That doesn't look like a CSV with a header row and at least one transaction.");
       return;
@@ -452,6 +479,11 @@ export function ImportPanel({
             ? "Download transactions from online banking as CSV. Any bank's layout works — you'll confirm which column is which."
             : "In Zeffy: Payments → Export. Each payment becomes one income row tagged with the donor and campaign."}
         </p>
+        {mode === "bank" && canPullFound && (
+          <button type="button" onClick={pullFound} disabled={pulling} className={primary}>
+            {pulling ? "Pulling from Found…" : "Pull last 45 days from Found"}
+          </button>
+        )}
         <input
           type="file"
           accept=".csv,text/csv"
@@ -469,7 +501,7 @@ export function ImportPanel({
           className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-ring"
         />
         {!table && (
-          <button type="button" onClick={readColumns} disabled={!text.trim()} className={primary}>
+          <button type="button" onClick={() => readColumns()} disabled={!text.trim()} className={primary}>
             Read file
           </button>
         )}

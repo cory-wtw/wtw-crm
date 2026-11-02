@@ -1,13 +1,15 @@
 import { listCategories, listTransactions } from "@/lib/db/finance";
 import type { KnownVendor } from "@/lib/finance/bank-import";
 import { ImportPanel } from "./import-panel";
+import { simplefinConfigured } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImportPage() {
-  const [categories, transactions] = await Promise.all([
+  const [categories, transactions, canPullFound] = await Promise.all([
     listCategories(),
     listTransactions(),
+    simplefinConfigured(),
   ]);
   // Newest first (listTransactions' order), so the latest categorisation of
   // a vendor wins when matching.
@@ -36,7 +38,7 @@ export default async function ImportPage() {
           Set up categories first.
         </p>
       ) : (
-        <ImportPanel categories={categories} known={known} />
+        <ImportPanel categories={categories} known={known} canPullFound={canPullFound} />
       )}
     </div>
   );
