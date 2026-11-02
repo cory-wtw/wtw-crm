@@ -58,26 +58,27 @@ body {
      used for small heading text, so it needs 4.5:1 (WCAG AA). */
   --wtw-deep-gold: #8f6316;
 
-  --background: var(--wtw-cream);
+  /* Lighter than the brand cream so white cards lift off the page. */
+  --background: #faf8f1;
   --foreground: var(--wtw-near-black);
-  --card: #fafaf0;
+  --card: #ffffff;
   --card-foreground: var(--wtw-near-black);
-  --popover: #fafaf0;
+  --popover: #ffffff;
   --popover-foreground: var(--wtw-near-black);
   --primary: var(--wtw-brand-gold);
   --primary-foreground: var(--wtw-near-black);
-  --secondary: #e8e6d4;
+  --secondary: #f1ede0;
   --secondary-foreground: var(--wtw-near-black);
-  --muted: #e8e6d4;
+  --muted: #f1ede0;
   --muted-foreground: #6b6354;
   --accent: var(--wtw-deep-gold);
   --accent-foreground: #ffffff;
   --destructive: #b3261e;
   --destructive-foreground: #ffffff;
-  --border: #d9d6c2;
-  --input: #d9d6c2;
+  --border: #e6e0cb;
+  --input: #ddd6bd;
   --ring: var(--wtw-brand-gold);
-  --radius: 0.5rem;
+  --radius: 0.875rem;
   /* Chart series, fixed order: 1 program / money in, 2 management / money
      out, 3 fundraising. Validated for colorblind separation against --card
      (dataviz validate_palette.js); dark steps below are validated separately. */

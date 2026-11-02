@@ -16,11 +16,22 @@ import { formatShortName } from "@/lib/name";
 import { PIPELINE_LABELS, type PipelineStage } from "@/lib/schemas";
 import type { VeteranListItem } from "@/lib/db/veterans";
 
+import { Search } from "lucide-react";
+
+// One hue per stage so the list scans at a glance.
 const STAGE_TINT: Record<PipelineStage, string> = {
-  found: "bg-secondary text-foreground",
-  connected: "bg-[color:var(--wtw-deep-gold)]/15 text-[color:var(--wtw-deep-gold)]",
-  filed: "bg-primary/20 text-foreground",
-  won: "bg-primary text-primary-foreground",
+  found: "bg-amber-100 text-amber-900 dark:bg-amber-400/15 dark:text-amber-200",
+  connected: "bg-sky-100 text-sky-900 dark:bg-sky-400/15 dark:text-sky-200",
+  filed: "bg-violet-100 text-violet-900 dark:bg-violet-400/15 dark:text-violet-200",
+  won: "bg-emerald-100 text-emerald-900 dark:bg-emerald-400/15 dark:text-emerald-200",
+  lost: "bg-muted text-muted-foreground",
+};
+
+const AVATAR_TINT: Record<PipelineStage, string> = {
+  found: "bg-amber-200/70 text-amber-950",
+  connected: "bg-sky-200/70 text-sky-950",
+  filed: "bg-violet-200/70 text-violet-950",
+  won: "bg-emerald-200/70 text-emerald-950",
   lost: "bg-muted text-muted-foreground",
 };
 
@@ -45,7 +56,7 @@ const columns: ColumnDef<VeteranListItem>[] = [
       const stage = row.original.pipelineStage;
       return (
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STAGE_TINT[stage]}`}
+          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${STAGE_TINT[stage]}`}
         >
           {PIPELINE_LABELS[stage]}
         </span>
@@ -81,19 +92,29 @@ const columns: ColumnDef<VeteranListItem>[] = [
   },
 ];
 
-export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
+export function VeteransTable({
+  rows,
+  counts,
+  stageOrder,
+}: {
+  rows: VeteranListItem[];
+  counts: Record<PipelineStage, number>;
+  stageOrder: PipelineStage[];
+}) {
+  const [stage, setStage] = useState<PipelineStage | "all">("all");
   const [sorting, setSorting] = useState<SortingState>([
     { id: "updatedAt", desc: true },
   ]);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return rows;
-    const q = query.toLowerCase();
-    return rows.filter((r) =>
-      formatShortName(r.firstName, r.lastInitial).toLowerCase().includes(q),
+    const q = query.trim().toLowerCase();
+    return rows.filter(
+      (r) =>
+        (stage === "all" || r.pipelineStage === stage) &&
+        (!q || formatShortName(r.firstName, r.lastInitial).toLowerCase().includes(q)),
     );
-  }, [rows, query]);
+  }, [rows, query, stage]);
 
   const table = useReactTable({
     data: filtered,
@@ -105,55 +126,94 @@ export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
     getFilteredRowModel: getFilteredRowModel(),
   });
 
+  const chips: { key: PipelineStage | "all"; label: string; count: number }[] = [
+    { key: "all", label: "All", count: rows.length },
+    ...stageOrder.map((k) => ({ key: k, label: PIPELINE_LABELS[k], count: counts[k] })),
+  ];
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <label className="relative block">
+        <span className="sr-only">Search veterans</span>
+        <Search
+          className="pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
         <input
           type="search"
-          placeholder="Search by name…"
+          placeholder="Search veterans"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-11 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="h-12 w-full rounded-2xl border border-input bg-card pr-4 pl-12 text-sm shadow-[0_1px_2px_rgb(29_25_18/0.04)] focus:ring-2 focus:ring-ring focus:outline-none"
         />
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {filtered.length} of {rows.length}
-        </span>
+      </label>
+
+      <div
+        role="group"
+        aria-label="Filter by stage"
+        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0"
+      >
+        {chips.map((c) => {
+          const on = stage === c.key;
+          return (
+            <button
+              key={c.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setStage(c.key)}
+              className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-bold transition-colors ${
+                on
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-card text-foreground hover:bg-secondary"
+              }`}
+            >
+              {c.label}
+              <span className={on ? "text-[color:var(--wtw-gold-light)]" : "text-muted-foreground"}>
+                {c.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
+
       {/* Cards on phones/tablets, sortable table on desktop. */}
-      <ul className="space-y-2 lg:pointer-fine:hidden">
+      <ul className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] lg:pointer-fine:hidden">
         {table.getRowModel().rows.map((row) => {
           const v = row.original;
+          const name = formatShortName(v.firstName, v.lastInitial);
           return (
-            <li key={row.id}>
+            <li key={row.id} className="border-b border-border last:border-b-0">
               <Link
                 href={`/veterans/${v.id}`}
-                className="block rounded-lg border border-border bg-card p-4 active:bg-secondary/40"
+                className="flex items-center gap-3 px-4 py-3.5 active:bg-secondary/60"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-bold text-foreground">
-                    {formatShortName(v.firstName, v.lastInitial)}
-                  </p>
-                  <span
-                    className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em] ${STAGE_TINT[v.pipelineStage]}`}
-                  >
-                    {PIPELINE_LABELS[v.pipelineStage]}
+                <span
+                  className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black ${AVATAR_TINT[v.pipelineStage]}`}
+                  aria-hidden
+                >
+                  {(v.firstName[0] ?? "") + (v.lastInitial[0] ?? "")}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-bold text-foreground">{name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {v.monthlyBenefitAfter ? `${formatUsd(v.monthlyBenefitAfter)}/mo · ` : ""}
+                    Updated {formatDate(v.updatedAt)}
                   </span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {v.monthlyBenefitAfter
-                    ? `${formatUsd(v.monthlyBenefitAfter)}/mo`
-                    : "No benefit on file"}{" "}
-                  · Updated {formatDate(v.updatedAt)}
-                </p>
+                </span>
+                <span
+                  className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${STAGE_TINT[v.pipelineStage]}`}
+                >
+                  {PIPELINE_LABELS[v.pipelineStage]}
+                </span>
               </Link>
             </li>
           );
         })}
       </ul>
 
-      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-lg border border-border bg-card lg:pointer-fine:block">
+      <div className="mobile-touch-scroll hidden overflow-x-auto rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgb(29_25_18/0.04)] lg:pointer-fine:block">
         <table className="w-full min-w-[36rem] text-sm">
-          <thead className="bg-secondary/60">
+          <thead className="bg-secondary/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -206,8 +266,8 @@ export function VeteransTable({ rows }: { rows: VeteranListItem[] }) {
         </table>
       </div>
       {filtered.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-          No matches for &ldquo;{query}&rdquo;.
+        <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          {query ? <>No matches for &ldquo;{query}&rdquo;.</> : "Nobody in this stage yet."}
         </p>
       )}
     </div>
