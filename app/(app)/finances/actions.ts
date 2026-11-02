@@ -9,6 +9,8 @@ import { CATEGORIES, TRANSACTIONS, listCategories } from "@/lib/db/finance";
 import { importIdentity } from "@/lib/finance/bank-import";
 import { findLikelyDuplicate, toIncomingTransaction } from "@/lib/finance/dedupe";
 import { loadDedupeIndex } from "@/lib/finance/dedupe-db";
+import { claimSetupToken, fetchSimplefin, pickAccounts, simplefinToCsv } from "@/lib/finance/simplefin";
+import { getSimplefinAccessUrl, saveSimplefinAccessUrl } from "@/lib/finance/simplefin-store";
 import { adminDb } from "@/lib/firebase/admin";
 import { getSession, type Session } from "@/lib/firebase/session";
 import { canManageFinances } from "@/lib/permissions";
@@ -358,4 +360,54 @@ export async function seedCategoriesAction(): Promise<Result<{ created: number }
   await batch.commit();
   revalidateFinances();
   return { ok: true, created };
+}
+
+/** Whether a SimpleFIN feed is configured — hides the pull button when not. */
+export async function simplefinConfigured(): Promise<boolean> {
+  return Boolean(await getSimplefinAccessUrl());
+}
+
+/** Connects Found: claims a SimpleFIN setup token and stores the access URL. */
+export async function connectFoundAction(raw: unknown): Promise<Result<{ connected: true }>> {
+  const auth = await requireFinanceSession();
+  if ("error" in auth) return { ok: false, error: auth.error };
+  const token = z.string().trim().min(10).max(4000).safeParse((raw as { token?: unknown } | null)?.token);
+  if (!token.success) return { ok: false, error: "Paste the setup token from SimpleFIN." };
+  try {
+    const accessUrl = await claimSetupToken(token.data);
+    await saveSimplefinAccessUrl(accessUrl, auth.session.uid);
+    return { ok: true, connected: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Couldn't connect to SimpleFIN." };
+  }
+}
+
+/**
+ * Pulls the Found account's recent posted transactions from SimpleFIN and
+ * hands them back as bank CSV, for the import screen's usual preview. Nothing
+ * is saved here.
+ */
+export async function pullFoundAction(
+  raw: unknown,
+): Promise<Result<{ csv: string; count: number }>> {
+  const auth = await requireFinanceSession();
+  if ("error" in auth) return { ok: false, error: auth.error };
+  const accessUrl = await getSimplefinAccessUrl();
+  if (!accessUrl) return { ok: false, error: "Connect Found first." };
+  const days = z.number().int().min(1).max(90).catch(45).parse(
+    (raw as { days?: unknown } | null)?.days,
+  );
+  try {
+    const since = new Date(Date.now() - days * 86_400_000);
+    const data = await fetchSimplefin(accessUrl, since);
+    const accounts = pickAccounts(data);
+    if (accounts.length === 0) {
+      const errs = data.errors?.length ? ` (${data.errors.join("; ")})` : "";
+      return { ok: false, error: `No Found account in the SimpleFIN feed${errs}.` };
+    }
+    const csv = simplefinToCsv(accounts);
+    return { ok: true, csv, count: csv.split("\n").length - 1 };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Couldn't reach SimpleFIN." };
+  }
 }

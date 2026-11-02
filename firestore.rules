@@ -154,6 +154,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /integrations/{id} {
+      // Third-party connection secrets (SimpleFIN access URL). Server only.
+      allow read, write: if false;
+    }
+
     match /auditLog/{id} {
       // Written only by the server (Admin SDK). Admins can read via the
       // /admin/audit page; the rule below is belt-and-suspenders.
