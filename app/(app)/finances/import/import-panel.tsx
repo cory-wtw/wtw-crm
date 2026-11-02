@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   NO_COLUMN,
   buildVendorIndex,
@@ -128,6 +128,7 @@ export function ImportPanel({
 
   const [pulling, setPulling] = useState(false);
   const [foundConnected, setFoundConnected] = useState(canPullFound);
+  const reviewRef = useRef<HTMLElement>(null);
   const [setupToken, setSetupToken] = useState("");
 
   async function connectFound() {
@@ -161,8 +162,13 @@ export function ImportPanel({
         setError("No posted Found transactions in the last 45 days.");
         return;
       }
+      // Straight to the review list: SimpleFIN's columns are always the same.
       setText(response.csv);
-      readColumns(response.csv);
+      const parsed = parseCsv(response.csv);
+      const detected = detectColumns(parsed[0], "bank");
+      setTable(parsed);
+      setMap(detected);
+      buildPreview(parsed, detected);
     } finally {
       setPulling(false);
     }
@@ -181,8 +187,14 @@ export function ImportPanel({
     setRows(null);
   }
 
-  function buildPreview() {
-    if (!table || !map) return;
+  useEffect(() => {
+    if (rows) reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [rows]);
+
+  function buildPreview(tbl: string[][] | null = table, mp: ColumnMap | null = map) {
+    if (!tbl || !mp) return;
+    const table = tbl;
+    const map = mp;
     if (map.date === NO_COLUMN || (map.amount === NO_COLUMN && map.debit === NO_COLUMN && map.credit === NO_COLUMN)) {
       setError("Pick at least a date column and an amount column.");
       return;
@@ -589,7 +601,7 @@ export function ImportPanel({
             </label>
           )}
           {!rows && (
-            <button type="button" onClick={buildPreview} className={primary}>
+            <button type="button" onClick={() => buildPreview()} className={primary}>
               Preview {table.length - 1} rows
             </button>
           )}
@@ -599,7 +611,7 @@ export function ImportPanel({
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {rows && (
-        <section className="space-y-3">
+        <section ref={reviewRef} className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
               Review
