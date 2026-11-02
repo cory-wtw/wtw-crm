@@ -69,7 +69,7 @@ export function UserAdmin({
 
   return (
     <div className="space-y-8">
-      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:p-6">
         <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
           Invite teammate
         </h2>
@@ -124,7 +124,7 @@ export function UserAdmin({
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:p-6">
         <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
           Pending invites ({invites.length})
         </h2>
@@ -132,8 +132,8 @@ export function UserAdmin({
           <p className="text-sm text-muted-foreground">No pending invites.</p>
         ) : (
           <div className="mobile-touch-scroll overflow-x-auto">
-          <table className="w-full min-w-[32rem] text-sm">
-            <thead>
+          <table className="block w-full text-sm sm:table sm:min-w-[32rem]">
+            <thead className="hidden sm:table-header-group">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                 <th className="py-2">Email</th>
                 <th className="py-2">Role</th>
@@ -141,15 +141,15 @@ export function UserAdmin({
                 <th className="py-2 text-right">Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block sm:table-row-group">
               {invites.map((i) => (
-                <tr key={i.email} className="border-t border-border">
-                  <td className="py-2.5 font-bold">{i.email}</td>
-                  <td className="py-2.5 capitalize">{i.role}</td>
-                  <td className="py-2.5 text-muted-foreground">
+                <tr key={i.email} className="block border-t border-border py-2 sm:table-row sm:py-0">
+                  <td className="block py-1 sm:table-cell sm:py-2.5 font-bold">{i.email}</td>
+                  <td className="block py-1 sm:table-cell sm:py-2.5 capitalize">{i.role}</td>
+                  <td className="block py-1 sm:table-cell sm:py-2.5 text-muted-foreground">
                     {i.invitedAt}
                   </td>
-                  <td className="py-2.5 text-right">
+                  <td className="block py-1 sm:table-cell sm:py-2.5 sm:text-right">
                     <button
                       type="button"
                       onClick={run(() => revokeInviteAction(i.email))}
@@ -167,7 +167,7 @@ export function UserAdmin({
         )}
       </section>
 
-      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:p-6">
         <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
           Users ({users.length})
         </h2>
@@ -175,8 +175,8 @@ export function UserAdmin({
           <p className="text-sm text-muted-foreground">No users yet.</p>
         ) : (
           <div className="mobile-touch-scroll overflow-x-auto">
-          <table className="w-full min-w-[44rem] text-sm">
-            <thead>
+          <table className="block w-full text-sm sm:table sm:min-w-[44rem]">
+            <thead className="hidden sm:table-header-group">
               <tr className="text-left text-[11px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                 <th className="py-2">Name / Email</th>
                 <th className="py-2">Role</th>
@@ -185,10 +185,10 @@ export function UserAdmin({
                 <th className="py-2 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block sm:table-row-group">
               {users.map((u) => (
-                <tr key={u.uid} className="border-t border-border">
-                  <td className="py-2.5">
+                <tr key={u.uid} className="block border-t border-border py-2 sm:table-row sm:py-0">
+                  <td className="block py-1 sm:table-cell sm:py-2.5">
                     <p className="font-bold">
                       {u.displayName ?? u.email}
                       {u.isSelf && (
@@ -203,7 +203,7 @@ export function UserAdmin({
                       </p>
                     )}
                   </td>
-                  <td className="py-2.5">
+                  <td className="block py-1 sm:table-cell sm:py-2.5">
                     <select
                       value={u.role}
                       onChange={(e) =>
@@ -214,14 +214,14 @@ export function UserAdmin({
                       disabled={
                         isPending || (u.isSelf && u.role === "admin")
                       }
-                      className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                      className="h-11 rounded-md border border-input bg-background px-2 text-xs focus:outline-none sm:h-8 focus:ring-2 focus:ring-ring disabled:opacity-50"
                     >
                       <option value="standard">Standard</option>
                       <option value="admin">Admin</option>
                       <option value="social">Social (media only)</option>
                     </select>
                   </td>
-                  <td className="py-2.5">
+                  <td className="block py-1 sm:table-cell sm:py-2.5">
                     {u.active ? (
                       <span className="inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.1em]">
                         Active
@@ -232,10 +232,10 @@ export function UserAdmin({
                       </span>
                     )}
                   </td>
-                  <td className="py-2.5 text-muted-foreground">
+                  <td className="block py-1 sm:table-cell sm:py-2.5 text-muted-foreground">
                     {u.lastLoginAt}
                   </td>
-                  <td className="py-2.5 text-right">
+                  <td className="block py-1 sm:table-cell sm:py-2.5 sm:text-right">
                     {u.isSelf ? (
                       <span className="text-xs text-muted-foreground">—</span>
                     ) : u.active ? (

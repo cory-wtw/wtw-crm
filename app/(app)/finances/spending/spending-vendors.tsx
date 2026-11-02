@@ -138,7 +138,7 @@ function VendorDetail({ vendor, names, transactions }: { vendor: VendorRow; name
           list="vendor-names"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm sm:max-w-xs"
+          className="h-11 sm:h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm sm:max-w-xs"
         />
         <datalist id="vendor-names">
           {names.map((n) => (
@@ -148,7 +148,7 @@ function VendorDetail({ vendor, names, transactions }: { vendor: VendorRow; name
         <button
           type="submit"
           disabled={busy || !name.trim() || name.trim() === vendor.name}
-          className="h-9 rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-40"
+          className="h-11 sm:h-9 rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-40"
         >
           {busy ? "Saving…" : merging ? `Merge into ${name.trim()}` : "Rename"}
         </button>
@@ -156,7 +156,7 @@ function VendorDetail({ vendor, names, transactions }: { vendor: VendorRow; name
           type="button"
           onClick={() => save("")}
           disabled={busy}
-          className="h-9 rounded-md px-2 text-xs font-bold text-muted-foreground hover:text-foreground"
+          className="h-11 sm:h-9 rounded-md px-2 text-xs font-bold text-muted-foreground hover:text-foreground"
           title="Go back to the name from the bank or import"
         >
           Reset

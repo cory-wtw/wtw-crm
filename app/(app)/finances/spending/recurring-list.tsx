@@ -83,14 +83,14 @@ function RecurringItem({ row }: { row: Row }) {
             inputMode="decimal"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="h-9 w-28 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-11 sm:h-9 w-28 rounded-md border border-input bg-background px-2 text-sm"
             autoFocus
           />
-          <button type="submit" disabled={busy} className="h-9 rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-50">
+          <button type="submit" disabled={busy} className="h-11 sm:h-9 rounded-md bg-primary px-3 text-xs font-bold text-primary-foreground disabled:opacity-50">
             {busy ? "Saving…" : "Save"}
           </button>
           {row.override != null && (
-            <button type="button" disabled={busy} onClick={() => save(null)} className="h-9 px-2 text-xs font-bold text-muted-foreground hover:text-foreground">
+            <button type="button" disabled={busy} onClick={() => save(null)} className="h-11 sm:h-9 px-2 text-xs font-bold text-muted-foreground hover:text-foreground">
               Use estimate ({formatUsdCents(row.estimated)})
             </button>
           )}
