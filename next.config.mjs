@@ -6,16 +6,29 @@ const nextConfig = {
   // 500s on every request because it can't find the hashed package.
   serverExternalPackages: ["firebase-admin"],
 
-  // The Claude connector's Allow screen must never load inside someone else's
-  // page, where a disguised button could get an admin to approve it.
+  poweredByHeader: false,
+
+  // Baseline security headers on every route. The nonce CSP (which also
+  // carries frame-ancestors 'none', so the connector's Allow screen can't be
+  // framed) lives in proxy.ts because it has to change per request.
   async headers() {
     return [
       {
-        source: "/oauth/:path*",
+        source: "/:path*",
         headers: [
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
+      },
+      // Only the login page opens a popup (Google sign-in) that has to reach
+      // back to its opener. Not set globally: the connector /oauth flow may
+      // rely on window.opener.
+      {
+        source: "/login",
+        headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }],
       },
     ];
   },

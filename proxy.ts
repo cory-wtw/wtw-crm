@@ -1,10 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { buildCsp } from "@/lib/csp";
 
 const SESSION_COOKIE = "__session";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+
+  // Next reads the nonce back out of the request's Content-Security-Policy
+  // header and stamps it on every script it emits; every page here renders
+  // dynamically (they all read the session cookie), which nonces require.
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = buildCsp(nonce, pathname);
+  const headers = new Headers(request.headers);
+  headers.set("x-nonce", nonce);
+  headers.set("Content-Security-Policy", csp);
+
+  const next = () => {
+    const response = NextResponse.next({ request: { headers } });
+    response.headers.set("Content-Security-Policy", csp);
+    return response;
+  };
 
   // The MCP endpoint and the connector sign-in endpoints authenticate with
   // bearer tokens and PKCE (lib/mcp/oauth.ts), not a session cookie, and must
@@ -16,16 +32,16 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/api/oauth/") ||
     pathname.startsWith("/.well-known/")
   ) {
-    return NextResponse.next();
+    return next();
   }
 
   if (pathname === "/login") {
     if (hasSession) {
-      const next = request.nextUrl.searchParams.get("next");
-      const target = next?.startsWith("/oauth/authorize?") ? next : "/";
+      const nextParam = request.nextUrl.searchParams.get("next");
+      const target = nextParam?.startsWith("/oauth/authorize?") ? nextParam : "/";
       return NextResponse.redirect(new URL(target, request.url));
     }
-    return NextResponse.next();
+    return next();
   }
 
   if (!hasSession) {
@@ -42,9 +58,8 @@ export function proxy(request: NextRequest) {
   // routing (it reads the session to know the role; the cookie here is
   // opaque and can't be decoded at the edge). Kept in a header rather than
   // a query param so it never leaks into the rendered URL.
-  const headers = new Headers(request.headers);
   headers.set("x-pathname", pathname);
-  return NextResponse.next({ request: { headers } });
+  return next();
 }
 
 // Next requires the matcher pattern to be a static literal. The same pattern
