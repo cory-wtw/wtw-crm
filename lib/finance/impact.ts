@@ -23,7 +23,7 @@ export type ImpactVeteran = {
   dateFiled?: Date | null;
   dateWon?: Date | null;
   createdAt: Date;
-  outcomes?: readonly Pick<VeteranOutcome, "kind" | "monthlyValue" | "oneTimeValue">[];
+  outcomes?: readonly (Pick<VeteranOutcome, "kind" | "monthlyValue" | "oneTimeValue"> & { achievedAt?: Date })[];
 };
 
 export const FUNNEL_STAGES = ["found", "connected", "filed", "won"] as const;
