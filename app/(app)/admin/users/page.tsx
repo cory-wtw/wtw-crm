@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { isInviteExpired, isLastLoginStale } from "@/lib/auth-provisioning";
 import { getSession } from "@/lib/firebase/session";
 import { listInvites } from "@/lib/db/invites";
 import { listAllUsers } from "@/lib/db/users";
@@ -17,6 +18,7 @@ export default async function AdminUsersPage() {
     listInvites(),
   ]);
 
+  const now = new Date();
   const userRows = users
     .slice()
     .sort((a, b) => {
@@ -33,6 +35,7 @@ export default async function AdminUsersPage() {
       active: u.active,
       createdAt: formatDate(u.createdAt),
       lastLoginAt: formatDate(u.lastLoginAt),
+      staleLogin: u.active && isLastLoginStale(u.lastLoginAt, now),
       isSelf: u.uid === session.uid,
     }));
 
@@ -40,6 +43,7 @@ export default async function AdminUsersPage() {
     email: i.email,
     role: i.role,
     invitedAt: formatDate(i.invitedAt),
+    expired: isInviteExpired(i, now),
   }));
 
   return (

@@ -2,10 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import {
+  INVITE_TTL_DAYS,
+  ORG_EMAIL_DOMAIN,
+  STALE_LOGIN_DAYS,
+  isOrgEmail,
+} from "@/lib/auth-provisioning";
 import type { UserRole } from "@/lib/schemas";
 import {
   changeUserRoleAction,
   inviteUserAction,
+  resendInviteAction,
   revokeInviteAction,
   setUserActiveAction,
 } from "./actions";
@@ -18,6 +25,7 @@ export type UserRow = {
   active: boolean;
   createdAt: string;
   lastLoginAt: string;
+  staleLogin: boolean;
   isSelf: boolean;
 };
 
@@ -25,6 +33,7 @@ export type InviteRow = {
   email: string;
   role: UserRole;
   invitedAt: string;
+  expired: boolean;
 };
 
 export function UserAdmin({
@@ -39,6 +48,9 @@ export function UserAdmin({
   const [error, setError] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("standard");
+  const [inviteOutsideOrg, setInviteOutsideOrg] = useState(false);
+  const inviteIsOutside =
+    inviteEmail.includes("@") && !isOrgEmail(inviteEmail.trim());
 
   function run<T extends { ok: true } | { ok: false; error: string }>(
     work: () => Promise<T>,
@@ -57,13 +69,24 @@ export function UserAdmin({
   async function onInvite(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const result = await inviteUserAction(inviteEmail, inviteRole);
+    if (inviteIsOutside && !inviteOutsideOrg) {
+      setError(
+        `Only @${ORG_EMAIL_DOMAIN} emails can be invited. Tick "Outside the org (contractor)" to invite this one anyway.`,
+      );
+      return;
+    }
+    const result = await inviteUserAction(
+      inviteEmail,
+      inviteRole,
+      inviteOutsideOrg,
+    );
     if (!result.ok) {
       setError(result.error);
       return;
     }
     setInviteEmail("");
     setInviteRole("standard");
+    setInviteOutsideOrg(false);
     startTransition(() => router.refresh());
   }
 
@@ -86,7 +109,11 @@ export function UserAdmin({
               type="email"
               required
               value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
+              onChange={(e) => {
+                setInviteEmail(e.target.value);
+                // The override is per-address: don't let it carry over.
+                setInviteOutsideOrg(false);
+              }}
               placeholder="teammate@worththeirweight.org"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -113,10 +140,25 @@ export function UserAdmin({
           >
             Send invite
           </button>
+          <label
+            htmlFor="invite-outside-org"
+            className="flex basis-full items-center gap-2 text-sm"
+          >
+            <input
+              id="invite-outside-org"
+              type="checkbox"
+              checked={inviteOutsideOrg}
+              onChange={(e) => setInviteOutsideOrg(e.target.checked)}
+              className="h-4 w-4 rounded border-input accent-[color:var(--wtw-deep-gold)]"
+            />
+            Outside the org (contractor)
+          </label>
         </form>
         <p className="mt-3 text-xs text-muted-foreground">
           The invite materializes into a user record the first time that
-          email signs in with Google.
+          email signs in with Google. Invites expire after {INVITE_TTL_DAYS}{" "}
+          days. Only @{ORG_EMAIL_DOMAIN} emails are allowed unless you tick
+          the contractor box.
         </p>
       </section>
 
@@ -138,7 +180,7 @@ export function UserAdmin({
                 <th className="py-2">Email</th>
                 <th className="py-2">Role</th>
                 <th className="py-2">Sent</th>
-                <th className="py-2 text-right">Action</th>
+                <th className="py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="block sm:table-row-group">
@@ -148,16 +190,31 @@ export function UserAdmin({
                   <td className="block py-1 sm:table-cell sm:py-2.5 capitalize">{i.role}</td>
                   <td className="block py-1 sm:table-cell sm:py-2.5 text-muted-foreground">
                     {i.invitedAt}
+                    {i.expired && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+                        Expired
+                      </span>
+                    )}
                   </td>
                   <td className="block py-1 sm:table-cell sm:py-2.5 sm:text-right">
-                    <button
-                      type="button"
-                      onClick={run(() => revokeInviteAction(i.email))}
-                      disabled={isPending}
-                      className="text-xs font-bold text-destructive underline-offset-4 hover:underline disabled:opacity-50"
-                    >
-                      Revoke
-                    </button>
+                    <span className="inline-flex gap-4">
+                      <button
+                        type="button"
+                        onClick={run(() => resendInviteAction(i.email))}
+                        disabled={isPending}
+                        className="text-xs font-bold text-[color:var(--wtw-deep-gold)] underline-offset-4 hover:underline disabled:opacity-50"
+                      >
+                        Resend
+                      </button>
+                      <button
+                        type="button"
+                        onClick={run(() => revokeInviteAction(i.email))}
+                        disabled={isPending}
+                        className="text-xs font-bold text-destructive underline-offset-4 hover:underline disabled:opacity-50"
+                      >
+                        Revoke
+                      </button>
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -234,6 +291,11 @@ export function UserAdmin({
                   </td>
                   <td className="block py-1 sm:table-cell sm:py-2.5 text-muted-foreground">
                     {u.lastLoginAt}
+                    {u.staleLogin && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold tracking-[0.05em] text-muted-foreground">
+                        Last login over {STALE_LOGIN_DAYS} days ago
+                      </span>
+                    )}
                   </td>
                   <td className="block py-1 sm:table-cell sm:py-2.5 sm:text-right">
                     {u.isSelf ? (

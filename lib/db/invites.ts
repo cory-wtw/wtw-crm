@@ -16,7 +16,8 @@ function deserialize(
     invitedAt:
       data.invitedAt instanceof Timestamp
         ? data.invitedAt.toDate()
-        : (data.invitedAt ?? new Date()),
+        : // Missing/garbage dates fail closed: epoch means "long expired".
+          (data.invitedAt ?? new Date(0)),
   };
 }
 
