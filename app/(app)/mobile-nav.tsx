@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   BookOpen,
   CalendarCheck,
@@ -42,6 +42,11 @@ function useActive(href: string) {
  * page and sign out. The desktop nav lives inline in the layout and only shows
  * on a wide screen WITH a fine pointer (`lg:pointer-fine`): touch stays
  * "coarse" even on a landscape iPad, so tablets get this instead.
+ *
+ * The tab bar, backdrop and sheet are `position: fixed`, so no ancestor of
+ * this component may carry `transform`, `filter`, `backdrop-filter`,
+ * `will-change` or `contain` — any of those would re-anchor them to that
+ * ancestor instead of the viewport.
  */
 export function MobileNav({
   items,
@@ -57,6 +62,8 @@ export function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
   const pathname = usePathname();
 
   // Close the sheet whenever the page changes.
@@ -66,13 +73,31 @@ export function MobileNav({
     setOpen(false);
   }
 
-  // Lock body scroll while the sheet is open.
+  // Lock body scroll while the sheet is open, and let Escape close it.
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  // Move focus into the sheet on open and back to whichever button opened it
+  // on close (the avatar or the More tab), so keyboard and screen-reader
+  // users don't lose their place behind the modal.
+  useEffect(() => {
+    if (!open) return;
+    returnFocus.current = document.activeElement as HTMLElement | null;
+    panelRef.current?.querySelector<HTMLElement>("a, button")?.focus();
+    return () => {
+      const el = returnFocus.current;
+      if (el && document.contains(el)) el.focus();
     };
   }, [open]);
 
@@ -132,7 +157,9 @@ export function MobileNav({
           />
           <div
             id={panelId}
+            ref={panelRef}
             role="dialog"
+            aria-modal="true"
             aria-label="Menu"
             className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-3xl bg-card pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] shadow-2xl lg:pointer-fine:hidden"
           >

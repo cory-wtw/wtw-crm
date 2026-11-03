@@ -59,7 +59,12 @@ export default async function AuthenticatedLayout({
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 pt-[env(safe-area-inset-top,0px)] backdrop-blur-xl print:hidden">
+      {/* The frosted background lives on a ::before pseudo-element, not on
+          the header itself: `backdrop-filter` turns an element into the
+          containing block for `position: fixed` descendants, which pinned
+          the MobileNav tab bar and "More" sheet to the header instead of the
+          viewport (the sheet opened upward, off-screen). */}
+      <header className="sticky top-0 z-20 border-b border-border/70 pt-[env(safe-area-inset-top,0px)] before:absolute before:inset-0 before:-z-10 before:bg-background/85 before:backdrop-blur-xl print:hidden">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6">
           <Link href="/veterans" className="flex min-w-0 items-center gap-2.5">
             <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-foreground">
