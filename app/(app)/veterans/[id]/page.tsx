@@ -12,7 +12,7 @@ import { getUser, listUsers } from "@/lib/db/users";
 import { getVeteran } from "@/lib/db/veterans";
 import { getVsosByIds } from "@/lib/db/vsos";
 import { claimGuideSend, eight00Url } from "@/lib/claim-guide";
-import { formatDate, formatUsd } from "@/lib/format";
+import { formatDate, formatDateOnly, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { Attachments } from "./attachments";
 import { DeleteVeteranButton } from "./delete-veteran-button";
@@ -207,7 +207,7 @@ export default async function VeteranDetailPage({
               : CONCIERGE_STATUS_LABELS.none
           }
         />
-        <Row label="Follow-up due" value={formatDate(veteran.followUpDue)} />
+        <Row label="Follow-up due" value={formatDateOnly(veteran.followUpDue)} />
       </Card>
 
       <Card title="Claim progress">
@@ -350,7 +350,7 @@ export default async function VeteranDetailPage({
                         {ENCOUNTER_TYPE_LABELS[e.type]}
                       </span>
                     )}
-                    {formatDate(e.occurredAt)}
+                    {formatDateOnly(e.occurredAt)}
                     {e.location && (
                       <span className="text-muted-foreground">
                         {" "}
@@ -395,9 +395,9 @@ export default async function VeteranDetailPage({
                 )}
                 {e.followUpDue && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Follow-up due {formatDate(e.followUpDue)}
+                    Follow-up due {formatDateOnly(e.followUpDue)}
                     {e.followUpCompleted &&
-                      ` · completed ${formatDate(e.followUpCompleted)}`}
+                      ` · completed ${formatDateOnly(e.followUpCompleted)}`}
                   </p>
                 )}
                 {e.nextStep && (
@@ -409,7 +409,7 @@ export default async function VeteranDetailPage({
                     {e.nextStepDueAt && (
                       <span className="text-muted-foreground">
                         {" "}
-                        · due {formatDate(e.nextStepDueAt)}
+                        · due {formatDateOnly(e.nextStepDueAt)}
                       </span>
                     )}
                   </p>

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getLatestIntake } from "@/lib/db/encounters";
 import { getVeteran } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
-import { formatDate } from "@/lib/format";
+import { formatDateOnly } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { canRunIntake } from "@/lib/permissions";
 import { IntakeForm } from "./intake-form";
@@ -63,7 +63,7 @@ export default async function IntakePage({
           lastIntake
             ? {
                 needs: lastIntake.bucketsIdentified,
-                on: formatDate(lastIntake.occurredAt),
+                on: formatDateOnly(lastIntake.occurredAt),
               }
             : null
         }

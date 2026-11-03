@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getLatestReferral } from "@/lib/db/encounters";
 import { getVeteran } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
-import { formatDate } from "@/lib/format";
+import { formatDateOnly } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { canRecordFollowUp } from "@/lib/permissions";
 import { FollowUpForm } from "./follow-up-form";
@@ -34,7 +34,7 @@ export default async function FollowUpPage({
           </h1>
           <p className="text-sm text-muted-foreground">
             {referral
-              ? `Programs sent ${formatDate(referral.occurredAt)}. Ask them about each one below.`
+              ? `Programs sent ${formatDateOnly(referral.occurredAt)}. Ask them about each one below.`
               : "No referral packet on this record."}
           </p>
         </div>
