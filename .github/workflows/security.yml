@@ -1,0 +1,94 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so new advisories against unchanged code still surface.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          output: sarif
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-codeql
+          path: sarif/
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      # Fails the PR if it introduces a new high/critical vulnerable dependency.
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  npm-audit:
+    name: Dependency scan (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: npm audit
+        run: npm audit --json > npm-audit.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-npm-audit
+          path: npm-audit.json
+      # Non-blocking until the existing backlog is cleared — new advisories
+      # are gated by dependency-review.
+      - name: Check for high/critical advisories
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+  secrets:
+    name: Secret detection (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz \
+            | tar xz -C "$RUNNER_TEMP" gitleaks
+      - name: Scan history
+        run: $RUNNER_TEMP/gitleaks git . --redact --exit-code 0 --report-format json --report-path gitleaks.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report-gitleaks
+          path: gitleaks.json
+      - name: Fail on leaks
+        run: |
+          jq -r '.[] | "::error file=\(.File),line=\(.StartLine)::\(.RuleID) in commit \(.Commit[:7]) (fingerprint \(.Fingerprint))"' gitleaks.json
+          n=$(jq length gitleaks.json)
+          if [ "$n" -gt 0 ]; then echo "::error::gitleaks found $n potential secret(s)"; exit 1; fi
+
