@@ -21,6 +21,8 @@ import {
   isAdmin,
   isSocialOnly,
   isSocialPath,
+  roleChangeBlockReason,
+  deactivationBlockReason,
 } from "./permissions";
 
 const ADMIN = { uid: "u-admin", role: "admin" as const };
@@ -285,5 +287,94 @@ describe("canApproveImportedResource", () => {
     expect(canApproveImportedResource(STANDARD_A)).toBe(false);
     expect(canApproveImportedResource(SOCIAL)).toBe(false);
     expect(canApproveImportedResource(null)).toBe(false);
+  });
+});
+
+describe("roleChangeBlockReason", () => {
+  const base = {
+    actorUid: "u-admin",
+    targetUid: "u-other",
+    targetName: "Pat",
+    targetRole: "admin" as const,
+    targetActive: true,
+    newRole: "standard" as const,
+    activeAdminCount: 2,
+  };
+
+  it("allows demoting another admin when more admins remain", () => {
+    expect(roleChangeBlockReason(base)).toBeNull();
+  });
+  it("allows promotions regardless of admin count", () => {
+    expect(
+      roleChangeBlockReason({
+        ...base,
+        targetRole: "standard",
+        newRole: "admin",
+        activeAdminCount: 1,
+      }),
+    ).toBeNull();
+  });
+  it("allows changing a non-admin's role", () => {
+    expect(
+      roleChangeBlockReason({
+        ...base,
+        targetRole: "standard",
+        newRole: "social",
+        activeAdminCount: 1,
+      }),
+    ).toBeNull();
+  });
+  it("blocks an admin demoting themselves", () => {
+    expect(
+      roleChangeBlockReason({ ...base, targetUid: "u-admin" }),
+    ).toMatch(/demote yourself/);
+  });
+  it("blocks demoting the last active admin (in-transaction count)", () => {
+    expect(
+      roleChangeBlockReason({ ...base, activeAdminCount: 1 }),
+    ).toBe("Pat is the last active admin. Make someone else an admin first.");
+  });
+  it("lets a deactivated admin be demoted even when they are the only one", () => {
+    expect(
+      roleChangeBlockReason({
+        ...base,
+        targetActive: false,
+        activeAdminCount: 0,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("deactivationBlockReason", () => {
+  const base = {
+    actorUid: "u-admin",
+    targetUid: "u-other",
+    targetName: "Pat",
+    targetRole: "admin" as const,
+    targetActive: true,
+    activeAdminCount: 2,
+  };
+
+  it("allows deactivating another admin when more admins remain", () => {
+    expect(deactivationBlockReason(base)).toBeNull();
+  });
+  it("allows deactivating a non-admin even when one admin remains", () => {
+    expect(
+      deactivationBlockReason({
+        ...base,
+        targetRole: "standard",
+        activeAdminCount: 1,
+      }),
+    ).toBeNull();
+  });
+  it("blocks deactivating yourself", () => {
+    expect(
+      deactivationBlockReason({ ...base, targetUid: "u-admin" }),
+    ).toBe("You can't deactivate yourself.");
+  });
+  it("blocks deactivating the last active admin", () => {
+    expect(
+      deactivationBlockReason({ ...base, activeAdminCount: 1 }),
+    ).toBe("Pat is the last active admin. Make someone else an admin first.");
   });
 });

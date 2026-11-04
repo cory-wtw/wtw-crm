@@ -8,6 +8,7 @@
  */
 
 import type { Session } from "./firebase/session";
+import type { UserRole } from "./schemas/user";
 
 type SessionLike = Pick<Session, "uid" | "role">;
 type VeteranLike = { assigneeUid: string | null };
@@ -182,4 +183,59 @@ export function canEditMedia(
  */
 export function canManageFinances(session: SessionLike | null): boolean {
   return isAdmin(session);
+}
+
+type RoleChangeTarget = {
+  actorUid: string;
+  targetUid: string;
+  targetName: string;
+  targetRole: UserRole | null;
+  targetActive: boolean;
+  /** Active admins counted in the same transaction as the write. */
+  activeAdminCount: number;
+};
+
+function lastActiveAdminReason(input: RoleChangeTarget): string | null {
+  if (
+    input.targetRole === "admin" &&
+    input.targetActive &&
+    input.activeAdminCount <= 1
+  ) {
+    return `${input.targetName} is the last active admin. Make someone else an admin first.`;
+  }
+  return null;
+}
+
+/**
+ * Why a role change must be refused, or null when it's allowed. Pure so the
+ * server action can be unit-tested without Firestore.
+ *
+ * Two guards: an admin may not demote themselves, and the last active admin
+ * may not be demoted by anyone — otherwise nobody could manage users again.
+ * The count must come from the same transaction as the write; two admins
+ * demoting each other at once would otherwise both pass.
+ */
+export function roleChangeBlockReason(
+  input: RoleChangeTarget & { newRole: UserRole },
+): string | null {
+  const demoting = input.targetRole === "admin" && input.newRole !== "admin";
+  if (!demoting) return null;
+  if (input.actorUid === input.targetUid) {
+    return "You can't demote yourself out of admin.";
+  }
+  return lastActiveAdminReason(input);
+}
+
+/**
+ * Why deactivating a user must be refused, or null when it's allowed. Same
+ * last-active-admin rule as role changes: deactivating the only admin would
+ * lock everyone out of user management.
+ */
+export function deactivationBlockReason(
+  input: RoleChangeTarget,
+): string | null {
+  if (input.actorUid === input.targetUid) {
+    return "You can't deactivate yourself.";
+  }
+  return lastActiveAdminReason(input);
 }

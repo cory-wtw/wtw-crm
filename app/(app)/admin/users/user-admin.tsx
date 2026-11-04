@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { UserRole } from "@/lib/schemas";
+import {
+  USER_ROLE_LABELS,
+  userRoleSchema,
+  type UserRole,
+} from "@/lib/schemas";
 import {
   changeUserRoleAction,
   inviteUserAction,
@@ -39,19 +43,65 @@ export function UserAdmin({
   const [error, setError] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("standard");
+  // Which row has a server call in flight, so its controls stay disabled
+  // until the refreshed list lands.
+  const [pendingUid, setPendingUid] = useState<string | null>(null);
+  // Roles confirmed and sent to the server, shown until router.refresh()
+  // brings back the saved value so the select doesn't snap back meanwhile.
+  const [roleOverrides, setRoleOverrides] = useState<
+    Record<string, UserRole>
+  >({});
 
   function run<T extends { ok: true } | { ok: false; error: string }>(
     work: () => Promise<T>,
   ) {
     return async () => {
       setError(null);
-      const result = await work();
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await work();
+        if (!result.ok) {
+          setError(result.error);
+          return false;
+        }
+        startTransition(() => router.refresh());
+        return true;
+      } catch {
+        setError("Something went wrong. Try again.");
+        return false;
       }
-      startTransition(() => router.refresh());
     };
+  }
+
+  function roleFor(u: UserRow): UserRole {
+    return roleOverrides[u.uid] ?? u.role;
+  }
+
+  async function onRoleChange(
+    u: UserRow,
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) {
+    const current = roleFor(u);
+    const next = userRoleSchema.safeParse(e.target.value);
+    if (!next.success || next.data === current) return;
+    const confirmed = window.confirm(
+      `Change ${u.displayName ?? u.email}'s role from ${USER_ROLE_LABELS[current]} to ${USER_ROLE_LABELS[next.data]}?`,
+    );
+    if (!confirmed) {
+      e.target.value = current;
+      setError(null);
+      return;
+    }
+    setRoleOverrides((prev) => ({ ...prev, [u.uid]: next.data }));
+    setPendingUid(u.uid);
+    const saved = await run(() => changeUserRoleAction(u.uid, next.data))();
+    if (!saved) {
+      setRoleOverrides((prev) => {
+        const rest = { ...prev };
+        delete rest[u.uid];
+        return rest;
+      });
+    }
+    setPendingUid(null);
   }
 
   async function onInvite(e: React.FormEvent) {
@@ -205,14 +255,12 @@ export function UserAdmin({
                   </td>
                   <td className="block py-1 sm:table-cell sm:py-2.5">
                     <select
-                      value={u.role}
-                      onChange={(e) =>
-                        run(() =>
-                          changeUserRoleAction(u.uid, e.target.value),
-                        )()
-                      }
+                      value={roleFor(u)}
+                      onChange={(e) => void onRoleChange(u, e)}
                       disabled={
-                        isPending || (u.isSelf && u.role === "admin")
+                        isPending ||
+                        pendingUid === u.uid ||
+                        (u.isSelf && u.role === "admin")
                       }
                       className="h-11 rounded-md border border-input bg-background px-2 text-xs focus:outline-none sm:h-8 focus:ring-2 focus:ring-ring disabled:opacity-50"
                     >
