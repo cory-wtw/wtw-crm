@@ -10,7 +10,14 @@ import {
 } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase/client";
 import { convertToPdf, isConvertibleFile } from "@/lib/pdf-convert";
-import { ATTACHMENT_MAX_BYTES } from "@/lib/schemas";
+import { findMedicalTerms } from "@/lib/medical-terms";
+import {
+  ATTACHMENT_CATEGORIES,
+  ATTACHMENT_CATEGORY_LABELS,
+  ATTACHMENT_MAX_BYTES,
+  attachmentCategoryLabel,
+  type AttachmentCategory,
+} from "@/lib/schemas";
 import {
   createAttachmentAction,
   deleteAttachmentAction,
@@ -20,6 +27,7 @@ import {
 export type AttachmentRow = {
   id: string;
   name: string;
+  category: AttachmentCategory | null;
   downloadUrl: string;
   sizeBytes: number;
   createdAtIso: string;
@@ -121,6 +129,10 @@ function UploadForm({
   const [uid, setUid] = useState<string | null>(auth.currentUser?.uid ?? null);
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
+  const [category, setCategory] = useState<AttachmentCategory | "">("");
+  // Which set of flagged terms the user confirmed for. Derived rather than a
+  // boolean so any change to the file, name, or category clears it.
+  const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +141,18 @@ function UploadForm({
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
   }, []);
+
+  // The chosen file's name and the display name both end up on the record,
+  // so both are checked. The server re-checks before writing.
+  const flaggedTerms = findMedicalTerms(
+    `${file?.name ?? ""} ${name}`,
+    category || null,
+  );
+  const looksMedical = flaggedTerms.length > 0;
+  const flaggedKey = flaggedTerms.join();
+  const nonMedicalConfirmed = looksMedical && confirmedFor === flaggedKey;
+  const setNonMedicalConfirmed = (checked: boolean) =>
+    setConfirmedFor(checked ? flaggedKey : null);
 
   function onFileChange(f: File | null) {
     setError(null);
@@ -153,6 +177,16 @@ function UploadForm({
     }
     if (!name.trim()) {
       setError("Give the file a name.");
+      return;
+    }
+    if (!category) {
+      setError("Pick a category.");
+      return;
+    }
+    if (looksMedical && !nonMedicalConfirmed) {
+      setError(
+        `This looks like a medical record (${flaggedTerms.join(", ")}). The Roster never stores diagnoses, treatment letters, or claim files. If it isn't one, tick the confirmation below.`,
+      );
       return;
     }
     if (!uid) {
@@ -209,6 +243,9 @@ function UploadForm({
         sizeBytes: pdfBytes.byteLength,
         fileName: `${sanitize(name.trim())}.pdf`,
         name: name.trim(),
+        category,
+        originalFileName: file.name,
+        nonMedicalConfirmed: looksMedical ? nonMedicalConfirmed : undefined,
       });
 
       if (!res.ok) {
@@ -220,6 +257,8 @@ function UploadForm({
 
       setFile(null);
       setName("");
+      setCategory("");
+      setConfirmedFor(null);
       if (fileInput.current) fileInput.current.value = "";
       setBusy(false);
       setProgress(null);
@@ -240,6 +279,12 @@ function UploadForm({
       onSubmit={onSubmit}
       className="mb-4 space-y-3 rounded-lg border border-border bg-background p-4"
     >
+      <p className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+        <span className="font-bold">No medical records.</span> The Roster never
+        stores diagnoses, treatment letters, or claim files. Keep those with the
+        veteran or their VSO.
+      </p>
+
       <div className="space-y-1">
         <label className="text-xs font-bold text-[color:var(--wtw-deep-gold)]">
           File
@@ -264,10 +309,40 @@ function UploadForm({
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. DD-214, VA award letter"
+          placeholder="e.g. DD-214, driver's license"
           className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
         />
       </div>
+
+      <div className="space-y-1">
+        <label
+          htmlFor="attachment-category"
+          className="text-xs font-bold text-[color:var(--wtw-deep-gold)]"
+        >
+          Category
+        </label>
+        <select
+          id="attachment-category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value as AttachmentCategory | "")}
+          className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+        >
+          <option value="">Pick a category…</option>
+          {ATTACHMENT_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {ATTACHMENT_CATEGORY_LABELS[c]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {looksMedical && (
+        <NonMedicalConfirmation
+          terms={flaggedTerms}
+          checked={nonMedicalConfirmed}
+          onChange={setNonMedicalConfirmed}
+        />
+      )}
 
       {converting && (
         <p className="text-[11px] text-muted-foreground">Converting…</p>
@@ -300,6 +375,34 @@ function UploadForm({
   );
 }
 
+function NonMedicalConfirmation({
+  terms,
+  checked,
+  onChange,
+}: {
+  terms: string[];
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-md border border-destructive/40 bg-card px-3 py-2">
+      <p className="text-sm text-destructive">
+        This name mentions {terms.join(", ")}. The Roster never stores
+        diagnoses, treatment letters, or claim files.
+      </p>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="mt-1"
+        />
+        <span>I confirm this is not a medical record</span>
+      </label>
+    </div>
+  );
+}
+
 function AttachmentItem({
   veteranId,
   item,
@@ -312,8 +415,16 @@ function AttachmentItem({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
+  const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const flaggedTerms = findMedicalTerms(name, item.category);
+  const looksMedical = flaggedTerms.length > 0;
+  const flaggedKey = flaggedTerms.join();
+  const nonMedicalConfirmed = looksMedical && confirmedFor === flaggedKey;
+  const setNonMedicalConfirmed = (checked: boolean) =>
+    setConfirmedFor(checked ? flaggedKey : null);
 
   async function onRename(e: React.FormEvent) {
     e.preventDefault();
@@ -321,10 +432,17 @@ function AttachmentItem({
       setError("Name can't be empty.");
       return;
     }
+    if (looksMedical && !nonMedicalConfirmed) {
+      setError(
+        "That name looks medical. Tick the confirmation if it isn't a medical record.",
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     const res = await renameAttachmentAction(veteranId, item.id, {
       name: name.trim(),
+      nonMedicalConfirmed: looksMedical ? nonMedicalConfirmed : undefined,
     });
     setBusy(false);
     if (!res.ok) {
@@ -352,7 +470,7 @@ function AttachmentItem({
     <li className="flex flex-col gap-1 rounded-md border border-border bg-background p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {editing ? (
-          <form onSubmit={onRename} className="flex flex-1 items-center gap-2">
+          <form onSubmit={onRename} className="flex flex-1 flex-wrap items-center gap-2">
             <input
               type="text"
               value={name}
@@ -372,12 +490,22 @@ function AttachmentItem({
               onClick={() => {
                 setEditing(false);
                 setName(item.name);
+                setConfirmedFor(null);
                 setError(null);
               }}
               className="text-xs font-bold text-muted-foreground hover:underline"
             >
               Cancel
             </button>
+            {looksMedical && (
+              <div className="w-full">
+                <NonMedicalConfirmation
+                  terms={flaggedTerms}
+                  checked={nonMedicalConfirmed}
+                  onChange={setNonMedicalConfirmed}
+                />
+              </div>
+            )}
           </form>
         ) : (
           <a
@@ -420,8 +548,14 @@ function AttachmentItem({
           </div>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {formatSize(item.sizeBytes)} · {dateFmt.format(new Date(item.createdAtIso))}
+      <p className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <span className="rounded-full border border-border bg-card px-2 py-0.5 font-bold text-foreground">
+          {attachmentCategoryLabel(item.category)}
+        </span>
+        <span>
+          {formatSize(item.sizeBytes)} ·{" "}
+          {dateFmt.format(new Date(item.createdAtIso))}
+        </span>
       </p>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </li>
