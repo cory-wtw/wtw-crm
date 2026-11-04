@@ -17,7 +17,7 @@ function tsToDate(value: unknown): Date | null {
   return null;
 }
 
-function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran {
+export function deserialize(id: string, data: FirebaseFirestore.DocumentData): Veteran {
   const history = (data.pipelineHistory ?? []) as Array<{
     stage: PipelineStage;
     enteredAt: unknown;

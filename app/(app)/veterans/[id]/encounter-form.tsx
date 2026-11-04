@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { mentionsMedicalTerm } from "@/lib/medical-terms";
 import { localTodayIso as todayIso } from "@/lib/utils";
 import { addEncounterAction } from "../actions";
 
@@ -29,6 +30,7 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -40,6 +42,9 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
       nextStepDueAt: "",
     },
   });
+
+  const summary = useWatch({ control, name: "summary" });
+  const summaryLooksMedical = mentionsMedicalTerm(summary);
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
@@ -115,6 +120,12 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
           placeholder="What happened?"
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
+        {summaryLooksMedical && (
+          <p className="text-xs text-[color:var(--wtw-deep-gold)]">
+            Looks like this mentions a condition or treatment. Keep notes to
+            needs and next steps.
+          </p>
+        )}
       </Field>
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Next step">

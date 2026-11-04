@@ -1,7 +1,7 @@
 import "server-only";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
-import type { Attachment } from "@/lib/schemas";
+import { ATTACHMENT_CATEGORIES, type Attachment } from "@/lib/schemas";
 
 const COLLECTION = "attachments";
 
@@ -24,7 +24,16 @@ export function deserialize(
     contentType: data.contentType ?? "application/octet-stream",
     sizeBytes: typeof data.sizeBytes === "number" ? data.sizeBytes : 0,
     fileName: data.fileName ?? "",
+    originalFileName:
+      typeof data.originalFileName === "string" ? data.originalFileName : null,
     name: data.name ?? data.fileName ?? "",
+    category: ATTACHMENT_CATEGORIES.includes(data.category)
+      ? data.category
+      : null,
+    nonMedicalConfirmedBy:
+      typeof data.nonMedicalConfirmedBy === "string"
+        ? data.nonMedicalConfirmedBy
+        : null,
     createdBy: data.createdBy ?? "",
     createdAt: tsToDate(data.createdAt) ?? new Date(),
     updatedBy: data.updatedBy ?? "",
@@ -44,6 +53,14 @@ export async function listAttachmentsForVeteran(
     .collection(COLLECTION)
     .where("veteranId", "==", veteranId)
     .get();
+  return snap.docs
+    .map((d) => deserialize(d.id, d.data()))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+/** Every attachment in the Roster, newest first. Admin cleanup tools only. */
+export async function listAllAttachments(): Promise<Attachment[]> {
+  const snap = await adminDb.collection(COLLECTION).get();
   return snap.docs
     .map((d) => deserialize(d.id, d.data()))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

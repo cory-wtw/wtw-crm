@@ -4,7 +4,7 @@ import type { User } from "@/lib/schemas";
 
 const COLLECTION = "users";
 
-function deserialize(
+export function deserialize(
   uid: string,
   data: FirebaseFirestore.DocumentData,
 ): User {
