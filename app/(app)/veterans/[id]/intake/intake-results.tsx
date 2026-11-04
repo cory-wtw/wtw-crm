@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateOnly } from "@/lib/format";
 import { startLine } from "@/lib/referral-text";
 import { MATCH_FLAG_LABELS } from "@/lib/matching/flags";
 import {
@@ -189,7 +189,7 @@ export function IntakeResults({
           <p className="text-sm text-muted-foreground">
             Nothing has been sent yet. Copy the text below and send it to
             them yourself (email or text). Check back with them on{" "}
-            {formatDate(referral.followUpDue)}.
+            {formatDateOnly(referral.followUpDue)}.
           </p>
         </div>
 

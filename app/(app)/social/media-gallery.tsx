@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
+import { formatDate } from "@/lib/format";
 import { type MediaKind, type MediaStatus } from "@/lib/schemas";
 import { deleteMediaAction, setMediaUsedAction } from "./actions";
 
@@ -36,12 +37,6 @@ function formatSize(bytes: number): string {
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
 }
-
-const dateFmt = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
 
 export function MediaGallery({
   rows,
@@ -215,11 +210,11 @@ function MediaCard({
 
         <p className="text-[11px] text-muted-foreground">
           {formatSize(row.sizeBytes)} ·{" "}
-          {dateFmt.format(new Date(row.createdAtIso))}
+          {formatDate(row.createdAtIso)}
           {isUsed && row.usedAtIso && (
             <span className="font-bold text-[color:var(--wtw-deep-gold)]">
               {" "}
-              · Used {dateFmt.format(new Date(row.usedAtIso))}
+              · Used {formatDate(row.usedAtIso)}
             </span>
           )}
         </p>

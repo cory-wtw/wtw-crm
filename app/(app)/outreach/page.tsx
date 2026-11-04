@@ -7,7 +7,7 @@ import {
 } from "@/lib/contact-cadence";
 import { listVeterans } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
-import { formatDate } from "@/lib/format";
+import { formatDateOnly } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { canAccessCrm } from "@/lib/permissions";
 
@@ -88,7 +88,7 @@ function QueueSection({
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Due {formatDate(row.due)}
+                      Due {formatDateOnly(row.due)}
                       {overdue > 0 && (
                         <span className="text-destructive">
                           {" "}

@@ -9,6 +9,7 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase/client";
+import { formatDate } from "@/lib/format";
 import { convertToPdf, isConvertibleFile } from "@/lib/pdf-convert";
 import { findMedicalTerms } from "@/lib/medical-terms";
 import {
@@ -42,12 +43,6 @@ function formatSize(bytes: number): string {
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${bytes} B`;
 }
-
-const dateFmt = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
 
 export function Attachments({
   veteranId,
@@ -553,8 +548,7 @@ function AttachmentItem({
           {attachmentCategoryLabel(item.category)}
         </span>
         <span>
-          {formatSize(item.sizeBytes)} ·{" "}
-          {dateFmt.format(new Date(item.createdAtIso))}
+          {formatSize(item.sizeBytes)} · {formatDate(item.createdAtIso)}
         </span>
       </p>
       {error && <p className="text-xs text-destructive">{error}</p>}

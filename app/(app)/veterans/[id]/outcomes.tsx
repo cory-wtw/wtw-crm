@@ -7,6 +7,7 @@ import {
   outcomeSummary,
   type OutcomeKind,
 } from "@/lib/schemas";
+import { formatDate } from "@/lib/format";
 import { localTodayIso as todayIso, positiveAmount } from "@/lib/utils";
 import { OutcomeKindPicker } from "../../outcome-kind-picker";
 import { logOutcomeAction, removeOutcomeAction } from "../actions";
@@ -196,11 +197,7 @@ export function Outcomes({
               <div className="text-sm">
                 <p>{outcomeSummary(item)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(item.achievedAtIso).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {formatDate(item.achievedAtIso)}
                 </p>
               </div>
               {canManage && (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase/client";
+import { formatDate } from "@/lib/format";
 import { RECORD_MAX_BYTES } from "@/lib/schemas";
 import { createRecordAction, deleteRecordAction } from "./actions";
 
@@ -28,7 +29,6 @@ function formatSize(bytes: number): string {
   return `${bytes} B`;
 }
 
-const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 const control =
   "w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
@@ -218,7 +218,7 @@ function RecordItem({ record }: { record: RecordRow }) {
           {record.label}
         </a>
         <p className="truncate text-xs text-muted-foreground">
-          {[record.fileName, formatSize(record.sizeBytes), `added ${dateFmt.format(new Date(record.createdAtIso))}`, record.notes]
+          {[record.fileName, formatSize(record.sizeBytes), `added ${formatDate(record.createdAtIso)}`, record.notes]
             .filter(Boolean)
             .join(" · ")}
         </p>
