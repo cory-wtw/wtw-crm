@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Transaction } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { logAudit } from "@/lib/audit";
+import { isOrgEmail } from "@/lib/auth-provisioning";
 import { getSession } from "@/lib/firebase/session";
 import {
   deactivationBlockReason,
@@ -14,6 +15,17 @@ import {
   userRoleSchema,
   type UserRole,
 } from "@/lib/schemas";
+
+/** Firestore Admin throws gRPC status 5 (NOT_FOUND) when updating a missing doc. */
+function isNotFound(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    ((err as { code: unknown }).code === 5 ||
+      (err as { code: unknown }).code === "not-found")
+  );
+}
 
 async function requireAdmin() {
   const session = await getSession();
@@ -29,6 +41,7 @@ async function requireAdmin() {
 export async function inviteUserAction(
   rawEmail: unknown,
   rawRole: unknown,
+  rawOutsideOrg: unknown = false,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
@@ -49,6 +62,29 @@ export async function inviteUserAction(
   }
 
   const normalized = normalizeEmail(email);
+  const outsideOrg = rawOutsideOrg === true;
+  if (!isOrgEmail(normalized) && !outsideOrg) {
+    return {
+      ok: false,
+      error:
+        "That email is outside the org. Tick \"Outside the org (contractor)\" to invite it anyway.",
+    };
+  }
+
+  // An invite for an existing user would let a deactivated account
+  // re-provision as a brand-new user. Reactivate instead.
+  const existing = await adminDb
+    .collection("users")
+    .where("email", "==", normalized)
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    return {
+      ok: false,
+      error: "That email already belongs to a user (reactivate them instead).",
+    };
+  }
+
   await adminDb.collection("invites").doc(normalized).set({
     email: normalized,
     role: role.data,
@@ -59,7 +95,62 @@ export async function inviteUserAction(
     action: "create",
     resourceType: "invite",
     resourceId: normalized,
-    diff: { role: { before: null, after: role.data } },
+    diff: {
+      role: { before: null, after: role.data },
+      // Only recorded when an admin overrode the domain rule, so the audit
+      // log shows who let an outside address in.
+      ...(outsideOrg && !isOrgEmail(normalized)
+        ? { outsideOrg: { before: null, after: true } }
+        : {}),
+    },
+  });
+
+  revalidatePath("/admin/users");
+  return { ok: true };
+}
+
+/**
+ * Reset the clock on an invite so it's usable for another INVITE_TTL_DAYS.
+ * Works on fresh and expired invites alike; the email itself isn't re-sent
+ * (the Roster never emails — the admin tells the person to sign in).
+ */
+export async function resendInviteAction(
+  email: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard;
+  if (typeof email !== "string") {
+    return { ok: false, error: "Email is required." };
+  }
+
+  const normalized = normalizeEmail(email);
+  const ref = adminDb.collection("invites").doc(normalized);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    return { ok: false, error: "That invite no longer exists." };
+  }
+  const data = snap.data() ?? {};
+  const before = {
+    invitedAt: data.invitedAt?.toDate?.() ?? null,
+    invitedBy: data.invitedBy ?? null,
+  };
+  const now = new Date();
+  try {
+    await ref.update({ invitedAt: now, invitedBy: guard.session.uid });
+  } catch (err) {
+    if (isNotFound(err)) {
+      return { ok: false, error: "That invite no longer exists." };
+    }
+    throw err;
+  }
+  await logAudit({
+    action: "update",
+    resourceType: "invite",
+    resourceId: normalized,
+    diff: {
+      invitedAt: { before: before.invitedAt, after: now },
+      invitedBy: { before: before.invitedBy, after: guard.session.uid },
+    },
   });
 
   revalidatePath("/admin/users");
@@ -71,6 +162,9 @@ export async function revokeInviteAction(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const guard = await requireAdmin();
   if (!guard.ok) return guard;
+  if (typeof email !== "string") {
+    return { ok: false, error: "Email is required." };
+  }
 
   const normalized = normalizeEmail(email);
   await adminDb.collection("invites").doc(normalized).delete();
@@ -89,6 +183,7 @@ type UserDoc = {
   role: UserRole | null;
   active: boolean;
   name: string;
+  email: string | null;
 };
 
 function isValidUid(uid: unknown): uid is string {
@@ -104,6 +199,7 @@ function readUserDoc(data: Record<string, unknown>): UserDoc {
       (typeof data.displayName === "string" && data.displayName) ||
       (typeof data.email === "string" && data.email) ||
       "This user",
+    email: (typeof data.email === "string" && data.email) || null,
   };
 }
 
@@ -153,10 +249,15 @@ export async function setUserActiveAction(
   }
 
   const outcome = await adminDb.runTransaction(
-    async (tx): Promise<ActionResult & { changed?: boolean }> => {
+    async (
+      tx,
+    ): Promise<
+      ActionResult & { changed?: boolean; revokedInvite?: string | null }
+    > => {
       const read = await readForUserWrite(tx, guard.session.uid, uid);
       if (!read.ok) return read;
       if (read.target.active === active) return { ok: true, changed: false };
+      let revokedInvite: string | null = null;
       if (!active) {
         const blocked = deactivationBlockReason({
           actorUid: guard.session.uid,
@@ -167,20 +268,43 @@ export async function setUserActiveAction(
           activeAdminCount: read.activeAdminCount,
         });
         if (blocked) return { ok: false, error: blocked };
+        // On deactivate, also close the side door: a pending invite for the
+        // same email would let a fresh Google account re-provision as a new
+        // user. Idempotent — no-op when there's no invite. Both writes land
+        // together in this transaction.
+        if (read.target.email) {
+          const normalized = normalizeEmail(read.target.email);
+          const inviteSnap = await tx.get(
+            adminDb.collection("invites").doc(normalized),
+          );
+          if (inviteSnap.exists) revokedInvite = normalized;
+        }
       }
       tx.update(adminDb.collection("users").doc(uid), {
         active,
         updatedAt: new Date(),
       });
-      return { ok: true, changed: true };
+      if (revokedInvite) {
+        tx.delete(adminDb.collection("invites").doc(revokedInvite));
+      }
+      return { ok: true, changed: true, revokedInvite };
     },
   );
   if (!outcome.ok) return outcome;
   if (!outcome.changed) return { ok: true };
+  const revokedInvite = outcome.revokedInvite ?? null;
 
   if (!active) {
     // Revoke their refresh tokens so any open browser session ends quickly.
     await adminAuth.revokeRefreshTokens(uid);
+  }
+  if (revokedInvite) {
+    await logAudit({
+      action: "delete",
+      resourceType: "invite",
+      resourceId: revokedInvite,
+      diff: { reason: { before: null, after: "user deactivated" } },
+    });
   }
 
   await logAudit({
