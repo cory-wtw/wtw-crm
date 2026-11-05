@@ -61,6 +61,9 @@ export function UserAdmin({
     Record<string, UserRole>
   >({});
   const [inviteOutsideOrg, setInviteOutsideOrg] = useState(false);
+  const [showDeactivated, setShowDeactivated] = useState(false);
+  const deactivatedCount = users.filter((u) => !u.active).length;
+  const visibleUsers = showDeactivated ? users : users.filter((u) => u.active);
   const inviteIsOutside =
     inviteEmail.includes("@") && !isOrgEmail(inviteEmail.trim());
 
@@ -275,10 +278,23 @@ export function UserAdmin({
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(29_25_18/0.04)] sm:p-6">
-        <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
-          Users ({users.length})
-        </h2>
-        {users.length === 0 ? (
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[color:var(--wtw-deep-gold)]">
+            Users ({visibleUsers.length})
+          </h2>
+          {deactivatedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowDeactivated((v) => !v)}
+              className="text-xs font-bold text-[color:var(--wtw-deep-gold)] underline-offset-4 hover:underline"
+            >
+              {showDeactivated
+                ? "Hide deactivated"
+                : `Show deactivated (${deactivatedCount})`}
+            </button>
+          )}
+        </div>
+        {visibleUsers.length === 0 ? (
           <p className="text-sm text-muted-foreground">No users yet.</p>
         ) : (
           <div className="mobile-touch-scroll overflow-x-auto">
@@ -293,7 +309,7 @@ export function UserAdmin({
               </tr>
             </thead>
             <tbody className="block sm:table-row-group">
-              {users.map((u) => (
+              {visibleUsers.map((u) => (
                 <tr key={u.uid} className="block border-t border-border py-2 sm:table-row sm:py-0">
                   <td className="block py-1 sm:table-cell sm:py-2.5">
                     <p className="font-bold">

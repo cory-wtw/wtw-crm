@@ -14,19 +14,22 @@ export default async function ResourcesPage() {
   ]);
   const canEdit = !!session;
 
-  const rows = resources.map((r) => ({
-    id: r.id,
-    organizationName: r.organizationName,
-    website: r.website ?? null,
-    contactName: r.contactName ?? null,
-    contactPhone: r.contactPhone ?? null,
-    contactEmail: r.contactEmail ?? null,
-    services: r.services ?? null,
-    description: r.description ?? null,
-    eligibility: r.eligibility ?? null,
-    buckets: r.buckets,
-    gaps: classificationGaps(r),
-  }));
+  // Retired records stay in the DB for history but drop out of the list.
+  const rows = resources
+    .filter((r) => r.verificationStatus !== "retired")
+    .map((r) => ({
+      id: r.id,
+      organizationName: r.organizationName,
+      website: r.website ?? null,
+      contactName: r.contactName ?? null,
+      contactPhone: r.contactPhone ?? null,
+      contactEmail: r.contactEmail ?? null,
+      services: r.services ?? null,
+      description: r.description ?? null,
+      eligibility: r.eligibility ?? null,
+      buckets: r.buckets,
+      gaps: classificationGaps(r),
+    }));
 
   // Every record starts life unclassified — no buckets means the matcher can
   // never offer it. Surface the size of that backlog rather than letting the

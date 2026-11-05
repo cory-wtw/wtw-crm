@@ -14,7 +14,6 @@ const formSchema = z.object({
   location: z.string().optional(),
   summary: z.string().min(1, "Required"),
   nextStep: z.string().optional(),
-  nextStepDueAt: z.string().optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -39,7 +38,6 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
       location: "",
       summary: "",
       nextStep: "",
-      nextStepDueAt: "",
     },
   });
 
@@ -53,20 +51,11 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
       setError("Please enter a valid date.");
       return;
     }
-    const due = values.nextStepDueAt
-      ? new Date(values.nextStepDueAt)
-      : null;
-    if (due && Number.isNaN(due.getTime())) {
-      setError("Please enter a valid date for the next step.");
-      return;
-    }
-
     const input = {
       occurredAt: occurred,
       location: values.location || undefined,
       summary: values.summary,
       nextStep: values.nextStep || undefined,
-      nextStepDueAt: due,
     };
 
     const result = await addEncounterAction(veteranId, input);
@@ -79,7 +68,6 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
       location: "",
       summary: "",
       nextStep: "",
-      nextStepDueAt: "",
     });
     setExpanded(false);
     startTransition(() => router.refresh());
@@ -127,17 +115,12 @@ export function EncounterForm({ veteranId }: { veteranId: string }) {
           </p>
         )}
       </Field>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Next step">
-          <Input
-            {...register("nextStep")}
-            placeholder="What needs to happen next?"
-          />
-        </Field>
-        <Field label="Next step by">
-          <Input type="date" {...register("nextStepDueAt")} />
-        </Field>
-      </div>
+      <Field label="Next step">
+        <Input
+          {...register("nextStep")}
+          placeholder="What needs to happen next?"
+        />
+      </Field>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex items-center gap-3">
         <button

@@ -318,14 +318,13 @@ export function buildRosterMcpServer(baseUrl: string, user: Proposer): McpServer
     {
       title: "Propose a timeline note",
       description:
-        "Queue a contact note on a veteran's timeline — a call, text, visit, voicemail. Approving it also moves their last-contacted date forward. occurredAt / nextStepDueAt are ISO dates; occurredAt defaults to now.",
+        "Queue a contact note on a veteran's timeline — a call, text, visit, voicemail. Approving it also moves their last-contacted date forward. occurredAt is an ISO date; occurredAt defaults to now.",
       inputSchema: {
         veteranId: VETERAN_ID,
         summary: z.string().min(1).describe("Short and neutral: what happened, what they asked for."),
         occurredAt: z.string().optional(),
         location: z.string().optional(),
         nextStep: z.string().optional(),
-        nextStepDueAt: z.string().optional(),
         reason: REASON,
         group: GROUP,
       },
