@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAttachment } from "@/lib/db/attachments";
+import { getVeteran } from "@/lib/db/veterans";
 import { mediaBucket } from "@/lib/firebase/admin";
 import { getSession } from "@/lib/firebase/session";
 import { attachmentDisposition } from "@/lib/http";
@@ -21,8 +22,12 @@ export async function GET(
   }
 
   const { id, attachmentId } = await params;
-  const attachment = await getAttachment(attachmentId);
-  if (!attachment || attachment.veteranId !== id) {
+  const [attachment, veteran] = await Promise.all([
+    getAttachment(attachmentId),
+    getVeteran(id),
+  ]);
+  // A deleted veteran's files are kept but not served until they're restored.
+  if (!veteran || !attachment || attachment.veteranId !== id) {
     return new NextResponse("Not found.", { status: 404 });
   }
 

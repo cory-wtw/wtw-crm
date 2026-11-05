@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminDb, mediaBucket } from "@/lib/firebase/admin";
+import { isLiveVeteran } from "@/lib/db/veterans";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getAttachment } from "@/lib/db/attachments";
@@ -66,7 +67,7 @@ export async function runIntakeAction(
   }
 
   const snap = await adminDb.collection("veterans").doc(veteranId).get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   const existing = snap.data()!;
   if (!canRunIntake(session, { assigneeUid: existing.assigneeUid ?? null })) {
     return {
@@ -96,7 +97,7 @@ export async function createReferralAction(
   }
 
   const snap = await adminDb.collection("veterans").doc(veteranId).get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   if (
     !canCreateReferral(session, { assigneeUid: snap.data()!.assigneeUid ?? null })
   ) {
@@ -124,7 +125,7 @@ async function requireVeteranEditAccess(
   if (!session) return { ok: false, error: "Not signed in." };
 
   const snap = await adminDb.collection("veterans").doc(veteranId).get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
 
   if (
     !canEditVeteran(session, { assigneeUid: snap.data()?.assigneeUid ?? null })

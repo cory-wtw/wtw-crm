@@ -109,3 +109,31 @@ describe("veteran lists skip soft-deleted veterans", () => {
     expect(body.monthlyBenefits).toBe(0);
   });
 });
+
+describe("writes to a soft-deleted veteran are refused", () => {
+  it("logging a win", async () => {
+    const { logOutcome } = await import("@/lib/ops/outcome");
+    const result = await logOutcome({ uid: "u1", email: "u@wtw.org" }, "gone", {
+      kind: "job",
+      achievedAt: "2026-11-05T12:00:00",
+    });
+    expect(result).toEqual({ ok: false, error: "Veteran not found." });
+  });
+
+  it("an MCP proposal", async () => {
+    const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+    const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+    const { buildRosterMcpServer } = await import("@/lib/mcp/server");
+    const server = buildRosterMcpServer("http://localhost", { uid: "u1", email: "u@wtw.org" });
+    const client = new Client({ name: "test", version: "1.0.0" });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(a), client.connect(b)]);
+    const result = await client.callTool({
+      name: "propose_contact_note",
+      arguments: { veteranId: "gone", summary: "Called.", reason: "Logged a call." },
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain("Veteran not found.");
+    await client.close();
+  });
+});

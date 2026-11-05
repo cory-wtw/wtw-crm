@@ -96,6 +96,18 @@ export type VeteranListItem = {
 };
 
 /**
+ * True when a veteran doc exists and isn't soft-deleted. Every write to a
+ * veteran checks this, so a stale tab or a queued Claude change can't land on
+ * a deleted record.
+ */
+export function isLiveVeteran(snap: {
+  exists: boolean;
+  data(): FirebaseFirestore.DocumentData | undefined;
+}): boolean {
+  return snap.exists && !snap.data()?.deletedAt;
+}
+
+/**
  * Every veteran that hasn't been soft-deleted. Filtered here, not in the
  * query: Firestore can't match a missing field, and older docs have no
  * deletedAt at all.

@@ -5,6 +5,7 @@ import { tidyVeteran } from "@/lib/tidy";
 import { redirect } from "next/navigation";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
+import { isLiveVeteran } from "@/lib/db/veterans";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
@@ -149,7 +150,7 @@ export async function editVeteranAction(
 
   const docRef = adminDb.collection("veterans").doc(id);
   const existingSnap = await docRef.get();
-  if (!existingSnap.exists) {
+  if (!isLiveVeteran(existingSnap)) {
     return { ok: false, error: "Veteran not found." };
   }
   const existing = existingSnap.data()!;
@@ -236,7 +237,7 @@ export async function changeStageAction(
 
   const docRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await docRef.get();
-  if (!snap.exists) {
+  if (!isLiveVeteran(snap)) {
     return { ok: false, error: "Veteran not found." };
   }
   const existing = snap.data()!;
@@ -314,7 +315,7 @@ export async function addEncounterAction(
 
   const veteranRef = adminDb.collection("veterans").doc(veteranId);
   const veteranSnap = await veteranRef.get();
-  if (!veteranSnap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(veteranSnap)) return { ok: false, error: "Veteran not found." };
   const existingLastContacted = tsToDate(veteranSnap.data()!.lastContactedAt);
 
   const encounterRef = await veteranRef.collection("encounters").add(data);
@@ -398,7 +399,7 @@ export async function logOutcomeAction(
     return { ok: false, error: "Your account doesn't have access to this." };
 
   const snap = await adminDb.collection("veterans").doc(veteranId).get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   if (!canEditVeteran(session, snap.data() as { assigneeUid: string | null }))
     return { ok: false, error: "Your account can't edit this veteran." };
 
@@ -422,7 +423,7 @@ export async function removeOutcomeAction(
     { error: string } | { removed: { id: string; kind: string } }
   >(async (tx) => {
     const snap = await tx.get(veteranRef);
-    if (!snap.exists) return { error: "Veteran not found." };
+    if (!isLiveVeteran(snap)) return { error: "Veteran not found." };
     const data = snap.data()!;
     if (!canEditVeteran(session, data as { assigneeUid: string | null }))
       return { error: "Your account can't edit this veteran." };

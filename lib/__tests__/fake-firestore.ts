@@ -30,6 +30,20 @@ export function fakeFirestore(seed: Record<string, Record<string, Doc>>) {
   });
 
   const adminDb = {
+    runTransaction: async <T>(
+      fn: (tx: {
+        get: (ref: { get: () => Promise<unknown> }) => Promise<unknown>;
+        update: (ref: { update: (p: Doc) => Promise<void> }, patch: Doc) => void;
+      }) => Promise<T>,
+    ): Promise<T> => {
+      const writes: (() => Promise<void>)[] = [];
+      const result = await fn({
+        get: (ref) => ref.get(),
+        update: (ref, patch) => void writes.push(() => ref.update(patch)),
+      });
+      for (const w of writes) await w();
+      return result;
+    },
     collection: (name: string) => ({
       ...query(name),
       doc: (id: string) => ({

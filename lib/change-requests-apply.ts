@@ -19,6 +19,7 @@
 import "server-only";
 import { Timestamp, type Transaction } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
+import { isLiveVeteran } from "@/lib/db/veterans";
 import { getResourcesByIds } from "@/lib/db/resources";
 import {
   noonIfDateOnly,
@@ -178,7 +179,7 @@ async function veteranForPropose(veteranId: string): Promise<Result<VeteranForPr
   }
   if (!veteranId || veteranId.includes("/")) return { ok: false, error: "Veteran not found." };
   const snap = await adminDb.collection("veterans").doc(veteranId).get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   return { ok: true, targetId: snap.id, label: veteranLabel(snap.data()!), data: snap.data()! };
 }
 
@@ -278,7 +279,7 @@ async function prepareFields(p: FieldProposal): Promise<Result<{ prepared: Prepa
         return { ok: false, error: "Change the proposed new veteran by withdrawing it and proposing it again." };
       }
       const snap = await readDoc("veterans", p.targetId);
-      if (!snap) return { ok: false, error: "Veteran not found." };
+      if (!snap || !isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
       return fromPlan(planVeteranUpdate(snap.data()!, p.changes), {
         kind: p.kind,
         targetId: snap.id,
@@ -643,7 +644,7 @@ async function applyFields(tx: Transaction, cr: ChangeRequest, actor: Actor, now
     case "veteran.update": {
       const ref = adminDb.collection("veterans").doc(cr.targetId!);
       const snap = await tx.get(ref);
-      if (!snap.exists) throw new Stale("The veteran has been deleted.");
+      if (!isLiveVeteran(snap)) throw new Stale("The veteran has been deleted.");
       const data = snap.data()!;
       const drifted = driftedFields(veteranSnapshot(data), cr.changes);
       if (drifted.length > 0) throw new Stale(`Changed since proposed: ${drifted.join(", ")}.`);
@@ -715,7 +716,7 @@ async function applyFields(tx: Transaction, cr: ChangeRequest, actor: Actor, now
       const veteranId = await resolveVeteranTarget(cr.targetId!, tx);
       const veteranRef = adminDb.collection("veterans").doc(veteranId);
       const snap = await tx.get(veteranRef);
-      if (!snap.exists) throw new Stale("The veteran has been deleted.");
+      if (!isLiveVeteran(snap)) throw new Stale("The veteran has been deleted.");
       recheck(planEncounterCreate(withoutNulls(after), now), cr.changes);
 
       const occurredAt = new Date(String(after.occurredAt));

@@ -73,6 +73,7 @@ describe("restoreVeteran", () => {
     const doc = fake.col("veterans").get("v1")!;
     expect(doc.deletedAt).toBeNull();
     expect(doc.deletedBy).toBeNull();
+    expect(doc.updatedBy).toBe("admin1");
     expect(logAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "update", resourceId: "v1" }),
     );

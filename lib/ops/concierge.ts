@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 import { adminDb } from "@/lib/firebase/admin";
+import { isLiveVeteran } from "@/lib/db/veterans";
 import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getResourcesByIds, listResources } from "@/lib/db/resources";
@@ -351,7 +352,7 @@ export async function recordIntake(
 ): Promise<{ ok: true; encounterId: string } | { ok: false; error: string }> {
   const docRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await docRef.get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   const existing = snap.data()!;
   const now = new Date();
   const stored = storedEligibility(existing);
@@ -490,7 +491,7 @@ export async function createReferral(
 
   const veteranRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await veteranRef.get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   const existing = snap.data()!;
 
   // Read the resources fresh rather than trusting names off the client: the
