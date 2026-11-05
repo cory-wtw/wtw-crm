@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
-  OUTCOME_KIND_INFO,
   outcomeSummary,
   type OutcomeKind,
 } from "@/lib/schemas";
@@ -85,7 +84,7 @@ export function Outcomes({
 
   async function remove(item: OutcomeItem) {
     if (removing) return;
-    if (!confirm(`Remove "${OUTCOME_KIND_INFO[item.kind].label}"?`)) return;
+    if (!confirm(`Remove the win "${outcomeSummary(item)}"?`)) return;
     setRemoving(item.id);
     try {
       const result = await removeOutcomeAction(veteranId, item.id);
@@ -205,9 +204,10 @@ export function Outcomes({
                   type="button"
                   onClick={() => remove(item)}
                   disabled={removing !== null}
-                  className="shrink-0 disabled:opacity-50 text-xs font-bold text-muted-foreground hover:text-destructive"
+                  aria-label={`Remove win: ${outcomeSummary(item)}`}
+                  className="inline-flex h-10 shrink-0 items-center text-xs font-bold text-muted-foreground hover:text-destructive disabled:opacity-50"
                 >
-                  {removing === item.id ? "Removing…" : "Remove"}
+                  {removing === item.id ? "Removing…" : "Remove win"}
                 </button>
               )}
             </li>

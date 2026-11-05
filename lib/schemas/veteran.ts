@@ -191,6 +191,12 @@ export const veteranSchema = z.object({
   createdAt: z.date(),
   updatedBy: z.string(),
   updatedAt: z.date(),
+
+  // Soft delete. A deleted veteran keeps their record and timeline but drops
+  // out of every list until an admin restores them from Admin → Recently
+  // deleted. Written by deleteVeteranAction, never by a form.
+  deletedAt: z.date().nullable().default(null),
+  deletedBy: z.string().nullable().default(null),
 });
 export type Veteran = z.infer<typeof veteranSchema>;
 
@@ -236,6 +242,8 @@ export const veteranInputSchema = veteranSchema
     createdAt: true,
     updatedBy: true,
     updatedAt: true,
+    deletedAt: true,
+    deletedBy: true,
   })
   // The eligibility keys accept an explicit null here, which the four optional
   // fields on the domain schema don't. That null is how a stored answer gets

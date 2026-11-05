@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { computeDiff } from "@/lib/audit-diff";
 import { getSession } from "@/lib/firebase/session";
 import { logOutcome } from "@/lib/ops/outcome";
+import { restoreVeteran, softDeleteVeteran } from "@/lib/ops/veteran-delete";
 import {
   canAccessCrm,
   canEditVeteran,
@@ -346,6 +347,7 @@ export async function redirectToVeteran(id: string): Promise<void> {
   redirect(`/veterans/${id}`);
 }
 
+/** Soft-delete a veteran. The work is in lib/ops/veteran-delete.ts. */
 export async function deleteVeteranAction(
   id: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -357,24 +359,32 @@ export async function deleteVeteranAction(
     return { ok: false, error: "Only admins can delete veterans." };
   }
 
-  const docRef = adminDb.collection("veterans").doc(id);
-  const snap = await docRef.get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  const result = await softDeleteVeteran(session, id);
+  if (result.ok) revalidateVeteranLists(id);
+  return result;
+}
 
-  // Delete encounter subcollection docs first so we don't leave orphans.
-  const encounters = await docRef.collection("encounters").listDocuments();
-  await Promise.all(encounters.map((e) => e.delete()));
+/** Undo a delete. Admins only, same as deleting. */
+export async function restoreVeteranAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Not signed in." };
+  if (!isAdmin(session)) {
+    return { ok: false, error: "Only admins can restore veterans." };
+  }
 
-  await docRef.delete();
-  await logAudit({
-    action: "delete",
-    resourceType: "veteran",
-    resourceId: id,
-  });
+  const result = await restoreVeteran(session, id);
+  if (result.ok) revalidateVeteranLists(id);
+  return result;
+}
 
+function revalidateVeteranLists(id: string): void {
+  revalidatePath(`/veterans/${id}`);
   revalidatePath("/veterans");
+  revalidatePath("/outreach");
+  revalidatePath("/admin/deleted");
   revalidatePath("/");
-  return { ok: true };
 }
 
 /** Record a win. The work is in lib/ops/outcome.ts. */

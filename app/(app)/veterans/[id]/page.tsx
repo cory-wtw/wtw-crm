@@ -16,6 +16,7 @@ import { formatDate, formatDateOnly, formatUsd } from "@/lib/format";
 import { formatShortName } from "@/lib/name";
 import { Attachments } from "./attachments";
 import { DeleteVeteranButton } from "./delete-veteran-button";
+import { RestoreVeteranButton } from "./restore-veteran-button";
 import { SendClaimGuideButton } from "./send-claim-guide-button";
 import {
   BUCKET_LABELS,
@@ -52,8 +53,11 @@ export default async function VeteranDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const veteran = await getVeteran(id);
+  const veteran = await getVeteran(id, { includeDeleted: true });
   if (!veteran) notFound();
+  if (veteran.deletedAt) {
+    return <DeletedVeteran veteranId={veteran.id} />;
+  }
 
   const [assignee, vsos, encounters, allUsers, session, attachments] =
     await Promise.all([
@@ -134,12 +138,6 @@ export default async function VeteranDetailPage({
             >
               Edit
             </Link>
-          )}
-          {canDelete && (
-            <DeleteVeteranButton
-              veteranId={veteran.id}
-              veteranName={shortName}
-            />
           )}
         </div>
       </div>
@@ -426,6 +424,38 @@ export default async function VeteranDetailPage({
           createdAtIso: a.createdAt.toISOString(),
         }))}
       />
+
+      {canDelete && (
+        <DeleteVeteranButton
+          veteranId={veteran.id}
+          firstName={veteran.firstName}
+        />
+      )}
+    </div>
+  );
+}
+
+/** What a link to a soft-deleted veteran shows. Admins can bring them back. */
+async function DeletedVeteran({ veteranId }: { veteranId: string }) {
+  const session = await getSession();
+  return (
+    <div className="space-y-5">
+      <Link href="/veterans" className="inline-flex h-10 items-center text-sm font-bold text-muted-foreground hover:text-foreground">
+        ← Veterans
+      </Link>
+      <section className="space-y-3 rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <h1 className="text-xl font-black tracking-tight">
+          This veteran was deleted
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {canDeleteVeteran(session)
+            ? "Their record and timeline are kept. Restore to bring them back to every list."
+            : "Ask an admin if this was a mistake. They can restore it."}
+        </p>
+        {canDeleteVeteran(session) && (
+          <RestoreVeteranButton veteranId={veteranId} />
+        )}
+      </section>
     </div>
   );
 }
