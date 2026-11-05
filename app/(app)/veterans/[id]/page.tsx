@@ -406,12 +406,6 @@ export default async function VeteranDetailPage({
                       Next step
                     </span>{" "}
                     {e.nextStep}
-                    {e.nextStepDueAt && (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · due {formatDateOnly(e.nextStepDueAt)}
-                      </span>
-                    )}
                   </p>
                 )}
               </li>
