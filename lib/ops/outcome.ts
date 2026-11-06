@@ -7,6 +7,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
+import { isLiveVeteran } from "@/lib/db/veterans";
 import { logAudit } from "@/lib/audit";
 import { outcomeInputSchema, outcomeAmounts, outcomeSummary } from "@/lib/schemas";
 import type { Actor, OnCommit } from "./actor";
@@ -48,7 +49,7 @@ export async function logOutcome(
 
   const veteranRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await veteranRef.get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
 
   let resourceName: string | undefined;
   if (input.resourceId) {

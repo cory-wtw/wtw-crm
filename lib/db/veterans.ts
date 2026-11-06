@@ -79,6 +79,8 @@ export function deserialize(id: string, data: FirebaseFirestore.DocumentData): V
     createdAt: tsToDate(data.createdAt) ?? new Date(),
     updatedBy: data.updatedBy ?? "",
     updatedAt: tsToDate(data.updatedAt) ?? new Date(),
+    deletedAt: tsToDate(data.deletedAt),
+    deletedBy: data.deletedBy ?? null,
   };
 }
 
@@ -93,7 +95,35 @@ export type VeteranListItem = {
   monthlyBenefitAfter: number;
 };
 
+/**
+ * True when a veteran doc exists and isn't soft-deleted. Every write to a
+ * veteran checks this, so a stale tab or a queued Claude change can't land on
+ * a deleted record.
+ */
+export function isLiveVeteran(snap: {
+  exists: boolean;
+  data(): FirebaseFirestore.DocumentData | undefined;
+}): boolean {
+  return snap.exists && !snap.data()?.deletedAt;
+}
+
+/**
+ * Every veteran that hasn't been soft-deleted. Filtered here, not in the
+ * query: Firestore can't match a missing field, and older docs have no
+ * deletedAt at all.
+ */
 export async function listVeterans(): Promise<Veteran[]> {
+  return (await listAllVeterans()).filter((v) => !v.deletedAt);
+}
+
+/** Soft-deleted veterans, most recently deleted first. */
+export async function listDeletedVeterans(): Promise<Veteran[]> {
+  return (await listAllVeterans())
+    .filter((v) => v.deletedAt)
+    .sort((a, b) => b.deletedAt!.getTime() - a.deletedAt!.getTime());
+}
+
+async function listAllVeterans(): Promise<Veteran[]> {
   const snap = await adminDb
     .collection(COLLECTION)
     .orderBy("updatedAt", "desc")
@@ -101,10 +131,19 @@ export async function listVeterans(): Promise<Veteran[]> {
   return snap.docs.map((d) => deserialize(d.id, d.data()));
 }
 
-export async function getVeteran(id: string): Promise<Veteran | null> {
+/**
+ * One veteran, or null. A soft-deleted veteran reads as null unless the
+ * caller asks for it — only the veteran page does, to offer a restore.
+ */
+export async function getVeteran(
+  id: string,
+  { includeDeleted = false }: { includeDeleted?: boolean } = {},
+): Promise<Veteran | null> {
   const doc = await adminDb.collection(COLLECTION).doc(id).get();
   if (!doc.exists) return null;
-  return deserialize(doc.id, doc.data()!);
+  const veteran = deserialize(doc.id, doc.data()!);
+  if (veteran.deletedAt && !includeDeleted) return null;
+  return veteran;
 }
 
 /** Veterans currently linked to a given VSO. */
@@ -115,7 +154,9 @@ export async function listVeteransByVsoId(
     .collection(COLLECTION)
     .where("vsoIds", "array-contains", vsoId)
     .get();
-  return snap.docs.map((d) => deserialize(d.id, d.data()));
+  return snap.docs
+    .map((d) => deserialize(d.id, d.data()))
+    .filter((v) => !v.deletedAt);
 }
 
 /** Stage counts for the dashboard, keyed by stage. */

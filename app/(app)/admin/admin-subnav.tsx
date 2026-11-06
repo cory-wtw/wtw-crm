@@ -12,6 +12,7 @@ const TABS = [
   { href: "/admin/zips", label: "Fill in ZIPs" },
   { href: "/admin/tidy", label: "Tidy data" },
   { href: "/admin/fixes", label: "Record fixes" },
+  { href: "/admin/deleted", label: "Recently deleted" },
   { href: "/admin/audit", label: "Audit log" },
 ];
 

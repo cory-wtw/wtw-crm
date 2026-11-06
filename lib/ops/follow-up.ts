@@ -11,6 +11,7 @@ import { logAudit } from "@/lib/audit";
 import { getResourcesByIds } from "@/lib/db/resources";
 import { listVerificationsForResource } from "@/lib/db/verifications";
 import { adminDb } from "@/lib/firebase/admin";
+import { isLiveVeteran } from "@/lib/db/veterans";
 import {
   resultForOutcome,
   shouldFlagForUnreachable,
@@ -106,7 +107,7 @@ export async function recordFollowUp(
 
   const veteranRef = adminDb.collection("veterans").doc(veteranId);
   const snap = await veteranRef.get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   const existing = snap.data()!;
 
   const referralRef = veteranRef

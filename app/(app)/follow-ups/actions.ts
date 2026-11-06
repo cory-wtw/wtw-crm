@@ -1,6 +1,7 @@
 "use server";
 
 import { adminDb } from "@/lib/firebase/admin";
+import { isLiveVeteran } from "@/lib/db/veterans";
 import { getSession } from "@/lib/firebase/session";
 import { recordFollowUp, type FollowUpSummary } from "@/lib/ops/follow-up";
 import { canAccessCrm, canRecordFollowUp } from "@/lib/permissions";
@@ -21,7 +22,7 @@ export async function recordFollowUpAction(
   }
 
   const snap = await adminDb.collection("veterans").doc(veteranId).get();
-  if (!snap.exists) return { ok: false, error: "Veteran not found." };
+  if (!isLiveVeteran(snap)) return { ok: false, error: "Veteran not found." };
   if (
     !canRecordFollowUp(session, { assigneeUid: snap.data()!.assigneeUid ?? null })
   ) {
